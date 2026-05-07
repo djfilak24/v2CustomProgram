@@ -54,7 +54,6 @@ export interface SpaceProgram {
   usfPerSeat: number;
   rentableAddOnFactor: number;
   rentableAddOnArea: number;
-  rentableAddOn: number;
   estimatedRentable: number;
   rentableFactor: number;
   rsfPerSeat: number;
@@ -337,9 +336,7 @@ export function computeSpaceProgram(
   ];
 
   const individualSubtotal = individual.reduce((s, i) => s + i.totalArea, 0);
-  const individualCirculation = Math.round(
-    individualSubtotal * circulationMultiplierIndividual
-  );
+  const individualCirculation = individualSubtotal * circulationMultiplierIndividual;
   const individualTotal = individualSubtotal + individualCirculation;
 
   const collaborative: SpaceItem[] = [
@@ -403,9 +400,7 @@ export function computeSpaceProgram(
     (s, i) => s + i.totalArea,
     0
   );
-  const collaborativeCirculation = Math.round(
-    collaborativeSubtotal * circulationMultiplierIndividual
-  );
+  const collaborativeCirculation = collaborativeSubtotal * circulationMultiplierIndividual;
   const collaborativeTotal = collaborativeSubtotal + collaborativeCirculation;
 
   const d10 = totalSeatDemand;
@@ -620,9 +615,7 @@ export function computeSpaceProgram(
   ];
 
   const supportSubtotal = support.reduce((s, i) => s + i.totalArea, 0);
-  const supportCirculation = Math.round(
-    supportSubtotal * circulationMultiplierSupport
-  );
+  const supportCirculation = supportSubtotal * circulationMultiplierSupport;
   const supportTotal = supportSubtotal + supportCirculation;
 
   const netAssignable =
@@ -630,7 +623,7 @@ export function computeSpaceProgram(
   const circulationTotal =
     individualCirculation + collaborativeCirculation + supportCirculation;
   const grossUsable = individualTotal + collaborativeTotal + supportTotal;
-  const rentableAddOnArea = Math.round(grossUsable * inputs.rentableFactor);
+  const rentableAddOnArea = grossUsable * inputs.rentableFactor;
   const estimatedRentable = grossUsable + rentableAddOnArea;
   const totalSeatCountForMetric = residentOfficeQtyR + unassignedOfficeQtyR + residentWsQtyR + unassignedWsQtyR;
 

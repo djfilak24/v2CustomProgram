@@ -113,7 +113,7 @@ export function FastTrackExplorer({ inputs: initialInputs, metrics: initialMetri
               className="text-teal-600 hover:text-teal-700 border-teal-200 hover:border-teal-300 hover:bg-teal-50"
             >
               <Settings className="h-4 w-4 mr-2" />
-              Advanced Canvas
+              Customize Program
             </Button>
             <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
               <FileDown className="h-4 w-4" />
@@ -345,11 +345,11 @@ export function FastTrackExplorer({ inputs: initialInputs, metrics: initialMetri
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowRight className="h-5 w-5 text-teal-600" />
-              Switch to Advanced Canvas
+              Customize Program
             </DialogTitle>
             <DialogDescription>
-              Your current Fast Track configuration will be loaded into the Advanced Canvas
-              as the default state. You can continue refining from there.
+              Your Explore configuration will become the starting point for your bespoke program.
+              Sliders will lock — use the Recalibrate button to update quantities from there.
             </DialogDescription>
           </DialogHeader>
 
@@ -368,8 +368,8 @@ export function FastTrackExplorer({ inputs: initialInputs, metrics: initialMetri
             <div className="flex items-start gap-2 rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs text-teal-900">
               <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-teal-600" />
               <div>
-                These values will populate the Configuration Target in the Advanced Canvas.
-                All ratios from the calculation engine will be preserved.
+                Space quantities are generated from these inputs. Ratios stay active as
+                industry-standard recommendations you can reference while customizing.
               </div>
             </div>
           </div>

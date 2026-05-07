@@ -39,7 +39,12 @@ import { X, AlertTriangle } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
   import { OnboardingModal, type GeneratedSpaceConfig, type OnboardingInputs } from "@/components/onboarding-modal"
   import { FastTrackExplorer } from "@/components/fast-track-explorer"
-  import { generateCanvasFromFastTrack } from "@/lib/generate-canvas-from-fast-track"
+  import { convertProgramToSpaces } from "@/lib/convert-program-to-spaces"
+  import {
+    computeSpaceProgram,
+    computeAllSeatDemandBlocks,
+  } from "@/lib/fast-track-calculations"
+  import type { SummaryInputs } from "@/lib/fast-track-calculations"
 
 // -----------------------------------------------------------------------------
 // NumberField: module-scope stable component for number input.
@@ -806,6 +811,62 @@ function ProgramIsland({
   )
 }
 
+// Space presets for the "Add Space" picker in Advanced Canvas.
+// Each entry defines a space type with default SF and capacity for its zone.
+const SPACE_PRESETS: Record<string, Array<{
+  name: string
+  sfEach: number
+  capacity: number
+  workspaceType?: "employee" | "private" | "flex" | null
+}>> = {
+  "Focus Open": [
+    { name: "Employee Workstation", sfEach: 42, capacity: 1, workspaceType: "employee" },
+    { name: "Large Workstation", sfEach: 64, capacity: 1, workspaceType: "employee" },
+    { name: "Hoteling / Flex Workstation", sfEach: 42, capacity: 1, workspaceType: "flex" },
+    { name: "Workpoint / Touchdown", sfEach: 30, capacity: 1, workspaceType: "flex" },
+    { name: "Open Collaboration Lounge", sfEach: 150, capacity: 6 },
+  ],
+  "Focus Enclosed": [
+    { name: "Private Office", sfEach: 140, capacity: 1, workspaceType: "private" },
+    { name: "Shared Office (2-person)", sfEach: 150, capacity: 2, workspaceType: "flex" },
+    { name: "Office for the Day", sfEach: 140, capacity: 1, workspaceType: "flex" },
+    { name: "Focus Studio", sfEach: 200, capacity: 2 },
+    { name: "Phone Booth / Focus Room", sfEach: 48, capacity: 1 },
+  ],
+  "Collaborative": [
+    { name: "Huddle Room", sfEach: 140, capacity: 4 },
+    { name: "Interview Room", sfEach: 140, capacity: 4 },
+    { name: "Medium Conference Room", sfEach: 280, capacity: 8 },
+    { name: "Large Conference Room", sfEach: 400, capacity: 12 },
+    { name: "Board Room", sfEach: 600, capacity: 20 },
+    { name: "Training Room", sfEach: 600, capacity: 20 },
+    { name: "Charette / Pin-up Room", sfEach: 200, capacity: 8 },
+    { name: "Project Room", sfEach: 150, capacity: 4 },
+    { name: "Outdoor Terrace", sfEach: 300, capacity: 12 },
+  ],
+  "Support": [
+    { name: "Kitchenette / Pantry", sfEach: 100, capacity: 4 },
+    { name: "Work Café", sfEach: 400, capacity: 20 },
+    { name: "Copy / Mail Area", sfEach: 80, capacity: 2 },
+    { name: "Lockers", sfEach: 150, capacity: 50 },
+    { name: "Coat Room", sfEach: 40, capacity: 20 },
+    { name: "Storage Room", sfEach: 150, capacity: 0 },
+    { name: "File Room", sfEach: 200, capacity: 0 },
+    { name: "Multipurpose Room", sfEach: 1200, capacity: 50 },
+    { name: "Server / MDF Room", sfEach: 150, capacity: 0 },
+    { name: "IT Closet / IDF", sfEach: 80, capacity: 0 },
+    { name: "ADA Restroom", sfEach: 60, capacity: 1 },
+  ],
+  "Wellness": [
+    { name: "Wellness Suite", sfEach: 300, capacity: 2 },
+    { name: "Mothers / Wellness Room", sfEach: 80, capacity: 1 },
+    { name: "Meditation Room", sfEach: 150, capacity: 4 },
+    { name: "Prayer Room", sfEach: 100, capacity: 6 },
+    { name: "Fitness Area", sfEach: 500, capacity: 10 },
+    { name: "Quiet / Nap Room", sfEach: 80, capacity: 1 },
+  ],
+}
+
 const WorkplaceProgrammingTool = () => {
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [showAdminPanel, setShowAdminPanel] = useState(false)
@@ -967,7 +1028,7 @@ const WorkplaceProgrammingTool = () => {
     library1: {
       id: "library1",
       name: "Library Room",
-      zone: "Collaborative", // Changed from "Focus Enclosed" to "Collaborative"
+      zone: "Support",
       quantity: 2,
       capacity: 8,
       sfEach: 200,
@@ -1077,7 +1138,7 @@ const WorkplaceProgrammingTool = () => {
     reception1: {
       id: "reception1",
       name: "Reception / Waiting",
-      zone: "Collaborative",
+      zone: "Support",
       quantity: 1,
       capacity: 10,
       sfEach: 250,
@@ -1388,8 +1449,14 @@ const WorkplaceProgrammingTool = () => {
   })
 
   const [showSaveSuccess, setShowSaveSuccess] = useState(false)
-
   const [showRecommendations, setShowRecommendations] = useState(true)
+
+  // Add Space picker dialog (Phase 3)
+  const [addSpaceDialog, setAddSpaceDialog] = useState<{ open: boolean; zone: string }>({ open: false, zone: "" })
+
+  // Quick-generate state for start-from-scratch path (Phase 4)
+  const [quickGen, setQuickGen] = useState<{ headcount: string; daysInOffice: number }>({ headcount: "", daysInOffice: 3 })
+  const [quickGenOpen, setQuickGenOpen] = useState(false)
 
   const [targetHeadcount, setTargetHeadcount] = useState(170)
   const [targetOfficeCount, setTargetOfficeCount] = useState(() => Math.round(170 * 0.2)) // 34 for 170 employees
@@ -1515,7 +1582,7 @@ const WorkplaceProgrammingTool = () => {
     const wellnessSpaces = Object.values(editableSpaces).filter((space) => space.zone === "Wellness")
 
     const calculateZoneRSF = (spaces: EditableSpace[]) =>
-      spaces.reduce((sum, space) => sum + (space.quantity || 0) * (space.sfEach || 0), 0)
+      spaces.reduce((sum, space) => sum + (space.totalArea || 0), 0)
 
     const focusOpenRSF = calculateZoneRSF(focusOpenSpaces)
     const focusEnclosedRSF = calculateZoneRSF(focusEnclosedSpaces)
@@ -1526,11 +1593,11 @@ const WorkplaceProgrammingTool = () => {
     const totalRSF = focusOpenRSF + focusEnclosedRSF + collaborativeRSF + supportRSF + wellnessRSF
 
     // Calculate USF with circulation per zone using admin ratios
-    const focusOpenUSF = focusOpenRSF * (1 + (adminRatios.zoneCirculation["Focus Open"] || 40) / 100)
-    const focusEnclosedUSF = focusEnclosedRSF * (1 + (adminRatios.zoneCirculation["Focus Enclosed"] || 40) / 100)
-    const collaborativeUSF = collaborativeRSF * (1 + (adminRatios.zoneCirculation["Collaborative"] || 30) / 100)
-    const supportUSF = supportRSF * (1 + (adminRatios.zoneCirculation["Support"] || 25) / 100)
-    const wellnessUSF = wellnessRSF * (1 + (adminRatios.zoneCirculation["Wellness"] || 20) / 100)
+    const focusOpenUSF = focusOpenRSF * (1 + (zoneCirculation["Focus Open"] || 45) / 100)
+    const focusEnclosedUSF = focusEnclosedRSF * (1 + (zoneCirculation["Focus Enclosed"] || 45) / 100)
+    const collaborativeUSF = collaborativeRSF * (1 + (zoneCirculation["Collaborative"] || 45) / 100)
+    const supportUSF = supportRSF * (1 + (zoneCirculation["Support"] || 35) / 100)
+    const wellnessUSF = wellnessRSF * (1 + (zoneCirculation["Wellness"] || 35) / 100)
 
     const totalUSF = focusOpenUSF + focusEnclosedUSF + collaborativeUSF + supportUSF + wellnessUSF
     const focusUSF = focusOpenUSF + focusEnclosedUSF
@@ -1970,7 +2037,7 @@ const WorkplaceProgrammingTool = () => {
   // Compute aggregate metrics from a snapshot for comparison readouts.
   const snapshotMetrics = (snap: ScenarioSnapshot) => {
     const totalUSF = Object.values(snap.editableSpaces).reduce(
-      (sum, sp) => sum + sp.quantity * sp.sfEach,
+      (sum, sp) => sum + (sp.totalArea || 0),
       0
     )
     const totalHeadcount = snap.targetHeadcount
@@ -2009,6 +2076,79 @@ const WorkplaceProgrammingTool = () => {
       delete newSpaces[spaceKey]
       return newSpaces
     })
+  }
+
+  // Phase 3: Add a new space from a preset into the given zone.
+  const addSpace = (
+    zone: string,
+    preset: { name: string; sfEach: number; capacity: number; workspaceType?: "employee" | "private" | "flex" | null },
+  ) => {
+    const slug = preset.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+    const key = `custom_${Date.now()}_${slug}`
+    setEditableSpaces((prev) => ({
+      ...prev,
+      [key]: {
+        id: key,
+        name: preset.name,
+        zone,
+        quantity: 1,
+        capacity: preset.capacity,
+        sfEach: preset.sfEach,
+        totalArea: preset.sfEach,
+        workspaceType: preset.workspaceType ?? null,
+        notes: "",
+        ratio: "1:1",
+        departmentAllocations: [],
+        customName: preset.name,
+        isActive: true,
+      },
+    }))
+    setAddSpaceDialog({ open: false, zone: "" })
+  }
+
+  // Phase 4: Zero out all spaces (start blank).
+  const clearAllSpaces = () => {
+    setEditableSpaces((prev) => {
+      const cleared: Record<string, EditableSpace> = {}
+      Object.entries(prev).forEach(([key, space]) => {
+        cleared[key] = { ...space, quantity: 0, totalArea: 0, isActive: false }
+      })
+      return cleared
+    })
+    setQuickGenOpen(false)
+  }
+
+  // Phase 4: Run the Fast Track engine with minimal inputs and seed the canvas.
+  const handleQuickGenerate = () => {
+    const hc = parseInt(quickGen.headcount, 10)
+    if (!hc || hc < 1) return
+
+    const inputs: SummaryInputs = {
+      clientName: projectInfo.client || "",
+      programmedBy: projectInfo.designedBy || "",
+      totalHeadcount: hc,
+      fullyRemote: 0,
+      percentOffices: 15,
+      grossRent: 50,
+      daysInOffice: quickGen.daysInOffice,
+      rentableFactor: loadFactor - 1,
+    }
+
+    try {
+      const blocks = computeAllSeatDemandBlocks(hc, 0)
+      const program = computeSpaceProgram(inputs, blocks)
+      const result = convertProgramToSpaces(program, inputs)
+
+      setTargetHeadcount(hc)
+      setTargetOfficeCount(result.targets.officeCount)
+      setTargetWorkstations(result.targets.workstationCount)
+      setTargetHybridWorkers(result.targets.hybridWorkers)
+      setEditableSpaces(result.spaces as Record<string, EditableSpace>)
+      setProgramMetrics({ generated: true })
+    } catch (err) {
+      console.error("[quickGen] Failed to generate program:", err)
+    }
+    setQuickGenOpen(false)
   }
 
   const onDragEnd = (result: any) => {
@@ -2321,7 +2461,7 @@ const WorkplaceProgrammingTool = () => {
           <div className="mb-3">
             <div className="flex items-center gap-3 mb-2">
               <button
-                onClick={() => updateSpace(spaceKey, { quantity: Math.max(1, space.quantity - 1) })}
+                onClick={() => { const q = Math.max(1, space.quantity - 1); updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach }) }}
                 className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center font-medium text-sm"
               >
                 −
@@ -2330,15 +2470,16 @@ const WorkplaceProgrammingTool = () => {
                 <input
                   type="number"
                   value={space.quantity}
-                  onChange={(e) =>
-                    updateSpace(spaceKey, { quantity: Math.max(1, Number.parseInt(e.target.value) || 1) })
-                  }
+                  onChange={(e) => {
+                    const q = Math.max(1, Number.parseInt(e.target.value) || 1)
+                    updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach })
+                  }}
                   className="text-4xl font-bold text-gray-900 w-20 border-none outline-none bg-transparent"
                 />
                 <div className="text-xs text-gray-500 -mt-1">quantity</div>
               </div>
               <button
-                onClick={() => updateSpace(spaceKey, { quantity: space.quantity + 1 })}
+                onClick={() => { const q = space.quantity + 1; updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach }) }}
                 className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center font-medium text-sm"
               >
                 +
@@ -2350,7 +2491,7 @@ const WorkplaceProgrammingTool = () => {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 <button
-                  onClick={() => updateSpace(spaceKey, { sfEach: Math.max(1, space.sfEach - 1) })}
+                  onClick={() => { const sf = Math.max(1, space.sfEach - 1); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
                   className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium"
                 >
                   −
@@ -2358,11 +2499,11 @@ const WorkplaceProgrammingTool = () => {
                 <input
                   type="number"
                   value={space.sfEach}
-                  onChange={(e) => updateSpace(spaceKey, { sfEach: Math.max(1, Number.parseInt(e.target.value) || 1) })}
+                  onChange={(e) => { const sf = Math.max(1, Number.parseInt(e.target.value) || 1); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
                   className="text-lg font-semibold text-gray-900 w-12 border-none outline-none bg-transparent text-center"
                 />
                 <button
-                  onClick={() => updateSpace(spaceKey, { sfEach: space.sfEach + 1 })}
+                  onClick={() => { const sf = space.sfEach + 1; updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
                   className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium"
                 >
                   +
@@ -2550,6 +2691,7 @@ const WorkplaceProgrammingTool = () => {
     onCirculationChange,
     viewMode,
     onViewModeChange,
+    onAddSpace,
   }: {
     title: string
     usf: number
@@ -2557,10 +2699,9 @@ const WorkplaceProgrammingTool = () => {
     color: string
     circulation: number
     onCirculationChange: (value: number) => void
-    // Optional per-zone view-mode toggle. When omitted, the toggle isn't rendered
-    // (used by sub-headers like Focus Open / Focus Enclosed that share a parent).
     viewMode?: ZoneViewMode
     onViewModeChange?: (mode: ZoneViewMode) => void
+    onAddSpace?: () => void
   }) => {
     const percentage = totalUSF > 0 ? Math.round((usf / totalUSF) * 100) : 0
 
@@ -2635,6 +2776,16 @@ const WorkplaceProgrammingTool = () => {
                 </button>
               </div>
             </div>
+
+            {onAddSpace && (
+              <button
+                onClick={onAddSpace}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-medium hover:bg-slate-700 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                Add Space
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -3291,12 +3442,12 @@ const WorkplaceProgrammingTool = () => {
           metrics={programMetrics}
           onRecalibrate={handleRecalibrate}
           onSwitchToAdvanced={(inputs, hybridProgram) => {
-            // Push Fast Track configuration into Advanced Canvas state
-            // 1. Persist as onboarding inputs (used for Fast Track recall)
+            // Persist FT inputs for potential recalibration
             setOnboardingInputs(inputs as typeof onboardingInputs)
 
-            // 2. Update Configuration Target driver values
+            // Sync configuration state
             setTargetHeadcount(inputs.totalHeadcount)
+            setLoadFactor(1 + inputs.rentableFactor)
             setConfig((prev) => ({
               ...prev,
               fullyRemoteEmployees: inputs.fullyRemote,
@@ -3308,27 +3459,13 @@ const WorkplaceProgrammingTool = () => {
               programmedBy: inputs.programmedBy,
             }))
 
-            // 3. REGENERATE the entire canvas state from the Fast Track program.
-            //    This replaces the old complex name-mapping approach with direct
-            //    generation of new EditableSpace objects from the FT items.
-            try {
-              const result = generateCanvasFromFastTrack(
-                hybridProgram,
-                inputs,
-              )
+            // Convert FT program directly to editable spaces — no key mapping needed
+            const result = convertProgramToSpaces(hybridProgram, inputs)
+            setEditableSpaces(result.spaces as Record<string, EditableSpace>)
+            setTargetOfficeCount(result.targets.officeCount)
+            setTargetWorkstations(result.targets.workstationCount)
+            setTargetHybridWorkers(result.targets.hybridWorkers)
 
-              // Configuration Target counters
-              setTargetOfficeCount(result.targets.officeCount)
-              setTargetWorkstations(result.targets.workstationCount)
-              setTargetHybridWorkers(result.targets.hybridWorkers)
-
-              // REPLACE entire editableSpaces state with the generated spaces
-              setEditableSpaces(result.spaces as Record<string, EditableSpace>)
-            } catch (err) {
-              console.error("[v0] Failed to generate canvas from Fast Track:", err)
-            }
-
-            // 4. Switch to Advanced Canvas view
             setShowFastTrackExplorer(false)
           }}
         />
@@ -3345,6 +3482,94 @@ const WorkplaceProgrammingTool = () => {
         onClose={() => setShowOnboarding(false)}
         onComplete={handleOnboardingComplete}
       />
+
+      {/* ── Add Space picker dialog (Phase 3) ── */}
+      <Dialog open={addSpaceDialog.open} onOpenChange={(open) => !open && setAddSpaceDialog({ open: false, zone: "" })}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Space — {addSpaceDialog.zone}</DialogTitle>
+            <DialogDescription>
+              Select a space type to add to this zone. You can edit quantity, SF, and name after adding.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2 max-h-[60vh] overflow-y-auto pr-1">
+            {(SPACE_PRESETS[addSpaceDialog.zone] ?? []).map((preset) => (
+              <button
+                key={preset.name}
+                onClick={() => addSpace(addSpaceDialog.zone, preset)}
+                className="text-left p-3 rounded-lg border border-gray-200 hover:border-slate-400 hover:bg-slate-50 transition-colors group"
+              >
+                <div className="font-medium text-sm text-gray-900 group-hover:text-slate-800 leading-tight mb-1">
+                  {preset.name}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {preset.sfEach.toLocaleString()} SF each
+                  {preset.capacity > 0 && ` · ${preset.capacity} seat${preset.capacity !== 1 ? "s" : ""}`}
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Quick-generate / start-from-scratch dialog (Phase 4) ── */}
+      <Dialog open={quickGenOpen} onOpenChange={setQuickGenOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Generate Program from Headcount</DialogTitle>
+            <DialogDescription>
+              Enter your headcount and in-office policy. The Fast Track engine will populate the canvas with a ratio-based starting point you can then customize.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Total Headcount</label>
+              <input
+                type="number"
+                min={1}
+                max={5000}
+                value={quickGen.headcount}
+                onChange={(e) => setQuickGen((p) => ({ ...p, headcount: e.target.value }))}
+                placeholder="e.g. 150"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Days in Office / Week</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setQuickGen((p) => ({ ...p, daysInOffice: d }))}
+                    className={`flex-1 py-2 rounded-md text-sm font-medium border transition-colors ${
+                      quickGen.daysInOffice === d
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={handleQuickGenerate}
+                disabled={!quickGen.headcount || parseInt(quickGen.headcount) < 1}
+                className="flex-1 py-2 rounded-md bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-40 transition-colors"
+              >
+                Generate Program
+              </button>
+              <button
+                onClick={clearAllSpaces}
+                className="px-4 py-2 rounded-md border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
+              >
+                Start Blank
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Warning dialog for switching back to Fast Track */}
       <Dialog open={showFastTrackWarning} onOpenChange={setShowFastTrackWarning}>
@@ -4385,6 +4610,32 @@ const WorkplaceProgrammingTool = () => {
               </div>
             </div>
 
+            {/* Phase 4 — Quick Start banner: shown when no program has been loaded yet */}
+            {programMetrics === null && (
+              <div className="flex items-center gap-4 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 mb-6">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-blue-900">No program loaded yet</p>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    Use Fast Track for a ratio-based start, generate from headcount, or build from scratch.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setShowOnboarding(true)}
+                    className="px-3 py-1.5 rounded-full bg-white border border-blue-300 text-blue-800 text-xs font-medium hover:bg-blue-50 transition-colors"
+                  >
+                    Fast Track
+                  </button>
+                  <button
+                    onClick={() => setQuickGenOpen(true)}
+                    className="px-3 py-1.5 rounded-full bg-blue-700 text-white text-xs font-medium hover:bg-blue-800 transition-colors"
+                  >
+                    Generate from headcount
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border border-slate-200 shadow-sm mb-8">
               <div
                 className="flex items-center justify-between p-6 cursor-pointer hover:bg-gradient-to-br hover:from-slate-100 hover:to-blue-100 transition-colors rounded-t-xl"
@@ -4765,11 +5016,19 @@ const WorkplaceProgrammingTool = () => {
 
               <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
                 <div className="mb-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
-                    <h4 className="text-md font-medium text-gray-800">
-                      Focus Open ({finalEditableTotals.focusOpenUSF.toLocaleString()} USF)
-                    </h4>
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
+                      <h4 className="text-md font-medium text-gray-800">
+                        Focus Open ({finalEditableTotals.focusOpenUSF.toLocaleString()} USF)
+                      </h4>
+                    </div>
+                    <button
+                      onClick={() => setAddSpaceDialog({ open: true, zone: "Focus Open" })}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium hover:bg-slate-200 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" /> Add Space
+                    </button>
                   </div>
                   {zoneViewMode["Focus Open"] === "table" ? (
                     // Table view: dense, inline-editable. Drag/drop is disabled in this mode
@@ -4826,11 +5085,19 @@ const WorkplaceProgrammingTool = () => {
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-2 h-2 rounded-full bg-cyan-600"></div>
-                    <h4 className="text-md font-medium text-gray-800">
-                      Focus Enclosed ({finalEditableTotals.focusEnclosedUSF.toLocaleString()} USF)
-                    </h4>
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-cyan-600"></div>
+                      <h4 className="text-md font-medium text-gray-800">
+                        Focus Enclosed ({finalEditableTotals.focusEnclosedUSF.toLocaleString()} USF)
+                      </h4>
+                    </div>
+                    <button
+                      onClick={() => setAddSpaceDialog({ open: true, zone: "Focus Enclosed" })}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium hover:bg-slate-200 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" /> Add Space
+                    </button>
                   </div>
                   {zoneViewMode["Focus Enclosed"] === "table" ? (
                     <ZoneTable
@@ -4919,6 +5186,7 @@ const WorkplaceProgrammingTool = () => {
                       onViewModeChange={(m) =>
                         setZoneViewMode((prev) => ({ ...prev, [zoneName]: m }))
                       }
+                      onAddSpace={() => setAddSpaceDialog({ open: true, zone: zoneName })}
                     />
 
                     {mode === "table" ? (

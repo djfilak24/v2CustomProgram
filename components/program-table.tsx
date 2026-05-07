@@ -120,7 +120,7 @@ export function ProgramTable({ program, title, daysInOffice }: ProgramTableProps
             <GrandTotalRow label="Net Assignable Total" area={program.netAssignableTotal} />
             <GrandTotalRow label="Circulation Total" area={program.circulationTotal} />
             <GrandTotalRow label="Gross Total Usable (USF)" area={program.grossUsable} highlight />
-            <SubtotalRow label={`Rentable Add-On (${Math.round(program.rentableFactor * 100)}%)`} area={program.rentableAddOn} section="support" />
+            <SubtotalRow label={`Rentable Add-On (${Math.round(program.rentableFactor * 100)}%)`} area={program.rentableAddOnArea} section="support" />
             <GrandTotalRow label="Estimated Total Rentable (RSF)" area={program.estimatedRentable} highlight />
           </tbody>
         </table>

@@ -63,6 +63,18 @@ export interface SpaceProgram {
   circulationMultiplierSupport: number;
 }
 
+export interface RatioConfig {
+  circulationIndividual?: number    // default 0.45
+  circulationCollaborative?: number  // default 0.45 (same as individual by default)
+  circulationSupport?: number        // default 0.35
+  phoneBoothRatio?: number           // overrides day-dependent default (10/12/15 per workstations)
+  huddleRatio?: number               // overrides day-dependent default (15/20/25 per workstations)
+  mediumConfRatio?: number           // default 40 seats per room
+  largeConfRatio?: number            // default 80 seats per room
+  openCollabRatio?: number           // default 25 seats per space
+  workCafeSfPerSeat?: number         // default 7.5 sf per person
+}
+
 export interface DashboardMetrics {
   workstations: number;
   offices: number;
@@ -217,7 +229,8 @@ function getReceptionArea(seatDemand: number): number {
 export function computeSpaceProgram(
   inputs: SummaryInputs,
   blocks: SurveyBlock[],
-  forceDays?: number
+  forceDays?: number,
+  ratioOverrides?: RatioConfig,
 ): SpaceProgram {
   const days = forceDays ?? inputs.daysInOffice;
   const blockIndex = days - 1;
@@ -226,8 +239,9 @@ export function computeSpaceProgram(
   const totalSeatDemand = getTotalSeatDemand(block);
   const residentSeatCount = getResidentSeatCount(block);
 
-  const circulationMultiplierIndividual = 0.45;
-  const circulationMultiplierSupport = 0.35;
+  const circulationMultiplierIndividual = ratioOverrides?.circulationIndividual ?? 0.45;
+  const circulationMultiplierCollaborative = ratioOverrides?.circulationCollaborative ?? 0.45;
+  const circulationMultiplierSupport = ratioOverrides?.circulationSupport ?? 0.35;
 
   const residentOfficeQty = residentSeatCount * (inputs.percentOffices / 100);
   const unassignedOfficeQty = Math.max(
@@ -260,8 +274,12 @@ export function computeSpaceProgram(
   const residentWsQtyR = Math.max(0, floored[2]);
   const unassignedWsQtyR = Math.max(0, floored[3]);
 
-  const phoneRoomRatio = getPhoneRoomRatio(days);
-  const huddleRoomRatio = getHuddleRoomRatio(days);
+  const phoneRoomRatio = ratioOverrides?.phoneBoothRatio ?? getPhoneRoomRatio(days);
+  const huddleRoomRatio = ratioOverrides?.huddleRatio ?? getHuddleRoomRatio(days);
+  const mediumConfRatio = ratioOverrides?.mediumConfRatio ?? 40;
+  const largeConfRatio = ratioOverrides?.largeConfRatio ?? 80;
+  const openCollabRatio = ratioOverrides?.openCollabRatio ?? 25;
+  const workCafeSfPerSeat = ratioOverrides?.workCafeSfPerSeat ?? 7.5;
   const totalWorkstations = residentWsQtyR + unassignedWsQtyR;
 
   const phoneRoomQty =
@@ -274,7 +292,7 @@ export function computeSpaceProgram(
       : 0;
   const openCollabQty =
     totalSeatDemand > 0
-      ? Math.ceil(totalSeatDemand / 25)
+      ? Math.ceil(totalSeatDemand / openCollabRatio)
       : 0;
 
   const touchDownRaw =
@@ -287,9 +305,9 @@ export function computeSpaceProgram(
   const touchDownQty = Math.max(0, Math.round(touchDownRaw));
 
   const mediumConfQty =
-    totalSeatDemand > 0 ? Math.ceil(totalSeatDemand / 40) : 0;
+    totalSeatDemand > 0 ? Math.ceil(totalSeatDemand / mediumConfRatio) : 0;
   const largeConfQty =
-    totalSeatDemand > 0 ? Math.round(totalSeatDemand / 80) : 0;
+    totalSeatDemand > 0 ? Math.round(totalSeatDemand / largeConfRatio) : 0;
   const trainingRoomQty = totalSeatDemand / 80 < 1 ? 0 : 1;
 
   const individual: SpaceItem[] = [
@@ -400,7 +418,7 @@ export function computeSpaceProgram(
     (s, i) => s + i.totalArea,
     0
   );
-  const collaborativeCirculation = collaborativeSubtotal * circulationMultiplierIndividual;
+  const collaborativeCirculation = collaborativeSubtotal * circulationMultiplierCollaborative;
   const collaborativeTotal = collaborativeSubtotal + collaborativeCirculation;
 
   const d10 = totalSeatDemand;
@@ -408,7 +426,7 @@ export function computeSpaceProgram(
     d10 / 250 < 1 ? 0 : Math.round(d10 / 250);
   const multipurposeQty =
     d10 / 750 < 1 ? 0 : Math.round(d10 / 750);
-  const workCafeArea = Math.round(d10 * 7.5);
+  const workCafeArea = Math.round(d10 * workCafeSfPerSeat);
   const kitchenStorageQty = d10 > 0 ? Math.round(d10 / 100) : 0;
   const pantryQty = d10 / 80 < 1 ? 1 : Math.round(d10 / 80);
   const libraryQty = d10 / 400 < 1 ? 0 : Math.round(d10 / 400);
@@ -641,11 +659,13 @@ export function computeSpaceProgram(
     supportCirculation,
     supportTotal,
     netAssignable,
+    netAssignableTotal: netAssignable,
     circulationTotal,
     grossUsable,
     usfPerSeat:
       totalSeatCountForMetric > 0 ? Math.round(grossUsable / totalSeatCountForMetric) : 0,
     rentableAddOnFactor: inputs.rentableFactor,
+    rentableFactor: inputs.rentableFactor,
     rentableAddOnArea,
     estimatedRentable,
     rsfPerSeat:
@@ -654,6 +674,7 @@ export function computeSpaceProgram(
         : 0,
     totalSeatDemand: Math.round(totalSeatDemand),
     circulationMultiplierIndividual,
+    circulationMultiplierCollaborative,
     circulationMultiplierSupport,
   };
 }

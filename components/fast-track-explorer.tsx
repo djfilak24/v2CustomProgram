@@ -40,8 +40,8 @@ import {
 } from "@/lib/fast-track-calculations"
 
 interface FastTrackInputs extends SummaryInputs {
-  clientName?: string
-  programmedBy?: string
+  clientName: string
+  programmedBy: string
 }
 
 interface FastTrackExplorerProps {
@@ -299,7 +299,7 @@ export function FastTrackExplorer({ inputs: initialInputs, metrics: initialMetri
                   <p className="text-sm text-slate-500 mt-1">Total: {metrics.hybrid.estimatedRentable.toLocaleString()} RSF</p>
                 </div>
               </div>
-              <ProgramTable program={metrics.hybrid} title={`Hybrid Program (${inputs.daysInOffice} days/week)`} daysLabel={daysLabel} />
+              <ProgramTable program={metrics.hybrid} title={`Hybrid Program (${inputs.daysInOffice} days/week)`} daysInOffice={inputs.daysInOffice} />
             </div>
           )}
 
@@ -311,7 +311,7 @@ export function FastTrackExplorer({ inputs: initialInputs, metrics: initialMetri
                   <p className="text-sm text-slate-500 mt-1">Total: {metrics.fullOcc.estimatedRentable.toLocaleString()} RSF</p>
                 </div>
               </div>
-              <ProgramTable program={metrics.fullOcc} title="Full Occupancy (5 days/week)" daysLabel="5 days" />
+              <ProgramTable program={metrics.fullOcc} title="Full Occupancy (5 days/week)" daysInOffice={5} />
             </div>
           )}
 

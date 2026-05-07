@@ -44,7 +44,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
     computeSpaceProgram,
     computeAllSeatDemandBlocks,
   } from "@/lib/fast-track-calculations"
-  import type { SummaryInputs } from "@/lib/fast-track-calculations"
+  import type { SummaryInputs, RatioConfig } from "@/lib/fast-track-calculations"
 
 // -----------------------------------------------------------------------------
 // NumberField: module-scope stable component for number input.
@@ -880,22 +880,8 @@ const WorkplaceProgrammingTool = () => {
   const [onboardingInputs, setOnboardingInputs] = useState<OnboardingInputs | null>(null)
   const [adminPinInput, setAdminPinInput] = useState("")
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
-  const [adminRatios, setAdminRatios] = useState({
-    rsfPerPerson: 233,
-    employeeWorkstation: 120,
-    hoteling: 15,
-    workpoint: 10,
-    privateOffice: 50,
-    phoneBooth: 25,
-    defaultRatio: 50,
-    zoneCirculation: {
-      "Focus Open": 40,
-      "Focus Enclosed": 40,
-      Collaborative: 30,
-      Support: 25,
-      Wellness: 20,
-    },
-  })
+  const [ratioConfig, setRatioConfig] = useState<RatioConfig>({})
+  const [rsfPerPerson, setRsfPerPerson] = useState(233)
 
   const handleAdminAccess = () => {
     if (adminPinInput === "1201") {
@@ -963,300 +949,6 @@ const WorkplaceProgrammingTool = () => {
     visibility?: VisibilitySettings
   }
 
-  const initialSpaces = {
-    // Focus Open spaces
-    workstation1: {
-      id: "workstation1",
-      name: "Employee Workstations",
-      zone: "Focus Open",
-      quantity: 120,
-      capacity: 1,
-      sfEach: 60,
-      totalArea: 7200,
-      workstationType: "employee" as const,
-    },
-    workstation2: {
-      id: "workstation2",
-      name: "Large Employee Workstations",
-      zone: "Focus Open",
-      quantity: 20,
-      capacity: 1,
-      sfEach: 80,
-      totalArea: 1600,
-      workstationType: "employee" as const,
-    },
-    hoteling1: {
-      id: "hoteling1",
-      name: "Hoteling / Flex Workstation",
-      zone: "Focus Open",
-      quantity: 15,
-      capacity: 1,
-      sfEach: 60,
-      totalArea: 900,
-      workstationType: "flex" as const,
-    },
-    workpoint1: {
-      id: "workpoint1",
-      name: "Workpoint",
-      zone: "Focus Open",
-      quantity: 10,
-      capacity: 1,
-      sfEach: 40,
-      totalArea: 400,
-    },
-
-    // Focus Enclosed spaces
-    office1: {
-      id: "office1",
-      name: "Private Offices",
-      zone: "Focus Enclosed",
-      quantity: 30,
-      capacity: 1,
-      sfEach: 120,
-      totalArea: 3600,
-      workstationType: "private" as const,
-    },
-    phonebooth1: {
-      id: "phonebooth1",
-      name: "Phone Booth",
-      zone: "Collaborative", // Changed from "Focus Enclosed" to "Collaborative"
-      quantity: 10,
-      capacity: 1,
-      sfEach: 40,
-      totalArea: 400,
-    },
-    library1: {
-      id: "library1",
-      name: "Library Room",
-      zone: "Support",
-      quantity: 2,
-      capacity: 8,
-      sfEach: 200,
-      totalArea: 400,
-    },
-    sharedoffice1: {
-      id: "sharedoffice1",
-      name: "Shared Private Office",
-      zone: "Focus Enclosed",
-      quantity: 5,
-      capacity: 2,
-      sfEach: 150,
-      totalArea: 750,
-    },
-    officeday1: {
-      id: "officeday1",
-      name: "Office for the Day",
-      zone: "Focus Enclosed",
-      quantity: 8,
-      capacity: 1,
-      sfEach: 100,
-      totalArea: 800,
-    },
-
-    // Collaborative spaces
-    huddle1: {
-      id: "huddle1",
-      name: "Huddle Room/Collaboration",
-      zone: "Collaborative",
-      quantity: 10,
-      capacity: 4,
-      sfEach: 150,
-      totalArea: 1500,
-    },
-    mediumconf1: {
-      id: "mediumconf1",
-      name: "Medium Conference",
-      zone: "Collaborative",
-      quantity: 4,
-      capacity: 8,
-      sfEach: 250,
-      totalArea: 1000,
-    },
-    largeconf1: {
-      id: "largeconf1",
-      name: "Large Conference",
-      zone: "Collaborative",
-      quantity: 2,
-      capacity: 12,
-      sfEach: 400,
-      totalArea: 800,
-    },
-    extralarge1: {
-      id: "extralarge1",
-      name: "Extra Large Conference",
-      zone: "Collaborative",
-      quantity: 1,
-      capacity: 20,
-      sfEach: 600,
-      totalArea: 600,
-    },
-    training1: {
-      id: "training1",
-      name: "Training Room",
-      zone: "Collaborative",
-      quantity: 2,
-      capacity: 16,
-      sfEach: 400,
-      totalArea: 800,
-    },
-    immersive1: {
-      id: "immersive1",
-      name: "Immersive Work Room",
-      zone: "Collaborative",
-      quantity: 3,
-      capacity: 6,
-      sfEach: 200,
-      totalArea: 600,
-    },
-    project1: {
-      id: "project1",
-      name: "Reservable Project Room",
-      zone: "Collaborative",
-      quantity: 4,
-      capacity: 4,
-      sfEach: 150,
-      totalArea: 600,
-    },
-    outdoor1: {
-      id: "outdoor1",
-      name: "Outdoor Terrace",
-      zone: "Collaborative",
-      quantity: 1,
-      capacity: 12,
-      sfEach: 300,
-      totalArea: 300,
-    },
-    charette1: {
-      id: "charette1",
-      name: "Charette / Pin-up",
-      zone: "Collaborative",
-      quantity: 2,
-      capacity: 8,
-      sfEach: 200,
-      totalArea: 400,
-    },
-    reception1: {
-      id: "reception1",
-      name: "Reception / Waiting",
-      zone: "Support",
-      quantity: 1,
-      capacity: 10,
-      sfEach: 250,
-      totalArea: 250,
-    },
-
-    // Support spaces
-    copymail1: {
-      id: "copymail1",
-      name: "Copy/Mail Area",
-      zone: "Support",
-      quantity: 2,
-      capacity: 2,
-      sfEach: 100,
-      totalArea: 200,
-    },
-    lockers1: {
-      id: "lockers1",
-      name: "Lockers",
-      zone: "Support",
-      quantity: 1,
-      capacity: 50,
-      sfEach: 150,
-      totalArea: 150,
-    },
-    coats1: {
-      id: "coats1",
-      name: "Coats",
-      zone: "Support",
-      quantity: 2,
-      capacity: 20,
-      sfEach: 50,
-      totalArea: 100,
-    },
-    storage1: {
-      id: "storage1",
-      name: "Storage",
-      zone: "Support",
-      quantity: 3,
-      capacity: 1,
-      sfEach: 80,
-      totalArea: 240,
-    },
-    ada1: {
-      id: "ada1",
-      name: "ADA Single User Restroom",
-      zone: "Support",
-      quantity: 2,
-      capacity: 1,
-      sfEach: 60,
-      totalArea: 120,
-    },
-    server1: {
-      id: "server1",
-      name: "Server Room/ MDF Room",
-      zone: "Support",
-      quantity: 1,
-      capacity: 1,
-      sfEach: 100,
-      totalArea: 100,
-    },
-    itcloset1: {
-      id: "itcloset1",
-      name: "IT /DF Closet",
-      zone: "Support",
-      quantity: 2,
-      capacity: 1,
-      sfEach: 25,
-      totalArea: 50,
-    },
-    kitchenette1: {
-      id: "kitchenette1",
-      name: "Kitchenette",
-      zone: "Support",
-      quantity: 2,
-      capacity: 4,
-      sfEach: 200,
-      totalArea: 400,
-    },
-
-    // Wellness spaces
-    meditation1: {
-      id: "meditation1",
-      name: "Meditation Room",
-      zone: "Wellness",
-      quantity: 1,
-      capacity: 4,
-      sfEach: 150,
-      totalArea: 150,
-    },
-    mothers1: {
-      id: "mothers1",
-      name: "Mothers / Wellness Room",
-      zone: "Wellness",
-      quantity: 1,
-      capacity: 1,
-      sfEach: 80,
-      totalArea: 80,
-    },
-    wellnesssuite1: {
-      id: "wellnesssuite1",
-      name: "Wellness Suite",
-      zone: "Wellness",
-      quantity: 1,
-      capacity: 2,
-      sfEach: 120,
-      totalArea: 120,
-    },
-    prayer1: {
-      id: "prayer1",
-      name: "Prayer Room",
-      zone: "Wellness",
-      quantity: 1,
-      capacity: 6,
-      sfEach: 100,
-      totalArea: 100,
-    },
-  }
 
   const initialConfig = {
     businessName: "Acme Corporation",
@@ -1342,34 +1034,7 @@ const WorkplaceProgrammingTool = () => {
     fullyRemoteEmployees: 0, // Added default for fullyRemoteEmployees
     percentOffices: 80, // Added default for percentOffices
   })
-  const [editableSpaces, setEditableSpaces] = useState<Record<string, EditableSpace>>(() => {
-    const converted: Record<string, EditableSpace> = {}
-    Object.entries(initialSpaces).forEach(([key, space]) => {
-      let defaultWorkspaceType: "employee" | "private" | "flex" | null = null
-
-      // Set defaults based on workspace names
-      if (space.name === "Employee Workstations" || space.name === "Large Employee Workstations") {
-        defaultWorkspaceType = "employee"
-      } else if (space.name === "Hoteling / Flex Workstation" || space.name === "Workpoint") {
-        defaultWorkspaceType = "flex"
-      } else if (space.name === "Private Offices") {
-        defaultWorkspaceType = "private"
-      } else if (space.name === "Shared Private Office" || space.name === "Office for the Day") {
-        defaultWorkspaceType = "flex"
-      }
-
-      converted[key] = {
-        ...space,
-        workstationType: defaultWorkspaceType, // Use logical defaults instead of null
-        notes: "",
-        ratio: "1:1",
-        departmentAllocations: [],
-        customName: space.name, // Initialize customName with the original name
-        isActive: true, // Initialize isActive to true
-      }
-    })
-    return converted
-  })
+  const [editableSpaces, setEditableSpaces] = useState<Record<string, EditableSpace>>({})
 
   // Compute whether we have data to show view tabs (either from onboarding or existing spaces)
   const hasConfiguredProgram = programMetrics !== null || Object.keys(editableSpaces).length > 0
@@ -1663,27 +1328,27 @@ const WorkplaceProgrammingTool = () => {
       assignableSeats,
       peakInOffice, // Use the newly calculated peakInOffice
       vsPeakSeats,
-      recommendedRSF: targetHeadcount * adminRatios.rsfPerPerson,
-      rsfDifference: calculatedRSF - targetHeadcount * adminRatios.rsfPerPerson,
+      recommendedRSF: targetHeadcount * rsfPerPerson,
+      rsfDifference: calculatedRSF - targetHeadcount * rsfPerPerson,
       rsfVariancePercent:
-        targetHeadcount * adminRatios.rsfPerPerson !== 0
-          ? (Math.abs(calculatedRSF - targetHeadcount * adminRatios.rsfPerPerson) /
-              (targetHeadcount * adminRatios.rsfPerPerson)) *
+        targetHeadcount * rsfPerPerson !== 0
+          ? (Math.abs(calculatedRSF - targetHeadcount * rsfPerPerson) /
+              (targetHeadcount * rsfPerPerson)) *
             100
           : 0,
       totalSpaceStatus: { text: "", color: "", bg: "" }, // Placeholder, will be calculated below
     }
-  }, [editableSpaces, loadFactor, adminRatios, config.hybrid, config.daysInOffice, targetHeadcount])
+  }, [editableSpaces, loadFactor, rsfPerPerson, config.hybrid, config.daysInOffice, targetHeadcount])
 
   const totalSpaceStatus = useMemo(() => {
-    const recommendedRSF = targetHeadcount * adminRatios.rsfPerPerson
+    const recommendedRSF = targetHeadcount * rsfPerPerson
     const rsfDifference = newEditableTotals.totalRSF - recommendedRSF
     const rsfVariancePercent = recommendedRSF !== 0 ? Math.abs(rsfDifference / recommendedRSF) * 100 : 0
 
     if (rsfVariancePercent <= 10) return { text: "On Track", color: "text-green-600", bg: "bg-green-100" }
     if (rsfVariancePercent <= 20) return { text: "Review", color: "text-yellow-600", bg: "bg-yellow-100" }
     return { text: "Over Target", color: "text-red-600", bg: "bg-red-100" }
-  }, [newEditableTotals.totalRSF, targetHeadcount, adminRatios.rsfPerPerson])
+  }, [newEditableTotals.totalRSF, targetHeadcount, rsfPerPerson])
 
   // Update newEditableTotals with the calculated totalSpaceStatus
   const finalEditableTotals = useMemo(
@@ -1829,66 +1494,48 @@ const WorkplaceProgrammingTool = () => {
    *   "flex" / hoteling / workpoint card so we don't fight a zero brief.
    */
   const buildRecalibratePreview = (): RecalibrateChange[] => {
-    // Effective targets honor growth-planning when enabled.
+    // When growth planning is on, use sum of per-department future headcounts.
     const futureAllocHeadcount = departments.reduce(
       (s, d) => s + (d.futureHeadcount ?? d.headcount ?? 0),
       0
     )
-    const futureAllocOffices = departments.reduce((s, d) => {
-      const curr = d.headcount || 1
-      const fut = d.futureHeadcount ?? curr
-      const scale = fut / curr
-      return s + Math.round((d.officeCount || 0) * scale)
-    }, 0)
-    const futureAllocHybrid = departments.reduce((s, d) => {
-      const curr = d.headcount || 1
-      const fut = d.futureHeadcount ?? curr
-      const scale = fut / curr
-      return s + Math.round((d.hybridWorkers || 0) * scale)
-    }, 0)
-
     const effHeadcount = planForGrowth ? futureAllocHeadcount : targetHeadcount
-    const effOffices = planForGrowth ? futureAllocOffices : targetOfficeCount
-    const effHybrid = planForGrowth ? futureAllocHybrid : targetHybridWorkers
+    if (effHeadcount === 0) return []
 
-    const ratioFor = (name: string) => {
-      const n = name.toLowerCase()
-      if (n.includes("employee workstation")) return adminRatios.employeeWorkstation
-      if (n.includes("hoteling") || n.includes("flex")) return adminRatios.hoteling
-      if (n.includes("workpoint")) return adminRatios.workpoint
-      if (n.includes("private office")) return adminRatios.privateOffice
-      if (n.includes("phone booth")) return adminRatios.phoneBooth
-      return adminRatios.defaultRatio
+    // Build SummaryInputs from current canvas state and run the FT engine.
+    const effInputs: SummaryInputs = {
+      clientName: projectInfo.client || "",
+      programmedBy: projectInfo.designedBy || "",
+      totalHeadcount: effHeadcount,
+      fullyRemote: Math.round(effHeadcount * ((config.fullyRemoteEmployees || 0) / 100)),
+      percentOffices: config.percentOffices ?? 15,
+      grossRent: 50,
+      daysInOffice: config.daysInOffice ?? 4,
+      rentableFactor: loadFactor - 1,
     }
+    const blocks = computeAllSeatDemandBlocks(effInputs.totalHeadcount, effInputs.fullyRemote)
+    const program = computeSpaceProgram(effInputs, blocks, undefined, ratioConfig)
 
-    const recommend = (space: EditableSpace): number => {
-      const wt = space.workstationType
-      // Smart-zero: if no hybrid workers in the brief, zero out flex/hoteling/workpoint cards.
-      const lname = (space.customName || space.name).toLowerCase()
-      const isFlexish =
-        wt === "flex" || lname.includes("hoteling") || lname.includes("workpoint")
-      if (isFlexish && effHybrid === 0) return 0
-
-      if (wt === "employee") return Math.max(0, effHeadcount - effOffices)
-      if (wt === "flex") return effHybrid
-      if (wt === "private") return effOffices
-      // Ratio-based fallback for everything else (phone booths, conf rooms, wellness, etc.)
-      const ratio = ratioFor(space.customName || space.name)
-      if (!ratio || effHeadcount === 0) return 0
-      return Math.ceil(effHeadcount / ratio)
-    }
+    // Build a name → FT quantity map so we can match by space name.
+    const ftByName = new Map(
+      [...program.individual, ...program.collaborative, ...program.support].map(
+        (item) => [item.name, item.quantity]
+      )
+    )
 
     const changes: RecalibrateChange[] = []
     Object.entries(editableSpaces).forEach(([spaceKey, space]) => {
-      const recommendedQty = recommend(space)
-      if (recommendedQty !== space.quantity) {
+      const spaceName = space.customName || space.name
+      const ftQty = ftByName.get(spaceName)
+      if (ftQty === undefined) return // no FT counterpart — leave untouched
+      if (ftQty !== space.quantity) {
         changes.push({
           spaceKey,
-          name: space.customName || space.name,
+          name: spaceName,
           zone: space.zone,
           workspaceType: space.workstationType,
           currentQty: space.quantity,
-          recommendedQty,
+          recommendedQty: ftQty,
           selected: true,
         })
       }
@@ -1952,11 +1599,10 @@ const WorkplaceProgrammingTool = () => {
     editableSpaces: JSON.parse(JSON.stringify(editableSpaces)),
     zoneCirculation: JSON.parse(JSON.stringify(zoneCirculation)),
     planForGrowth,
+    ratioConfig: { ...ratioConfig },
   })
 
-  // Apply a snapshot back into live state. Order matters less here since each
-  // setter is independent, but we keep dependent updates (targets) before the
-  // spaces that depend on them for cleaner devtools history.
+  // Apply a snapshot back into live state.
   const applySnapshot = (snap: ScenarioSnapshot) => {
     setDepartments(JSON.parse(JSON.stringify(snap.departments)))
     setTargetHeadcount(snap.targetHeadcount)
@@ -1966,6 +1612,7 @@ const WorkplaceProgrammingTool = () => {
     setEditableSpaces(JSON.parse(JSON.stringify(snap.editableSpaces)))
     setZoneCirculation(JSON.parse(JSON.stringify(snap.zoneCirculation)))
     setPlanForGrowth(snap.planForGrowth)
+    if (snap.ratioConfig) setRatioConfig(snap.ratioConfig)
   }
 
   const saveCurrentAsNewScenario = (name: string) => {
@@ -2136,7 +1783,7 @@ const WorkplaceProgrammingTool = () => {
 
     try {
       const blocks = computeAllSeatDemandBlocks(hc, 0)
-      const program = computeSpaceProgram(inputs, blocks)
+      const program = computeSpaceProgram(inputs, blocks, undefined, ratioConfig)
       const result = convertProgramToSpaces(program, inputs)
 
       setTargetHeadcount(hc)
@@ -2228,12 +1875,8 @@ const WorkplaceProgrammingTool = () => {
 
     const getRecommendationRatio = (spaceName: string) => {
       const name = spaceName.toLowerCase()
-      if (name.includes("employee workstation")) return adminRatios.employeeWorkstation
-      if (name.includes("hoteling") || name.includes("flex")) return adminRatios.hoteling
-      if (name.includes("workpoint")) return adminRatios.workpoint
-      if (name.includes("private office")) return adminRatios.privateOffice
-      if (name.includes("phone booth")) return adminRatios.phoneBooth
-      return adminRatios.defaultRatio
+      if (name.includes("phone booth") || name.includes("focus booth")) return ratioConfig.phoneBoothRatio ?? 10
+      return 50
     }
 
     const getTargetBasedRecommendation = (space: EditableSpace) => {
@@ -2820,12 +2463,8 @@ const WorkplaceProgrammingTool = () => {
   }) => {
     const ratioFor = (name: string) => {
       const n = name.toLowerCase()
-      if (n.includes("employee workstation")) return adminRatios.employeeWorkstation
-      if (n.includes("hoteling") || n.includes("flex")) return adminRatios.hoteling
-      if (n.includes("workpoint")) return adminRatios.workpoint
-      if (n.includes("private office")) return adminRatios.privateOffice
-      if (n.includes("phone booth")) return adminRatios.phoneBooth
-      return adminRatios.defaultRatio
+      if (n.includes("phone booth") || n.includes("focus booth")) return ratioConfig.phoneBoothRatio ?? 10
+      return 50
     }
     const recommendQty = (space: EditableSpace) => {
       const wt = space.workstationType
@@ -3265,6 +2904,7 @@ const WorkplaceProgrammingTool = () => {
     editableSpaces: Record<string, EditableSpace>
     zoneCirculation: Record<string, number>
     planForGrowth: boolean
+    ratioConfig: RatioConfig
   }
   type Scenario = {
     id: string
@@ -3438,7 +3078,7 @@ const WorkplaceProgrammingTool = () => {
           onComplete={handleOnboardingComplete}
         />
         <FastTrackExplorer
-          inputs={onboardingInputs}
+          inputs={{ clientName: "", programmedBy: "", ...onboardingInputs }}
           metrics={programMetrics}
           onRecalibrate={handleRecalibrate}
           onSwitchToAdvanced={(inputs, hybridProgram) => {
@@ -5655,115 +5295,48 @@ const WorkplaceProgrammingTool = () => {
             ) : (
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
                 <div className="space-y-6">
-                  {/* RSF Calculations */}
+                  {/* RSF Benchmark */}
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">RSF Calculations</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">RSF Benchmark</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">RSF per Person</label>
                         <input
                           type="number"
-                          value={adminRatios.rsfPerPerson}
-                          onChange={(e) =>
-                            setAdminRatios((prev) => ({
-                              ...prev,
-                              rsfPerPerson: Number.parseInt(e.target.value) || 233,
-                            }))
-                          }
+                          value={rsfPerPerson}
+                          onChange={(e) => setRsfPerPerson(Number.parseInt(e.target.value) || 233)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* Space Type Ratios */}
+                  {/* Engine Ratios — affect both Explore and Recalibrate */}
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Space Type Ratios (People per Space)</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">Engine Ratios</h3>
+                    <p className="text-xs text-gray-500 mb-4">Override the default ratios used by the calculation engine. Affects both Explore mode and Recalibrate.</p>
                     <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Employee Workstation</label>
-                        <input
-                          type="number"
-                          value={adminRatios.employeeWorkstation}
-                          onChange={(e) =>
-                            setAdminRatios((prev) => ({
-                              ...prev,
-                              employeeWorkstation: Number.parseInt(e.target.value) || 120,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Hoteling/Flex</label>
-                        <input
-                          type="number"
-                          value={adminRatios.hoteling}
-                          onChange={(e) =>
-                            setAdminRatios((prev) => ({
-                              ...prev,
-                              hoteling: Number.parseInt(e.target.value) || 15,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Workpoint</label>
-                        <input
-                          type="number"
-                          value={adminRatios.workpoint}
-                          onChange={(e) =>
-                            setAdminRatios((prev) => ({
-                              ...prev,
-                              workpoint: Number.parseInt(e.target.value) || 10,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Private Office</label>
-                        <input
-                          type="number"
-                          value={adminRatios.privateOffice}
-                          onChange={(e) =>
-                            setAdminRatios((prev) => ({
-                              ...prev,
-                              privateOffice: Number.parseInt(e.target.value) || 50,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone Booth</label>
-                        <input
-                          type="number"
-                          value={adminRatios.phoneBooth}
-                          onChange={(e) =>
-                            setAdminRatios((prev) => ({
-                              ...prev,
-                              phoneBooth: Number.parseInt(e.target.value) || 25,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Default Ratio</label>
-                        <input
-                          type="number"
-                          value={adminRatios.defaultRatio}
-                          onChange={(e) =>
-                            setAdminRatios((prev) => ({
-                              ...prev,
-                              defaultRatio: Number.parseInt(e.target.value) || 50,
-                            }))
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
+                      {[
+                        { label: "Phone Booth (per workstation)", key: "phoneBoothRatio" as const, defaultVal: 10 },
+                        { label: "Huddle Room (per workstation)", key: "huddleRatio" as const, defaultVal: 15 },
+                        { label: "Medium Conf (per seat)", key: "mediumConfRatio" as const, defaultVal: 40 },
+                        { label: "Large Conf (per seat)", key: "largeConfRatio" as const, defaultVal: 80 },
+                        { label: "Open Collab (per seat)", key: "openCollabRatio" as const, defaultVal: 25 },
+                        { label: "Work Cafe (SF per person)", key: "workCafeSfPerSeat" as const, defaultVal: 7.5 },
+                      ].map(({ label, key, defaultVal }) => (
+                        <div key={key}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                          <input
+                            type="number"
+                            value={ratioConfig[key] ?? defaultVal}
+                            onChange={(e) => {
+                              const v = Number.parseFloat(e.target.value)
+                              setRatioConfig((prev) => ({ ...prev, [key]: v || defaultVal }))
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -5771,7 +5344,7 @@ const WorkplaceProgrammingTool = () => {
                   <div>
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Zone Circulation Percentages</h3>
                     <div className="grid grid-cols-3 gap-4">
-                      {Object.entries(adminRatios.zoneCirculation).map(([zone, percentage]) => (
+                      {Object.entries(zoneCirculation).map(([zone, percentage]) => (
                         <div key={zone}>
                           <label className="block text-sm font-medium text-gray-700 mb-1">{zone}</label>
                           <div className="flex items-center space-x-2">
@@ -5779,12 +5352,9 @@ const WorkplaceProgrammingTool = () => {
                               type="number"
                               value={percentage}
                               onChange={(e) =>
-                                setAdminRatios((prev) => ({
+                                setZoneCirculation((prev) => ({
                                   ...prev,
-                                  zoneCirculation: {
-                                    ...prev.zoneCirculation,
-                                    [zone]: Number.parseInt(e.target.value) || 0,
-                                  },
+                                  [zone]: Number.parseInt(e.target.value) || 0,
                                 }))
                               }
                               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -5803,7 +5373,7 @@ const WorkplaceProgrammingTool = () => {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="font-medium">Recommended RSF:</span>{" "}
-                          {(targetHeadcount * adminRatios.rsfPerPerson).toLocaleString()}
+                          {(targetHeadcount * rsfPerPerson).toLocaleString()}
                         </div>
                         <div>
                           <span className="font-medium">Current RSF:</span>{" "}

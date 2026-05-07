@@ -73,7 +73,7 @@ export function ProgramTable({ program, title, daysInOffice }: ProgramTableProps
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-800">{title} ({daysInOffice} days/week)</h2>
+        <h2 className="text-xl font-bold text-slate-800">{title}</h2>
         <span className="text-teal-600 font-semibold">Total: {formatNumber(program.estimatedRentable)} RSF</span>
       </div>
       

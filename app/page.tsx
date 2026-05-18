@@ -3,7 +3,9 @@
 import type React from "react"
 
   import { useState, useMemo, useEffect, useRef } from "react"
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
+import { DragDropContext, Droppable, Draggable, resetServerContext } from "react-beautiful-dnd"
+// Prevents hydration mismatch in Next.js App Router by resetting the DnD context counter
+resetServerContext()
   import {
   Building2,
   Info,
@@ -26,8 +28,15 @@ import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
   GitCompare,
   Layers,
   BarChart3,
+  PanelRightOpen,
+  PanelRightClose,
+  Eye,
+  Presentation,
+  Wrench,
+  Focus,
 } from "lucide-react"
 import Image from "next/image"
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 
 import { computeKpis } from "@/utils/kpi"
 
@@ -37,6 +46,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { Button } from "@/components/ui/button" // Import Button component
 import { X, AlertTriangle } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { BriefingView } from "@/components/briefing-view"
   import { OnboardingModal, type GeneratedSpaceConfig, type OnboardingInputs } from "@/components/onboarding-modal"
   import { FastTrackExplorer } from "@/components/fast-track-explorer"
   import { convertProgramToSpaces } from "@/lib/convert-program-to-spaces"
@@ -171,6 +181,7 @@ function TargetTile({
   growthMode?: boolean
   futureValue?: number
   futureAllocated?: number
+  showAllocations?: boolean
 }) {
   const styles = TARGET_ACCENT_MAP[accent]
   // In growth mode, status compares against futureValue; otherwise current.
@@ -514,6 +525,11 @@ function ProgramIsland({
   variant = "floating",
   dock = "top",
   onDockChange,
+  headcount,
+  seatCount,
+  rsfPerPerson: rsfPerPersonProp,
+  usfPerPerson,
+  scenarioName,
 }: {
   totalRSF: number
   totalUSF: number
@@ -528,6 +544,11 @@ function ProgramIsland({
   // Controlled dock position (only meaningful for floating variant).
   dock?: IslandDock
   onDockChange?: (dock: IslandDock) => void
+  headcount?: number
+  seatCount?: number
+  rsfPerPerson?: number
+  usfPerPerson?: number
+  scenarioName?: string
 }) {
   const [hovering, setHovering] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -625,25 +646,43 @@ function ProgramIsland({
     </div>
   )
 
-  // Primary KPIs — RSF big, USF small
+  // Primary KPIs — 2×2 grid: RSF | RSF/person | Seats | Headcount
   const KPIBlock = (
-    <div className="flex flex-col leading-none shrink-0">
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-2xl font-semibold tabular-nums text-slate-900">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-2 shrink-0">
+      {/* Top-left: Total RSF (primary) */}
+      <div className="flex flex-col leading-none">
+        <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400 font-semibold mb-0.5">RSF</span>
+        <span className="text-xl font-semibold tabular-nums text-slate-900">
           {Math.round(totalRSF).toLocaleString()}
         </span>
-        <span className="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-semibold">
-          RSF
+      </div>
+      {/* Top-right: RSF/person */}
+      <div className="flex flex-col leading-none">
+        <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400 font-semibold mb-0.5">RSF/person</span>
+        <span className="text-xl font-semibold tabular-nums text-slate-700">
+          {rsfPerPersonProp ? rsfPerPersonProp.toLocaleString() : Math.round(totalRSF / Math.max(headcount || 1, 1)).toLocaleString()}
         </span>
       </div>
-      <div className="flex items-baseline gap-1 mt-1.5">
-        <span className="text-xs tabular-nums text-slate-500">
-          {Math.round(totalUSF).toLocaleString()}
-        </span>
-        <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400 font-medium">
-          USF
+      {/* Bottom-left: Total Seats */}
+      <div className="flex flex-col leading-none">
+        <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400 font-semibold mb-0.5">Seats</span>
+        <span className="text-sm tabular-nums text-slate-600 font-medium">
+          {(seatCount ?? Math.round(totalUSF / 42)).toLocaleString()}
         </span>
       </div>
+      {/* Bottom-right: Headcount */}
+      <div className="flex flex-col leading-none">
+        <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400 font-semibold mb-0.5">Headcount</span>
+        <span className="text-sm tabular-nums text-slate-600 font-medium">
+          {(headcount ?? 0).toLocaleString()}
+        </span>
+      </div>
+      {/* Scenario label if active */}
+      {scenarioName && (
+        <div className="col-span-2">
+          <span className="text-[9px] text-teal-600 font-medium truncate">{scenarioName}</span>
+        </div>
+      )}
     </div>
   )
 
@@ -867,7 +906,39 @@ const SPACE_PRESETS: Record<string, Array<{
   ],
 }
 
+function FeatureToggle({
+  active,
+  onClick,
+  label,
+  title,
+  suffix,
+}: {
+  active: boolean
+  onClick: () => void
+  label: string
+  title?: string
+  suffix?: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
+        active
+          ? "bg-white border-slate-300 text-slate-900 hover:bg-slate-50 shadow-sm"
+          : "bg-transparent border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+      }`}
+    >
+      {label}
+      {suffix}
+    </button>
+  )
+}
+
 const WorkplaceProgrammingTool = () => {
+  const [hasMounted, setHasMounted] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [showAdminPanel, setShowAdminPanel] = useState(false)
   const [viewMode, setViewMode] = useState<"dashboard" | "hybrid" | "fullOccupancy" | "comparison" | "seatDemand">("dashboard")
@@ -1007,18 +1078,17 @@ const WorkplaceProgrammingTool = () => {
     }
 
     return (
-      <div className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded group">
-        <div className={`w-3 h-3 rounded-full ${department.color}`}></div>
-        <span className="flex-1 text-sm text-gray-700">{department.name}</span>
-        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-          <button onClick={onEdit} className="text-gray-400 hover:text-gray-600 text-xs" title="Edit">
-            ✏️
+      <div className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded group">
+        <div className={`w-2.5 h-2.5 rounded-full ${department.color} shrink-0`}></div>
+        <button onClick={onEdit} className="flex-1 text-sm text-gray-700 text-left hover:text-gray-900 truncate" title="Click to rename">
+          {department.name}
+        </button>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={onDuplicate} className="p-1 text-gray-400 hover:text-gray-600 rounded" title="Duplicate">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2"/><path strokeWidth="2" d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
-          <button onClick={onDuplicate} className="text-gray-400 hover:text-gray-600 text-xs" title="Duplicate">
-            📋
-          </button>
-          <button onClick={onDelete} className="text-gray-400 hover:text-red-600 text-xs" title="Delete">
-            🗑️
+          <button onClick={onDelete} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
@@ -1063,23 +1133,104 @@ const WorkplaceProgrammingTool = () => {
     })
     
     setEditableSpaces(newEditableSpaces)
-    
+
     // Update load factor from inputs (rentableFactor is 0.22 = 22%, so 1 + 0.22 = 1.22)
     if (inputs.rentableFactor) {
       setLoadFactor(1 + inputs.rentableFactor)
     }
 
+    // ── Sync config with onboarding inputs so Recalibrate uses matching parameters ──
+    // Without this, buildRecalibratePreview uses stale defaults (e.g. percentOffices=80)
+    // which produces wildly different quantities than what the engine generated on onboarding.
+    setConfig((prev) => ({
+      ...prev,
+      percentOffices: inputs.percentOffices,
+      daysInOffice: inputs.daysInOffice,
+      fullyRemoteEmployees:
+        inputs.totalHeadcount > 0
+          ? Math.round((inputs.fullyRemote / inputs.totalHeadcount) * 100)
+          : 0,
+    }))
+
+    // ── Sync Config Targets from engine inputs (perfect match, no gaps) ──
+    try {
+      const summaryInputs: SummaryInputs = {
+        clientName: inputs.clientName || "",
+        programmedBy: inputs.programmedBy || "",
+        totalHeadcount: inputs.totalHeadcount,
+        fullyRemote: inputs.fullyRemote ?? 0,
+        percentOffices: inputs.percentOffices ?? 15,
+        grossRent: inputs.grossRent ?? 50,
+        daysInOffice: inputs.daysInOffice ?? 3,
+        rentableFactor: inputs.rentableFactor ?? 0.22,
+      }
+      const blocks = computeAllSeatDemandBlocks(summaryInputs.totalHeadcount, summaryInputs.fullyRemote)
+      const program = computeSpaceProgram(summaryInputs, blocks, undefined, ratioConfig)
+      const result = convertProgramToSpaces(program, summaryInputs)
+
+      setTargetHeadcount(summaryInputs.totalHeadcount)
+      setTargetOfficeCount(result.targets.officeCount)
+      setTargetWorkstations(result.targets.workstationCount)
+      setTargetHybridWorkers(result.targets.hybridWorkers)
+
+      // Pre-populate department headcounts + space allocations by distributing
+      // evenly across departments based on their proportional headcount share.
+      // Only runs if all departments currently have 0 headcount (fresh state).
+      setDepartments((prev) => {
+        const totalAllocated = prev.reduce((s, d) => s + (d.headcount || 0), 0)
+        if (totalAllocated > 0) return prev // user already set some HCs — don't overwrite
+        const hc = summaryInputs.totalHeadcount
+        const n = prev.length
+        return prev.map((d, i) => {
+          // Distribute headcount: first dept gets remainder so total is exact
+          const base = Math.floor(hc / n)
+          const extra = i === 0 ? hc - base * n : 0
+          const deptHC = base + extra
+          // Proportionally distribute office/workstation/hybrid from engine targets
+          // so that Growth mode FUTURE columns start from meaningful non-zero values
+          const share = hc > 0 ? deptHC / hc : 1 / n
+          const deptOffices = Math.round(result.targets.officeCount * share)
+          const deptWorkstations = Math.round(result.targets.workstationCount * share)
+          const deptHybrid = Math.round(result.targets.hybridWorkers * share)
+          return {
+            ...d,
+            headcount: deptHC,
+            futureHeadcount: deptHC,
+            officeCount: deptOffices,
+            workstations: deptWorkstations,
+            hybridWorkers: deptHybrid,
+          }
+        })
+      })
+    } catch (err) {
+      // Fallback: simple computation from inputs
+      const hc = inputs.totalHeadcount
+      const officeCount = Math.round(hc * (inputs.percentOffices / 100))
+      setTargetHeadcount(hc)
+      setTargetOfficeCount(officeCount)
+      setTargetWorkstations(Math.max(0, hc - officeCount - (inputs.fullyRemote ?? 0)))
+      setTargetHybridWorkers(Math.round((hc - (inputs.fullyRemote ?? 0)) * (1 - (inputs.daysInOffice ?? 3) / 5)))
+    }
+
+    // Sync project info from onboarding
+    if (inputs.clientName) {
+      setProjectInfo((prev) => ({ ...prev, client: inputs.clientName! }))
+    }
+    if (inputs.programmedBy) {
+      setProjectInfo((prev) => ({ ...prev, designedBy: inputs.programmedBy! }))
+    }
+
     // Store metrics for Hybrid vs Full Occupancy comparison
     setProgramMetrics(metrics)
     setOnboardingInputs(inputs)
-    
+
     // Show Fast Track Explorer if user chose that view mode
     if (inputs.viewMode === "fast-track") {
       setShowFastTrackExplorer(true)
     } else {
       setShowFastTrackExplorer(false)
     }
-    
+
     setShowOnboarding(false)
   }
 
@@ -1567,6 +1718,10 @@ const WorkplaceProgrammingTool = () => {
           }
         }
       })
+      // Reset divergence baseline so dots clear after Recalibrate
+      ftBaselineRef.current = new Map(
+        Object.values(next).map((s) => [s.name, { quantity: s.quantity, sfEach: s.sfEach }])
+      )
       return next
     })
     setRecalibratePreview(null)
@@ -1900,6 +2055,11 @@ const WorkplaceProgrammingTool = () => {
 
     const recommendedQuantity = getTargetBasedRecommendation(space)
 
+    // FT engine divergence indicators (teal = qty, amber = sfEach)
+    const ftBaselineEntry = ftBaseline.get(space.customName || space.name)
+    const qtyDiverged = !!ftBaselineEntry && space.quantity !== ftBaselineEntry.quantity
+    const sfDiverged = !!ftBaselineEntry && space.sfEach !== ftBaselineEntry.sfEach
+
     const delta = space.quantity - recommendedQuantity
     const percentDiff = recommendedQuantity !== 0 ? Math.abs(delta / recommendedQuantity) * 100 : 0
 
@@ -1929,90 +2089,206 @@ const WorkplaceProgrammingTool = () => {
             ? "Under Target"
             : "Near Threshold"
 
+    // ── Compact premium SpaceCard ──
+    const totalSF = (space.quantity || 0) * (space.sfEach || 0)
+    const isCompact = canvasMode === "focus"
+
     return (
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-        <div className={`${zoneColor.bg} ${zoneColor.border} border-b px-3 py-2`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 ${zoneColor.dot} rounded-full`}></div>
-              {editingName ? (
-                <input
-                  value={tempName}
-                  onChange={(e) => setTempName(e.target.value)}
-                  onBlur={() => {
+      <div className={`bg-white rounded-xl border overflow-hidden transition-shadow ${isCompact ? "border-slate-200 shadow-sm hover:shadow-md" : "border-slate-200 shadow-sm hover:shadow-md"}`}>
+        {/* Coloured accent bar */}
+        <div className={`h-1 w-full ${zoneColor.dot}`} />
+
+        {/* Header row: name + actions */}
+        <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {editingName ? (
+              <input
+                value={tempName}
+                onChange={(e) => setTempName(e.target.value)}
+                onBlur={() => {
+                  setEditingName(false)
+                  updateSpace(spaceKey, { customName: tempName })
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
                     setEditingName(false)
                     updateSpace(spaceKey, { customName: tempName })
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      setEditingName(false)
-                      updateSpace(spaceKey, { customName: tempName })
-                    } else if (e.key === "Escape") {
-                      setTempName(space.customName || space.name)
-                      setEditingName(false)
-                    }
-                  }}
-                  className="font-medium text-gray-900 bg-transparent border-none outline-none text-sm"
-                  autoFocus
-                />
-              ) : (
+                  } else if (e.key === "Escape") {
+                    setTempName(space.customName || space.name)
+                    setEditingName(false)
+                  }
+                }}
+                className="flex-1 text-sm font-semibold text-slate-900 bg-transparent border-b border-slate-300 outline-none"
+                autoFocus
+              />
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
                 <h4
-                  className={`font-medium ${zoneColor.text} cursor-pointer text-sm`}
+                  className="text-sm font-semibold text-slate-900 cursor-pointer hover:text-teal-700 truncate leading-tight"
                   onClick={() => setEditingName(true)}
+                  title="Click to rename"
                 >
                   {space.customName || space.name}
                 </h4>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
+                {visibility.recommendations && (qtyDiverged || sfDiverged) && (
+                  <span className="flex items-center gap-0.5 shrink-0" title={[
+                    qtyDiverged && `Qty: ${space.quantity} (rec: ${ftBaselineEntry?.quantity})`,
+                    sfDiverged && `SF: ${space.sfEach} (rec: ${ftBaselineEntry?.sfEach})`,
+                  ].filter(Boolean).join(" · ")}>
+                    {qtyDiverged && <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block shrink-0" />}
+                    {sfDiverged && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block shrink-0" />}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0 ml-1 opacity-0 hover:opacity-100 group-hover:opacity-100 [.bg-white:hover_&]:opacity-100">
+            <button
+              onClick={() => duplicateSpace(spaceKey)}
+              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+              title="Duplicate"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2"/>
+                <path strokeWidth="2" d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+            <button onClick={() => deleteSpace(spaceKey)} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-red-500" title="Delete">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* Metrics row: Qty | SF ea | Total SF */}
+        <div className="flex divide-x divide-slate-100 border-t border-slate-100">
+          {/* Qty */}
+          <div className="flex-1 px-2 py-2 min-w-0">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">Qty</div>
+            <div className="flex items-center gap-0.5">
               <button
-                onClick={() => duplicateSpace(spaceKey)}
-                className="p-1 hover:bg-white/50 rounded"
-                title="Duplicate"
-              >
-                <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </button>
-              <button onClick={() => deleteSpace(spaceKey)} className="p-1 hover:bg-white/50 rounded" title="Delete">
-                <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
-              </button>
+                onClick={() => { const q = Math.max(1, space.quantity - 1); updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach }) }}
+                className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0"
+              >−</button>
+              <input
+                type="number"
+                value={space.quantity}
+                onChange={(e) => {
+                  const q = Math.max(1, Number.parseInt(e.target.value) || 1)
+                  updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach })
+                }}
+                className="w-0 flex-1 text-center text-sm font-bold text-slate-900 tabular-nums bg-transparent border-none outline-none"
+              />
+              <button
+                onClick={() => { const q = space.quantity + 1; updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach }) }}
+                className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0"
+              >+</button>
+            </div>
+          </div>
+
+          {/* SF ea */}
+          <div className="flex-1 px-2 py-2 min-w-0">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">SF ea</div>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => { const sf = Math.max(1, space.sfEach - 1); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
+                className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0"
+              >−</button>
+              <input
+                type="number"
+                value={space.sfEach}
+                onChange={(e) => { const sf = Math.max(1, Number.parseInt(e.target.value) || 1); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
+                className="w-0 flex-1 text-center text-sm font-semibold text-slate-900 tabular-nums bg-transparent border-none outline-none"
+              />
+              <button
+                onClick={() => { const sf = space.sfEach + 1; updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
+                className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0"
+              >+</button>
+            </div>
+          </div>
+
+          {/* Total SF — wider, zone-tinted */}
+          <div className={`flex-[1.4] px-2 py-2 ${zoneColor.bg} min-w-0`}>
+            <div className={`text-[9px] font-semibold uppercase tracking-[0.12em] mb-1 ${zoneColor.text} opacity-70`}>Total SF</div>
+            <div className={`text-sm font-bold tabular-nums ${zoneColor.text} truncate`}>
+              {totalSF.toLocaleString()}
             </div>
           </div>
         </div>
 
-        <div className="p-4">
-          <div className="mb-3">
-            {visibility?.departmentManagement && (
+        {/* Capacity row — only when visibility.capacity is on */}
+        {visibility?.capacity && (
+          <div className="px-3 py-2 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Capacity</span>
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setDepartmentExpansionState((prev) => ({ ...prev, [spaceKey]: !isDepartmentExpanded }))}
-                className="flex items-center justify-between w-full text-left"
-              >
-                <div className="text-sm font-medium text-gray-700">Department Allocation</div>
-                <svg
-                  className={`w-4 h-4 text-gray-400 transition-transform ${isDepartmentExpanded ? "rotate-180" : ""}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            )}
+                onClick={() => updateSpace(spaceKey, { capacity: Math.max(1, space.capacity - 1) })}
+                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600"
+              >−</button>
+              <input
+                type="number"
+                value={space.capacity}
+                onChange={(e) => updateSpace(spaceKey, { capacity: Math.max(1, Number.parseInt(e.target.value) || 1) })}
+                className="w-10 text-center text-sm font-semibold text-slate-900 bg-transparent border-none outline-none"
+              />
+              <button
+                onClick={() => updateSpace(spaceKey, { capacity: space.capacity + 1 })}
+                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600"
+              >+</button>
+            </div>
+          </div>
+        )}
 
-            {isDepartmentExpanded && visibility?.departmentManagement && (() => {
+        {/* Workspace type chips — only in Workbench mode when visibility.workspaceType is on */}
+        {visibility?.workspaceType && canvasMode !== "focus" && (
+          <div className="px-3 py-2 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 mr-0.5">Type</span>
+              {(["employee", "private", "flex"] as const).map((type) => {
+                const labels = { employee: "Workstation", private: "Private Office", flex: "Hoteling/Flex" }
+                const targets = { employee: "Workstations", private: "Offices", flex: "Hybrid" }
+                const chipColors = {
+                  employee: { on: "bg-blue-100 text-blue-700 border-blue-200", off: "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100" },
+                  private: { on: "bg-purple-100 text-purple-700 border-purple-200", off: "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100" },
+                  flex: { on: "bg-green-100 text-green-700 border-green-200", off: "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100" },
+                }
+                const isSelected = space.workstationType === type
+                return (
+                  <button
+                    key={type}
+                    onClick={() => updateSpace(spaceKey, { workstationType: isSelected ? null : type })}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${isSelected ? chipColors[type].on : chipColors[type].off}`}
+                    title={isSelected ? `Remove ${targets[type]} mapping` : `Map to ${targets[type]} target`}
+                  >
+                    {labels[type]}
+                    {isSelected && <span className="opacity-60">×</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Department allocation — shown when allocations toggle is on */}
+        <div className={visibility?.allocations && canvasMode !== "focus" ? "px-3 py-2 border-t border-slate-100" : ""}>
+          {visibility?.departmentManagement && canvasMode !== "focus" && !visibility?.allocations && (
+            <button
+              onClick={() => setDepartmentExpansionState((prev) => ({ ...prev, [spaceKey]: !isDepartmentExpanded }))}
+              className="flex items-center justify-between w-full text-left px-3 py-2 border-t border-slate-100"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Dept Allocation</div>
+              <svg
+                className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isDepartmentExpanded ? "rotate-180" : ""}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
+          {visibility?.allocations && canvasMode !== "focus" && (
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Dept Allocation</div>
+          )}
+
+            {canvasMode !== "focus" && ((isDepartmentExpanded && visibility?.departmentManagement) || visibility?.allocations) && (() => {
               // Cascade bridge: show how this card's allocations relate to
               // the department-level plan and the company target.
               const wsType = space.workstationType as "employee" | "private" | "flex" | undefined
@@ -2101,226 +2377,44 @@ const WorkplaceProgrammingTool = () => {
             })()}
           </div>
 
-          <div className="mb-3">
-            <div className="flex items-center gap-3 mb-2">
-              <button
-                onClick={() => { const q = Math.max(1, space.quantity - 1); updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach }) }}
-                className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center font-medium text-sm"
-              >
-                −
-              </button>
-              <div>
-                <input
-                  type="number"
-                  value={space.quantity}
-                  onChange={(e) => {
-                    const q = Math.max(1, Number.parseInt(e.target.value) || 1)
-                    updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach })
-                  }}
-                  className="text-4xl font-bold text-gray-900 w-20 border-none outline-none bg-transparent"
-                />
-                <div className="text-xs text-gray-500 -mt-1">quantity</div>
-              </div>
-              <button
-                onClick={() => { const q = space.quantity + 1; updateSpace(spaceKey, { quantity: q, totalArea: q * space.sfEach }) }}
-                className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center font-medium text-sm"
-              >
-                +
-              </button>
-            </div>
+        {/* Recommendation badge — compact, shown when Recommendations toggle is on */}
+        {visibility?.recommendations && recommendedQuantity > 0 && (
+          <div className="px-3 py-1.5 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[10px] text-slate-400">Rec: <span className="font-semibold text-slate-600">{recommendedQuantity}</span></span>
+            {space.quantity !== recommendedQuantity && (
+              <span className={`text-[10px] font-semibold tabular-nums ${space.quantity > recommendedQuantity ? "text-amber-600" : "text-blue-600"}`}>
+                {space.quantity > recommendedQuantity ? "+" : ""}{space.quantity - recommendedQuantity}
+              </span>
+            )}
           </div>
+        )}
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <div className="flex items-center gap-1 mb-1">
-                <button
-                  onClick={() => { const sf = Math.max(1, space.sfEach - 1); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
-                  className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium"
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  value={space.sfEach}
-                  onChange={(e) => { const sf = Math.max(1, Number.parseInt(e.target.value) || 1); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
-                  className="text-lg font-semibold text-gray-900 w-12 border-none outline-none bg-transparent text-center"
+        {/* Notes — Workbench only */}
+        {canvasMode !== "focus" && (
+          <div className="border-t border-slate-100">
+            <button
+              onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-600 w-full text-left"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Notes {isNotesExpanded ? "▲" : "▼"}
+            </button>
+            {isNotesExpanded && (
+              <div className="px-3 pb-2">
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onBlur={() => updateSpace(spaceKey, { notes })}
+                  placeholder="Add notes about this space..."
+                  className="w-full p-2 text-xs border border-slate-200 rounded resize-none focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  rows={2}
                 />
-                <button
-                  onClick={() => { const sf = space.sfEach + 1; updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
-                  className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium"
-                >
-                  +
-                </button>
-              </div>
-              <div className="text-xs text-gray-500">SF each</div>
-            </div>
-            {visibility?.capacity && (
-              <div>
-                <div className="flex items-center gap-1 mb-1">
-                  <button
-                    onClick={() => updateSpace(spaceKey, { capacity: Math.max(1, space.capacity - 1) })}
-                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    value={space.capacity}
-                    onChange={(e) =>
-                      updateSpace(spaceKey, { capacity: Math.max(1, Number.parseInt(e.target.value) || 1) })
-                    }
-                    className="text-lg font-semibold text-gray-900 w-12 border-none outline-none bg-transparent text-center"
-                  />
-                  <button
-                    onClick={() => updateSpace(spaceKey, { capacity: space.capacity + 1 })}
-                    className="w-5 h-5 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium"
-                  >
-                    +
-                  </button>
-                </div>
-                <div className="text-xs text-gray-500">capacity</div>
               </div>
             )}
           </div>
-
-          <div className="mb-3 p-2 bg-gray-50 rounded">
-            <div className={`text-xl font-bold ${zoneColor.text}`}>
-              {((space.quantity || 0) * (space.sfEach || 0)).toLocaleString()} SF
-            </div>
-            <div className="text-xs text-gray-500">total area</div>
-          </div>
-
-          {/*
-            Workspace Distribution removed from Focus cards.
-            The per-bundle "Across all <type> cards — X / Y planned" header and
-            the "N unassigned" warning in Department Allocation already convey
-            planned vs configured at a glance, so this box was duplicative here.
-            Distribution-style rollups will live on Collaborative / Support /
-            Wellness cards (where planning is ratio-based) in a later pass.
-          */}
-
-          {space.zone === "Collaborative" && showRecommendations && visibility?.recommendations && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-gray-700">Recommendation</div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      Math.abs((space.quantity || 0) - recommendedQuantity) <= Math.ceil(recommendedQuantity * 0.1)
-                        ? "bg-green-500"
-                        : Math.abs((space.quantity || 0) - recommendedQuantity) <= Math.ceil(recommendedQuantity * 0.2)
-                          ? "bg-yellow-500"
-                          : "bg-red-500"
-                    }`}
-                  ></div>
-                </div>
-              </div>
-              <div className="text-sm text-gray-600 mb-1">
-                Recommended: {recommendedQuantity.toLocaleString()} {space.name.toLowerCase()}
-              </div>
-              <div className="text-xs text-gray-500">
-                <span
-                  className={`font-medium ${
-                    Math.abs((space.quantity || 0) - recommendedQuantity) <= Math.ceil(recommendedQuantity * 0.1)
-                      ? "text-green-600"
-                      : Math.abs((space.quantity || 0) - recommendedQuantity) <= Math.ceil(recommendedQuantity * 0.2)
-                        ? "text-yellow-600"
-                        : "text-red-600"
-                  }`}
-                >
-                  {(space.quantity || 0) - recommendedQuantity > 0 ? "+" : ""}
-                  {((space.quantity || 0) - recommendedQuantity).toLocaleString()}
-                </span>{" "}
-                vs recommended • Ratio: {getRecommendationRatio(space.name)}:1
-              </div>
-            </div>
-          )}
-
-          {visibility?.workspaceType && (
-            <div className="mt-4 space-y-3">
-              <div>
-                <div className="flex items-baseline justify-between mb-2">
-                  <div className="text-sm font-medium text-gray-700">Workspace Type</div>
-                  <div className="text-[10px] text-gray-500">Feeds a company target</div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                {["employee", "private", "flex"].map((type) => {
-                  const targetLabel = type === "employee" ? "Workstations" : type === "private" ? "Offices" : "Hybrid"
-                  const typeLabel =
-                    type === "employee" ? "Employee Workstations" : type === "private" ? "Private" : "Hoteling/Flex"
-                  const isSelected = space.workstationType === type
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      // Clicking a selected chip toggles it off (removes the mapping).
-                      // Clicking an unselected chip selects it. Single-button keeps HTML valid.
-                      onClick={() =>
-                        updateSpace(spaceKey, { workstationType: isSelected ? null : (type as any) })
-                      }
-                      title={
-                        isSelected
-                          ? `Click to unassign from ${targetLabel} target`
-                          : `Counts toward the ${targetLabel} company target`
-                      }
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                        isSelected
-                          ? type === "employee"
-                            ? "bg-blue-100 text-blue-700"
-                            : type === "private"
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      <span>{typeLabel}</span>
-                      {isSelected && (
-                        <>
-                          <span className="text-[10px] opacity-70">
-                            {"\u2192"} {targetLabel}
-                          </span>
-                          <span className="text-xs leading-none opacity-70" aria-hidden="true">
-                            ×
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  )
-                })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div>
-              <button
-                onClick={() => setIsNotesExpanded(!isNotesExpanded)}
-                className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-                Notes
-              </button>
-              {isNotesExpanded && (
-                <div className="mt-2">
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    onBlur={() => updateSpace(spaceKey, { notes })}
-                    placeholder="Add notes about this space..."
-                    className="w-full p-2 text-sm border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows={3}
-                  />
-                </div>
-              )}
-            </div>
-        </div>
+        )}
       </div>
     )
   }
@@ -2335,6 +2429,7 @@ const WorkplaceProgrammingTool = () => {
     viewMode,
     onViewModeChange,
     onAddSpace,
+    gapBadges,
   }: {
     title: string
     usf: number
@@ -2345,57 +2440,43 @@ const WorkplaceProgrammingTool = () => {
     viewMode?: ZoneViewMode
     onViewModeChange?: (mode: ZoneViewMode) => void
     onAddSpace?: () => void
+    gapBadges?: { label: string; configured: number; target: number }[]
   }) => {
     const percentage = totalUSF > 0 ? Math.round((usf / totalUSF) * 100) : 0
 
     return (
       <div className="mb-4">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-          <div className="flex items-center gap-3">
-            <div className={`w-2.5 h-2.5 rounded-full ${color}`}></div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              {title}
-              <span className="text-gray-400 font-normal">{" \u00B7 "}</span>
-              <span className="tabular-nums text-gray-700">{usf.toLocaleString()}</span>
-              <span className="text-gray-400 font-normal text-sm ml-1">USF</span>
-              <span className="text-gray-400 font-normal text-sm ml-2">({percentage}%)</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-2.5 h-2.5 rounded-full ${color} shrink-0`}></div>
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 flex-wrap">
+              <span>
+                {title}
+                <span className="text-gray-400 font-normal">{" \u00B7 "}</span>
+                <span className="tabular-nums text-gray-700">{usf.toLocaleString()}</span>
+                <span className="text-gray-400 font-normal text-sm ml-1">USF</span>
+                <span className="text-gray-400 font-normal text-sm ml-2">({percentage}%)</span>
+              </span>
+              {gapBadges && gapBadges.map(({ label, configured, target }) => {
+                if (target === 0) return null
+                const gap = target - configured
+                const met = gap <= 0
+                return (
+                  <span
+                    key={label}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums ${
+                      met ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                    }`}
+                    title={`${label}: ${configured} configured of ${target} target`}
+                  >
+                    {met ? "\u2713" : "\u26A0"} {configured}/{target} {label}
+                  </span>
+                )
+              })}
             </h3>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Cards / Table view toggle (per zone) */}
-            {viewMode && onViewModeChange && (
-              <div className="inline-flex items-center rounded-full bg-white border border-gray-200 p-0.5 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => onViewModeChange("cards")}
-                  aria-pressed={viewMode === "cards"}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                    viewMode === "cards"
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                  title="Card view"
-                >
-                  <LayoutGrid className="w-3 h-3" />
-                  Cards
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onViewModeChange("table")}
-                  aria-pressed={viewMode === "table"}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                    viewMode === "table"
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                  title="Table view"
-                >
-                  <Table2 className="w-3 h-3" />
-                  Table
-                </button>
-              </div>
-            )}
 
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Circulation</span>
@@ -2449,6 +2530,7 @@ const WorkplaceProgrammingTool = () => {
    */
   const ZoneTable = ({
     zoneSpaceEntries,
+    focusMode = false,
     visibility: visibilitySettings = {
       allocations: true,
       departmentManagement: true,
@@ -2459,6 +2541,7 @@ const WorkplaceProgrammingTool = () => {
     },
   }: {
     zoneSpaceEntries: [string, EditableSpace][]
+    focusMode?: boolean
     visibility?: VisibilitySettings
   }) => {
     const ratioFor = (name: string) => {
@@ -2531,6 +2614,10 @@ const WorkplaceProgrammingTool = () => {
       )
     }
 
+    // In Focus mode only show Space / Qty / SF Each / Total SF
+    const focusCols = focusMode
+    const deptCols = !focusCols && departments
+
     return (
       <div className="mb-8 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -2541,29 +2628,37 @@ const WorkplaceProgrammingTool = () => {
                 <th className="sticky left-0 z-10 bg-slate-50 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 min-w-[220px]">
                   Space
                 </th>
-                <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                  Type
-                </th>
+                {!focusCols && (
+                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                    Type
+                  </th>
+                )}
                 <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
-                  Quantity
+                  Qty
                 </th>
-                <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
-                  Capacity
-                </th>
+                {!focusCols && (
+                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
+                    Cap.
+                  </th>
+                )}
                 <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
                   SF Each
                 </th>
-                <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
+                <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-right">
                   Total SF
                 </th>
-                <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
-                  Allocated
-                </th>
-                <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
-                  Status
-                </th>
-                {/* One column per department */}
-                {departments.map((dept) => (
+                {!focusCols && (
+                  <>
+                    <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
+                      Alloc.
+                    </th>
+                    <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center">
+                      Status
+                    </th>
+                  </>
+                )}
+                {/* One column per department — Workbench only */}
+                {deptCols && departments.map((dept) => (
                   <th
                     key={dept.id}
                     className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 text-center min-w-[110px]"
@@ -2583,7 +2678,7 @@ const WorkplaceProgrammingTool = () => {
               {zoneSpaceEntries.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9 + departments.length}
+                    colSpan={focusCols ? 4 : 9 + departments.length}
                     className="px-4 py-6 text-center text-sm text-slate-500"
                   >
                     No spaces in this zone yet.
@@ -2594,6 +2689,13 @@ const WorkplaceProgrammingTool = () => {
                 const recQty = recommendQty(space)
                 const delta = space.quantity - recQty
                 const variance = recQty > 0 ? Math.abs(delta) / recQty : 0
+
+                // FT engine divergence indicators
+                const ftEntry = ftBaseline.get(space.customName || space.name)
+                const rowQtyDiverged = !!ftEntry && space.quantity !== ftEntry.quantity
+                const rowSfDiverged = !!ftEntry && space.sfEach !== ftEntry.sfEach
+                const rowDiverged = visibilitySettings.recommendations && (rowQtyDiverged || rowSfDiverged)
+
                 const status =
                   recQty === 0 && space.quantity === 0
                     ? { label: "Idle", color: "bg-slate-100 text-slate-500" }
@@ -2622,22 +2724,35 @@ const WorkplaceProgrammingTool = () => {
                 return (
                   <tr
                     key={spaceKey}
-                    className="hover:bg-slate-50/60 transition-colors group"
+                    className={`hover:bg-slate-50/60 transition-colors group ${rowDiverged ? "bg-amber-50/30" : ""}`}
                   >
                     {/* Space name — sticky left */}
-                    <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/60 px-4 py-2 border-b border-slate-100 min-w-[220px]">
-                      <input
-                        type="text"
-                        value={space.customName || space.name}
-                        onChange={(e) =>
-                          updateSpace(spaceKey, { customName: e.target.value })
-                        }
-                        className="text-sm font-medium text-slate-900 bg-transparent border-none focus:outline-none focus:bg-slate-100 rounded px-1 py-0.5 w-full"
-                      />
+                    <td className={`sticky left-0 z-10 px-4 py-2 border-b border-slate-100 min-w-[220px] ${rowDiverged ? "bg-amber-50/40 group-hover:bg-amber-50/60" : "bg-white group-hover:bg-slate-50/60"}`}>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={space.customName || space.name}
+                          onChange={(e) =>
+                            updateSpace(spaceKey, { customName: e.target.value })
+                          }
+                          className="text-sm font-medium text-slate-900 bg-transparent border-none focus:outline-none focus:bg-slate-100 rounded px-1 py-0.5 flex-1 min-w-0"
+                        />
+                        {rowDiverged && (
+                          <span className="flex items-center gap-0.5 shrink-0" title={[
+                            rowQtyDiverged && `Qty: ${space.quantity} (recommended: ${ftEntry?.quantity})`,
+                            rowSfDiverged && `SF: ${space.sfEach} (recommended: ${ftEntry?.sfEach})`,
+                          ].filter(Boolean).join(" · ")}>
+                            {rowQtyDiverged && <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block" />}
+                            {rowSfDiverged && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />}
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-3 py-2 border-b border-slate-100">
-                      {visibilitySettings.workspaceType && typePill(space.workstationType)}
-                    </td>
+                    {!focusCols && (
+                      <td className="px-3 py-2 border-b border-slate-100">
+                        {visibilitySettings.workspaceType && typePill(space.workstationType)}
+                      </td>
+                    )}
                     {/* Quantity */}
                     <td className="px-3 py-2 border-b border-slate-100">
                       <div className="flex items-center justify-center gap-1">
@@ -2681,20 +2796,31 @@ const WorkplaceProgrammingTool = () => {
                         </button>
                       </div>
                     </td>
-                    {/* Capacity */}
+                    {/* Capacity — Workbench only */}
+                    {!focusCols && (
+                      <td className="px-3 py-2 border-b border-slate-100">
+                        <div className="flex items-center justify-center">
+                          <NumberField
+                            value={space.capacity}
+                            onChange={(n) => updateSpace(spaceKey, { capacity: n })}
+                            ariaLabel={`${space.customName || space.name} capacity`}
+                            className="w-12 text-sm tabular-nums text-center bg-transparent border-none focus:outline-none focus:bg-slate-50 rounded px-1 py-0.5"
+                          />
+                        </div>
+                      </td>
+                    )}
+                    {/* SF Each — editable with step controls */}
                     <td className="px-3 py-2 border-b border-slate-100">
-                      <div className="flex items-center justify-center">
-                        <NumberField
-                          value={space.capacity}
-                          onChange={(n) => updateSpace(spaceKey, { capacity: n })}
-                          ariaLabel={`${space.customName || space.name} capacity`}
-                          className="w-12 text-sm tabular-nums text-center bg-transparent border-none focus:outline-none focus:bg-slate-50 rounded px-1 py-0.5"
-                        />
-                      </div>
-                    </td>
-                    {/* SF Each */}
-                    <td className="px-3 py-2 border-b border-slate-100">
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const n = Math.max(1, space.sfEach - 10)
+                            updateSpace(spaceKey, { sfEach: n, totalArea: space.quantity * n })
+                          }}
+                          className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs"
+                          aria-label="Decrease SF"
+                        >−</button>
                         <NumberField
                           value={space.sfEach}
                           onChange={(n) =>
@@ -2706,33 +2832,46 @@ const WorkplaceProgrammingTool = () => {
                           ariaLabel={`${space.customName || space.name} SF each`}
                           className="w-14 text-sm tabular-nums text-center bg-transparent border-none focus:outline-none focus:bg-slate-50 rounded px-1 py-0.5"
                         />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const n = space.sfEach + 10
+                            updateSpace(spaceKey, { sfEach: n, totalArea: space.quantity * n })
+                          }}
+                          className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs"
+                          aria-label="Increase SF"
+                        >+</button>
                       </div>
                     </td>
                     {/* Total SF */}
-                    <td className="px-3 py-2 border-b border-slate-100 text-center text-sm font-semibold tabular-nums text-slate-900">
+                    <td className="px-3 py-2 border-b border-slate-100 text-right text-sm font-semibold tabular-nums text-slate-900">
                       {(space.quantity * space.sfEach).toLocaleString()}
                     </td>
-                    {/* Allocated rollup */}
-                    <td className="px-3 py-2 border-b border-slate-100 text-center">
-                      <span
-                        className={`text-sm font-semibold tabular-nums ${allocStatus}`}
-                        title={`${totalAllocated} allocated of ${space.quantity}`}
-                      >
-                        {totalAllocated}
-                        <span className="text-slate-400 font-normal">/{space.quantity}</span>
-                      </span>
-                    </td>
-                    {/* Status */}
-                    <td className="px-3 py-2 border-b border-slate-100 text-center">
-                      <span
-                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${status.color}`}
-                        title={recQty > 0 ? `Recommended: ${recQty}` : ""}
-                      >
-                        {status.label}
-                      </span>
-                    </td>
-                    {/* Per-department allocation steppers */}
-                    {departments.map((dept) => {
+                    {/* Allocated rollup — Workbench only */}
+                    {!focusCols && (
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <span
+                          className={`text-sm font-semibold tabular-nums ${allocStatus}`}
+                          title={`${totalAllocated} allocated of ${space.quantity}`}
+                        >
+                          {totalAllocated}
+                          <span className="text-slate-400 font-normal">/{space.quantity}</span>
+                        </span>
+                      </td>
+                    )}
+                    {/* Status — Workbench only */}
+                    {!focusCols && (
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${status.color}`}
+                          title={recQty > 0 ? `Recommended: ${recQty}` : ""}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                    )}
+                    {/* Per-department allocation steppers — Workbench only */}
+                    {!focusCols && departments.map((dept) => {
                       const alloc = (space.departmentAllocations || []).find(
                         (a) => a.departmentId === dept.id
                       )
@@ -2981,6 +3120,37 @@ const WorkplaceProgrammingTool = () => {
     },
   }
 
+  // Canvas mode: Focus (minimal, table-first), Workbench (all features), Briefing (read-only)
+  type CanvasMode = "focus" | "workbench" | "briefing"
+  const [canvasMode, setCanvasMode] = useState<CanvasMode>("workbench")
+
+  // Targets sidebar toggle (shown in Workbench, hidden in Focus/Briefing)
+  const [showTargetsSidebar, setShowTargetsSidebar] = useState(true)
+
+  // Global card/table master toggle — overrides all zone view modes when changed
+  const [globalViewMode, setGlobalViewMode] = useState<"cards" | "table">("cards")
+
+  // Set hasMounted after first client render to avoid SSR/DnD hydration mismatch
+  useEffect(() => { setHasMounted(true) }, [])
+
+  // React to mode changes: update sidebar + view mode defaults
+  useEffect(() => {
+    if (canvasMode === "workbench") {
+      setShowTargetsSidebar(true)
+    } else {
+      setShowTargetsSidebar(false)
+    }
+    if (canvasMode === "focus") {
+      // Focus mode: switch all zones to table view
+      setZoneViewMode({ "Focus Open": "table", "Focus Enclosed": "table", Collaborative: "table", Support: "table", Wellness: "table" })
+      setGlobalViewMode("table")
+    } else if (canvasMode === "workbench") {
+      setZoneViewMode({ "Focus Open": "cards", "Focus Enclosed": "cards", Collaborative: "cards", Support: "cards", Wellness: "cards" })
+      setGlobalViewMode("cards")
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasMode])
+
   // ProgramIsland orchestration:
   //  - `islandDock` is lifted here so the position persists across the
   //     embedded -> floating transition on scroll.
@@ -3050,6 +3220,43 @@ const WorkplaceProgrammingTool = () => {
       count: islandCounts.Wellness,
     },
   ]
+
+  // Live FT engine baseline for divergence indicators.
+  // Computes what the engine would recommend for the current config, and exposes
+  // it as a name-keyed Map so SpaceCard + ZoneTable can flag qty/SF divergence.
+  // Divergence baseline: snapshot of space values at canvas load time (or after Recalibrate).
+  // Compares the USER's current edits against the engine's output — only shows dots when something
+  // has actually been manually changed, not on every render due to config drift.
+  const ftBaselineRef = useRef<Map<string, { quantity: number; sfEach: number }> | null>(null)
+  if (
+    ftBaselineRef.current === null ||
+    (ftBaselineRef.current.size === 0 && Object.keys(editableSpaces).length > 0)
+  ) {
+    ftBaselineRef.current = new Map(
+      Object.values(editableSpaces).map((s) => [
+        s.name,
+        { quantity: s.quantity, sfEach: s.sfEach },
+      ])
+    )
+  }
+  const ftBaseline = visibility.recommendations
+    ? ftBaselineRef.current
+    : new Map<string, { quantity: number; sfEach: number }>()
+
+  // Count actual divergences from baseline to drive the Edits indicator dots.
+  const divergenceCount = (() => {
+    const baseline = ftBaselineRef.current
+    if (!baseline || baseline.size === 0) return { qty: 0, sf: 0 }
+    let qty = 0, sf = 0
+    for (const space of Object.values(editableSpaces)) {
+      if (space.isActive === false) continue
+      const entry = baseline.get(space.name)
+      if (!entry) continue
+      if (space.quantity !== entry.quantity) qty++
+      if (space.sfEach !== entry.sfEach) sf++
+    }
+    return { qty, sf }
+  })()
 
   // Floating island position classes per dock, kept outside JSX for clarity.
   const floatingDockClasses: Record<IslandDock, string> = {
@@ -3272,271 +3479,339 @@ const WorkplaceProgrammingTool = () => {
           variant="floating"
           dock={islandDock}
           onDockChange={setIslandDock}
+          headcount={targetHeadcount}
+          seatCount={finalEditableTotals.assignableSeats}
+          rsfPerPerson={targetHeadcount > 0 ? Math.round((finalEditableTotals.totalRSF || 0) / targetHeadcount) : 0}
+          usfPerPerson={targetHeadcount > 0 ? Math.round((finalEditableTotals.totalUSF || 0) / targetHeadcount) : 0}
+          scenarioName={activeScenario?.name}
         />
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <header className="bg-white/80 backdrop-blur border-b border-slate-200/70 px-6 py-3 sticky top-0 z-30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Image
-                src="/nelson-logo.png"
-                alt="Nelson"
-                width={120}
-                height={40}
-                className="h-8 w-auto"
+      <DragDropContext key={hasMounted ? 'client' : 'ssr'} onDragEnd={handleDragEnd}>
+        {/* ============================================================
+            HEADER — 3 tiers
+            Row 1: Logo · Project identity · Actions · Avatar
+            Row 2: Mode tabs with subtitles
+            Row 3: Feature toggles (mode-adaptive) — hidden in Briefing
+            ============================================================ */}
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+
+          {/* Row 1 — Brand + Project + Actions */}
+          <div className="flex items-center justify-between gap-4 px-6 h-14 border-b border-slate-100">
+            <div className="flex items-center gap-3 shrink-0 min-w-0">
+              <Image src="/nelson-logo.png" alt="Nelson" width={100} height={32} className="h-7 w-auto shrink-0" />
+              <span className="h-5 w-px bg-slate-200 shrink-0" aria-hidden="true" />
+              {/* Inline-editable project name */}
+              <input
+                value={projectInfo.projectName}
+                onChange={(e) => setProjectInfo((p) => ({ ...p, projectName: e.target.value }))}
+                placeholder="Untitled Project"
+                className="text-sm font-semibold text-slate-800 bg-transparent border-none outline-none focus:bg-slate-50 rounded px-1 py-0.5 max-w-[220px] truncate placeholder:text-slate-400"
               />
-              <span className="hidden sm:inline-block h-5 w-px bg-slate-200" aria-hidden="true" />
-              <span className="hidden sm:inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-slate-500 font-semibold">
-                Workplace Programming
-              </span>
+              {projectInfo.client && (
+                <>
+                  <span className="text-slate-300 text-xs">·</span>
+                  <input
+                    value={projectInfo.client}
+                    onChange={(e) => setProjectInfo((p) => ({ ...p, client: e.target.value }))}
+                    placeholder="Client"
+                    className="text-xs text-slate-500 bg-transparent border-none outline-none focus:bg-slate-50 rounded px-1 py-0.5 max-w-[140px] truncate placeholder:text-slate-300"
+                  />
+                </>
+              )}
             </div>
-            <div className="flex items-center gap-3">
-  <Button
-  variant="outline"
-  size="sm"
-  onClick={() => setShowFastTrackWarning(true)}
-  className="text-teal-600 hover:text-teal-700 border-teal-200 hover:border-teal-300 hover:bg-teal-50"
-  >
-  <BarChart3 className="h-4 w-4 mr-2" />
-  Fast Track View
-  </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowOnboarding(true)}
-                className="text-slate-600 hover:text-slate-900 border-slate-200"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                New Program
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => setShowFastTrackWarning(true)}
+                className="text-teal-600 hover:text-teal-700 border-teal-200 hover:border-teal-300 hover:bg-teal-50 gap-1.5">
+                <BarChart3 className="h-3.5 w-3.5" /> Explore
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAdminPanel(true)}
-                className="text-slate-600 hover:text-slate-900 border-slate-200"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Admin
+              <Button variant="ghost" size="sm" onClick={() => setShowAdminPanel(true)}
+                className="text-slate-500 hover:text-slate-700 gap-1.5">
+                <Settings className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Admin</span>
               </Button>
-              <div className="flex items-center gap-2 pl-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold ring-2 ring-white shadow-sm">
-                  D
-                </div>
-                <span className="text-sm font-medium text-slate-700">David</span>
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold ring-2 ring-white shadow-sm shrink-0">
+                D
               </div>
             </div>
           </div>
+
+          {/* Row 2 — Mode tabs (right-aligned under Explore/Admin) */}
+          <div className="flex items-stretch justify-end border-b border-slate-100 px-6">
+            {(
+              [
+                { id: "focus" as CanvasMode, label: "Focus", icon: Focus, sub: "Quantities & SF · Clean table" },
+                { id: "workbench" as CanvasMode, label: "Workbench", icon: Wrench, sub: "Full toolbox · All columns" },
+                { id: "briefing" as CanvasMode, label: "Briefing", icon: Presentation, sub: "Presentation · Read-only" },
+              ] as { id: CanvasMode; label: string; icon: React.ElementType; sub: string }[]
+            ).map(({ id, label, icon: Icon, sub }) => (
+              <button
+                key={id}
+                onClick={() => setCanvasMode(id)}
+                className={`flex flex-col items-start px-4 py-2.5 border-b-2 transition-all gap-0.5 ${
+                  canvasMode === id
+                    ? "border-teal-600 text-teal-700"
+                    : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="text-sm font-semibold">{label}</span>
+                </div>
+                <span className={`text-[10px] font-normal leading-none ${canvasMode === id ? "text-teal-500" : "text-slate-400"}`}>{sub}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Row 3 — Feature toggles (mode-adaptive, hidden in Briefing) */}
+          {canvasMode !== "briefing" && (
+            <div className="flex items-center gap-0.5 px-4 py-1.5 bg-slate-50/80">
+              <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mr-2 shrink-0">Show</span>
+
+              {/* Global Cards / Table toggle */}
+              <div className="inline-flex items-center rounded-md border border-slate-200 bg-white overflow-hidden mr-2 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGlobalViewMode("cards")
+                    setZoneViewMode(Object.fromEntries(
+                      ["Focus Open","Focus Enclosed","Collaborative","Support","Wellness"].map(z => [z, "cards"])
+                    ) as Record<string, ZoneViewMode>)
+                  }}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors ${
+                    globalViewMode === "cards" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                  }`}
+                  title="Cards view"
+                >
+                  <LayoutGrid className="w-3 h-3" />
+                  Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGlobalViewMode("table")
+                    setZoneViewMode(Object.fromEntries(
+                      ["Focus Open","Focus Enclosed","Collaborative","Support","Wellness"].map(z => [z, "table"])
+                    ) as Record<string, ZoneViewMode>)
+                  }}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors ${
+                    globalViewMode === "table" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                  }`}
+                  title="Table view"
+                >
+                  <Table2 className="w-3 h-3" />
+                  Table
+                </button>
+              </div>
+
+              <span className="w-px h-4 bg-slate-200 mx-1 shrink-0" />
+
+              {/* Workspace Type + Capacity (Workbench only) */}
+              {canvasMode === "workbench" && (
+                <>
+                  <FeatureToggle active={visibility.workspaceType} onClick={() => toggleVisibility("workspaceType")} label="Type" title="Workspace type (Employee / Private / Flex)" />
+                  <FeatureToggle active={visibility.capacity} onClick={() => toggleVisibility("capacity")} label="Capacity" title="Seats per space" />
+                  <span className="w-px h-4 bg-slate-200 mx-1.5 shrink-0" />
+                </>
+              )}
+
+              {/* Recommendations / Edits */}
+              <FeatureToggle
+                active={visibility.recommendations}
+                onClick={() => toggleVisibility("recommendations")}
+                label="Edits"
+                title="Highlight spaces manually changed from the engine baseline (● qty  ● SF)"
+                suffix={visibility.recommendations && (divergenceCount.qty > 0 || divergenceCount.sf > 0) ? (
+                  <span className="flex items-center gap-0.5 ml-1">
+                    {divergenceCount.qty > 0 && <span className="w-2 h-2 rounded-full bg-teal-500 inline-block" title={`${divergenceCount.qty} qty changes`} />}
+                    {divergenceCount.sf > 0 && <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" title={`${divergenceCount.sf} SF changes`} />}
+                  </span>
+                ) : undefined}
+              />
+
+              {/* Allocations + Departments (Workbench only) */}
+              {canvasMode === "workbench" && (
+                <>
+                  <span className="w-px h-4 bg-slate-200 mx-1.5 shrink-0" />
+                  <FeatureToggle active={visibility.allocations} onClick={() => toggleVisibility("allocations")} label="Allocations" title="Department allocation indicators" />
+                  <FeatureToggle active={visibility.departmentManagement} onClick={() => toggleVisibility("departmentManagement")} label="Departments" title="Per-department columns" />
+                  <span className="w-px h-4 bg-slate-200 mx-1.5 shrink-0" />
+                  <FeatureToggle active={visibility.growth} onClick={() => toggleVisibility("growth")} label="Growth" title="Growth planning" />
+                </>
+              )}
+
+              {/* Targets toggle (Workbench only, right-aligned) */}
+              {canvasMode === "workbench" && (
+                <>
+                  <span className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={() => setShowTargetsSidebar((v) => !v)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all border ${
+                      showTargetsSidebar
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-500 border-slate-200 hover:text-slate-800 hover:border-slate-300"
+                    }`}
+                  >
+                    {showTargetsSidebar ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
+                    Targets
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </header>
 
         {/* ============================================================
-            Visibility Control Toolbar
+            Briefing Mode — read-only KPI presentation, replaces canvas
             ============================================================ */}
-        <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 sticky top-[57px] z-20">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mr-2">
-              Show:
-            </span>
-
-            {/* Allocations toggle */}
-            <button
-              type="button"
-              onClick={() => toggleVisibility("allocations")}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                visibility.allocations
-                  ? "bg-white border border-slate-300 text-slate-900 hover:bg-slate-50"
-                  : "bg-slate-200 border border-slate-300 text-slate-600 hover:bg-slate-300"
-              }`}
-              title="Toggle allocation indicators (remaining headcount, etc.)"
-              aria-pressed={visibility.allocations}
-            >
-              Allocations
-            </button>
-
-            {/* Department Management toggle */}
-            <button
-              type="button"
-              onClick={() => toggleVisibility("departmentManagement")}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                visibility.departmentManagement
-                  ? "bg-white border border-slate-300 text-slate-900 hover:bg-slate-50"
-                  : "bg-slate-200 border border-slate-300 text-slate-600 hover:bg-slate-300"
-              }`}
-              title="Toggle department allocation columns and UI"
-              aria-pressed={visibility.departmentManagement}
-            >
-              Department Management
-            </button>
-
-            {/* Workspace Type toggle */}
-            <button
-              type="button"
-              onClick={() => toggleVisibility("workspaceType")}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                visibility.workspaceType
-                  ? "bg-white border border-slate-300 text-slate-900 hover:bg-slate-50"
-                  : "bg-slate-200 border border-slate-300 text-slate-600 hover:bg-slate-300"
-              }`}
-              title="Toggle workspace type indicators (Employee/Private/Flex)"
-              aria-pressed={visibility.workspaceType}
-            >
-              Workspace Type
-            </button>
-
-            {/* Capacity toggle */}
-            <button
-              type="button"
-              onClick={() => toggleVisibility("capacity")}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                visibility.capacity
-                  ? "bg-white border border-slate-300 text-slate-900 hover:bg-slate-50"
-                  : "bg-slate-200 border border-slate-300 text-slate-600 hover:bg-slate-300"
-              }`}
-              title="Toggle capacity data per space"
-              aria-pressed={visibility.capacity}
-            >
-              Capacity
-            </button>
-
-            {/* Recommendations toggle */}
-            <button
-              type="button"
-              onClick={() => toggleVisibility("recommendations")}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                visibility.recommendations
-                  ? "bg-white border border-slate-300 text-slate-900 hover:bg-slate-50"
-                  : "bg-slate-200 border border-slate-300 text-slate-600 hover:bg-slate-300"
-              }`}
-              title="Toggle recommendation status and indicators"
-              aria-pressed={visibility.recommendations}
-            >
-              Recommendations
-            </button>
-
-            {/* Growth toggle */}
-            <button
-              type="button"
-              onClick={() => toggleVisibility("growth")}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                visibility.growth
-                  ? "bg-white border border-slate-300 text-slate-900 hover:bg-slate-50"
-                  : "bg-slate-200 border border-slate-300 text-slate-600 hover:bg-slate-300"
-              }`}
-              title="Toggle growth planning UI and projections"
-              aria-pressed={visibility.growth}
-            >
-              Growth
-            </button>
-
-            <span className="ml-auto text-[10px] text-slate-400">|</span>
-
-            {/* Preset quick buttons (future-proofing) */}
-            <button
-              type="button"
-              onClick={() => setVisibility(presets.planning)}
-              className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium text-slate-600 hover:bg-white hover:border hover:border-slate-300 transition-colors"
-              title="Show all details (Planning mode)"
-            >
-              All
-            </button>
-            <button
-              type="button"
-              onClick={() => setVisibility(presets.clientPresentation)}
-              className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium text-slate-600 hover:bg-white hover:border hover:border-slate-300 transition-colors"
-              title="Minimize detail for client presentation"
-            >
-              Minimal
-            </button>
+        {canvasMode === "briefing" && (
+          <div className="overflow-y-auto" style={{ height: "calc(100vh - 106px)" }}>
+            <BriefingView
+              spaces={editableSpaces}
+              totals={{
+                totalRSF: finalEditableTotals.totalRSF || 0,
+                totalUSF: finalEditableTotals.totalUSF || 0,
+                assignableSeats: finalEditableTotals.assignableSeats || 0,
+                focusOpenUSF: finalEditableTotals.focusOpenUSF || 0,
+                focusEnclosedUSF: finalEditableTotals.focusEnclosedUSF || 0,
+                collaborativeUSF: finalEditableTotals.collaborativeUSF || 0,
+                supportUSF: finalEditableTotals.supportUSF || 0,
+                wellnessUSF: finalEditableTotals.wellnessUSF || 0,
+              }}
+              headcount={targetHeadcount}
+              scenarioName={activeScenario?.name}
+              projectInfo={{
+                projectName: projectInfo.projectName,
+                client: projectInfo.client,
+                date: projectInfo.date,
+                designedBy: projectInfo.designedBy,
+              }}
+            />
           </div>
-        </div>
+        )}
 
-        <div className="flex">
-          <div className="flex-1 p-6">
-            {/*
-              Premium project header — project identity on the left, live
-              program summary island embedded on the right. As the user
-              scrolls past this card, the embedded island fades out and a
-              fixed sticky version fades in at the user's chosen dock.
-            */}
-            <div
-              ref={headerCardRef}
-              className="relative mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50 shadow-[0_1px_0_0_rgb(15_23_42_/_0.03),0_8px_24px_-12px_rgb(15_23_42_/_0.08)]"
-            >
-              {/* Decorative accent ribbon */}
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent rounded-t-2xl"
-              />
-              <div className="p-6 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold mb-1.5">
-                    <span className="inline-flex w-1.5 h-1.5 rounded-full bg-cyan-500" />
-                    Workplace Program
+        {/* ============================================================
+            Main layout: ResizablePanelGroup with optional Config sidebar
+            ============================================================ */}
+        {canvasMode !== "briefing" && (
+        <ResizablePanelGroup direction="horizontal" className="overflow-hidden" style={{ height: "calc(100vh - 140px)" }}>
+          {/* Main scrollable content area */}
+          <ResizablePanel defaultSize={showTargetsSidebar && canvasMode === "workbench" ? 68 : 100} minSize={50}>
+          <div className="h-full overflow-y-auto">
+          {/* ── Focus mode: sticky KPI bar ── */}
+          {canvasMode === "focus" && (
+            <div className="sticky top-0 z-20 bg-white border-b-2 border-teal-600 px-6 py-3.5 flex items-center gap-0 shadow-sm">
+              {/* RSF — primary hero metric */}
+              <div className="flex flex-col pr-6 border-r border-slate-200 mr-6">
+                <span className="text-[9px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-0.5">Total RSF</span>
+                <span className="text-4xl font-black tabular-nums leading-none text-teal-600">
+                  {Math.round(finalEditableTotals.totalRSF || 0).toLocaleString()}
+                </span>
+              </div>
+              {/* Secondary KPIs */}
+              <div className="flex items-center gap-5 mr-6">
+                {[
+                  { label: "USF",        value: Math.round(finalEditableTotals.totalUSF || 0).toLocaleString() },
+                  { label: "RSF/person", value: targetHeadcount > 0 ? Math.round((finalEditableTotals.totalRSF || 0) / targetHeadcount).toLocaleString() : "—" },
+                  { label: "Seats",      value: (finalEditableTotals.assignableSeats || 0).toLocaleString() },
+                  { label: "Headcount",  value: targetHeadcount.toLocaleString() },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex flex-col">
+                    <span className="text-[9px] uppercase tracking-[0.14em] text-slate-400 font-semibold mb-0.5">{label}</span>
+                    <span className="text-2xl font-bold tabular-nums leading-none text-slate-800">{value}</span>
                   </div>
-                  <input
-                    type="text"
-                    value={projectInfo.projectName}
-                    onChange={(e) =>
-                      setProjectInfo((prev) => ({ ...prev, projectName: e.target.value }))
-                    }
-                    className="block w-full max-w-xl text-2xl lg:text-3xl font-semibold tracking-tight text-slate-900 bg-transparent border-none outline-none focus:bg-slate-50 rounded-md px-0 py-0.5 -ml-0.5 placeholder:text-slate-300"
-                    placeholder="Name this project"
-                    aria-label="Project name"
-                  />
+                ))}
+              </div>
+              {/* Zone mix chips */}
+              <div className="flex items-center gap-2 border-l border-slate-200 pl-6">
+                {[
+                  { label: "FO", usf: finalEditableTotals.focusOpenUSF,     color: "bg-cyan-500" },
+                  { label: "FE", usf: finalEditableTotals.focusEnclosedUSF, color: "bg-teal-600" },
+                  { label: "CO", usf: finalEditableTotals.collaborativeUSF, color: "bg-green-500" },
+                  { label: "SP", usf: finalEditableTotals.supportUSF,       color: "bg-amber-500" },
+                  { label: "WE", usf: finalEditableTotals.wellnessUSF,      color: "bg-purple-500" },
+                ].map(({ label, usf, color }) => {
+                  const total = finalEditableTotals.totalUSF || 1
+                  const pct = Math.round(((usf || 0) / total) * 100)
+                  if (pct === 0) return null
+                  return (
+                    <div key={label} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className={`w-2 h-2 rounded-full ${color}`} />
+                      <span className="text-sm font-bold text-slate-700 tabular-nums">{pct}%</span>
+                      <span className="text-[10px] text-slate-400 font-medium">{label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              {/* Scenario picker — right side of focus bar */}
+              <div className="ml-auto pl-4 flex items-center gap-2">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => { setScenarioMenuOpen((o) => !o); setCompareMenuOpen(false) }}
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors"
+                    aria-expanded={scenarioMenuOpen}
+                  >
+                    <Layers className="w-3 h-3" />
+                    <span className="normal-case tracking-normal text-xs font-semibold">{activeScenario ? activeScenario.name : "Unsaved"}</span>
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {scenarioMenuOpen && (
+                    <div className="absolute top-full right-0 mt-1.5 w-72 rounded-xl border border-slate-200 bg-white shadow-xl z-40 overflow-hidden" role="menu">
+                      <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                        <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Scenarios</span>
+                        <span className="text-[10px] text-slate-400 tabular-nums">{scenarios.length} saved</span>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto">
+                        {scenarios.length === 0 && (
+                          <div className="px-3 py-4 text-center text-xs text-slate-500">No scenarios saved yet.</div>
+                        )}
+                        {scenarios.map((s) => {
+                          const isActive = s.id === activeScenarioId
+                          const m = snapshotMetrics(s.snapshot)
+                          return (
+                            <div key={s.id} className={`group px-3 py-2 border-b border-slate-50 last:border-b-0 ${isActive ? "bg-indigo-50/60" : "hover:bg-slate-50"}`}>
+                              <div className="flex items-center gap-2">
+                                {isActive && <Check className="w-3 h-3 text-indigo-600 shrink-0" />}
+                                <button type="button" onClick={() => switchToScenario(s.id)} className="flex-1 text-left text-sm font-medium text-slate-900 truncate" disabled={isActive}>{s.name}</button>
+                                <button type="button" onClick={() => deleteScenario(s.id)} className="p-1 rounded hover:bg-red-100 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3" /></button>
+                              </div>
+                              <div className="flex gap-3 mt-0.5 text-[10px] text-slate-500 tabular-nums pl-5">
+                                <span>{m.totalUSF.toLocaleString()} USF</span><span>{m.totalHeadcount} HC</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="border-t border-slate-100 p-2 flex gap-1.5">
+                        {activeScenarioId && <button type="button" onClick={overwriteActiveScenario} className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"><Save className="w-3 h-3" />Save</button>}
+                        <button type="button" onClick={() => { setSavingNewScenario(true); setNewScenarioName(scenarios.length === 0 ? "Baseline" : `Scenario ${scenarios.length + 1}`) }} className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"><Plus className="w-3 h-3" />Save as new</button>
+                      </div>
+                      {savingNewScenario && (
+                        <div className="border-t border-slate-100 p-2 bg-slate-50/60 flex items-center gap-1.5">
+                          <input autoFocus value={newScenarioName} onChange={(e) => setNewScenarioName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveCurrentAsNewScenario(newScenarioName); if (e.key === "Escape") { setSavingNewScenario(false); setNewScenarioName("") } }} placeholder="Scenario name" className="flex-1 text-sm bg-white border border-slate-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                          <button type="button" onClick={() => saveCurrentAsNewScenario(newScenarioName)} className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold">Save</button>
+                          <button type="button" onClick={() => { setSavingNewScenario(false); setNewScenarioName("") }} className="px-2 py-1 rounded text-slate-600 hover:bg-slate-200 text-xs">Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
-                  {/* Compact meta row */}
-                  <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-slate-600">
-                    <label className="group inline-flex items-center gap-1.5">
-                      <span className="text-[10px] uppercase tracking-[0.14em] text-slate-400 font-semibold">
-                        Client
-                      </span>
-                      <input
-                        type="text"
-                        value={projectInfo.client}
-                        onChange={(e) =>
-                          setProjectInfo((prev) => ({ ...prev, client: e.target.value }))
-                        }
-                        className="bg-transparent border-none outline-none focus:bg-slate-50 rounded px-1.5 py-0.5 min-w-[110px] text-slate-800 font-medium placeholder:text-slate-300"
-                        placeholder="—"
-                      />
-                    </label>
-                    <span className="text-slate-200" aria-hidden="true">
-                      |
-                    </span>
-                    <label className="group inline-flex items-center gap-1.5">
-                      <span className="text-[10px] uppercase tracking-[0.14em] text-slate-400 font-semibold">
-                        Designed by
-                      </span>
-                      <input
-                        type="text"
-                        value={projectInfo.designedBy}
-                        onChange={(e) =>
-                          setProjectInfo((prev) => ({ ...prev, designedBy: e.target.value }))
-                        }
-                        className="bg-transparent border-none outline-none focus:bg-slate-50 rounded px-1.5 py-0.5 min-w-[110px] text-slate-800 font-medium placeholder:text-slate-300"
-                        placeholder="—"
-                      />
-                    </label>
-                    <span className="text-slate-200" aria-hidden="true">
-                      |
-                    </span>
-                    <label className="group inline-flex items-center gap-1.5">
-                      <span className="text-[10px] uppercase tracking-[0.14em] text-slate-400 font-semibold">
-                        Date
-                      </span>
-                      <input
-                        type="date"
-                        value={projectInfo.date}
-                        onChange={(e) =>
-                          setProjectInfo((prev) => ({ ...prev, date: e.target.value }))
-                        }
-                        className="bg-transparent border-none outline-none focus:bg-slate-50 rounded px-1.5 py-0.5 text-slate-800 font-medium tabular-nums"
-                      />
-                    </label>
-                    <span className="text-slate-200" aria-hidden="true">
-                      |
-                    </span>
-                    {/* Plan for growth toggle (visibility-controlled) */}
+          {/* ── Workbench mode: sticky ProgramIsland header ── */}
+          {canvasMode === "workbench" && (
+          <div
+            ref={headerCardRef}
+            className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm"
+          >
+              <div className="p-4 flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600 min-w-0">
+                  {/* Plan for growth toggle (visibility-controlled) */}
                     {visibility.growth && (
                       <>
                         <button
@@ -3892,11 +4167,18 @@ const WorkplaceProgrammingTool = () => {
                     onUploadLogo={(dataUrl) => setClientLogoUrl(dataUrl)}
                     onRemoveLogo={() => setClientLogoUrl(null)}
                     variant="embedded"
+                    headcount={targetHeadcount}
+                    seatCount={finalEditableTotals.assignableSeats}
+                    rsfPerPerson={targetHeadcount > 0 ? Math.round((finalEditableTotals.totalRSF || 0) / targetHeadcount) : 0}
+                    usfPerPerson={targetHeadcount > 0 ? Math.round((finalEditableTotals.totalUSF || 0) / targetHeadcount) : 0}
+                    scenarioName={activeScenario?.name}
                   />
                 </div>
-              </div>
             </div>
+          )}
 
+          {/* ── Main scrollable content ── */}
+          <div className="p-6">
             {/* KPI cards hidden - summary now lives in the floating dynamic island at the top */}
             <div className="hidden grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               {/* Total Space Card */}
@@ -4276,6 +4558,7 @@ const WorkplaceProgrammingTool = () => {
               </div>
             )}
 
+            {canvasMode === "workbench" && !showTargetsSidebar && (
             <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border border-slate-200 shadow-sm mb-8">
               <div
                 className="flex items-center justify-between p-6 cursor-pointer hover:bg-gradient-to-br hover:from-slate-100 hover:to-blue-100 transition-colors rounded-t-xl"
@@ -4629,6 +4912,7 @@ const WorkplaceProgrammingTool = () => {
                 )
               })()}
             </div>
+            )}
 
             <div className="w-full">
               <ZoneHeader
@@ -4652,8 +4936,63 @@ const WorkplaceProgrammingTool = () => {
                     "Focus Enclosed": mode,
                   }))
                 }
+                gapBadges={canvasMode === "workbench" ? [
+                  { label: "offices", configured: getWorkspaceTypeDistribution("private").configured, target: targetOfficeCount },
+                  { label: "workstations", configured: getWorkspaceTypeDistribution("employee").configured + getWorkspaceTypeDistribution("flex").configured, target: targetWorkstations + targetHybridWorkers },
+                ] : undefined}
               />
 
+              {/* Focus mode: always side-by-side Open / Enclosed */}
+              {canvasMode === "focus" ? (
+                <div className="bg-white rounded-lg border border-gray-200 mb-8 overflow-hidden">
+                  <div className="grid grid-cols-2 divide-x divide-slate-100">
+                    {/* Focus Open column */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                          <span className="text-xs font-semibold text-slate-700">Focus Open</span>
+                          <span className="text-[10px] text-slate-400 tabular-nums">{finalEditableTotals.focusOpenUSF.toLocaleString()} USF</span>
+                        </div>
+                        <button onClick={() => setAddSpaceDialog({ open: true, zone: "Focus Open" })} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium hover:bg-slate-200 transition-colors">
+                          <Plus className="w-3 h-3" /> Add
+                        </button>
+                      </div>
+                      {zoneViewMode["Focus Open"] === "table" ? (
+                        <ZoneTable zoneSpaceEntries={Object.entries(editableSpaces).filter(([_, s]) => s.zone === "Focus Open")} focusMode={true} visibility={visibility} />
+                      ) : (
+                        <div className="p-4 grid grid-cols-1 gap-3">
+                          {Object.entries(editableSpaces).filter(([_, s]) => s.zone === "Focus Open").map(([spaceKey, space]) => (
+                            <SpaceCard key={spaceKey} spaceKey={spaceKey} space={space} updateSpace={updateSpace} toggleDedicatedStatus={toggleDedicatedStatus} departments={departments} departmentExpansionState={departmentExpansionState} setDepartmentExpansionState={setDepartmentExpansionState} configuredByDeptAndType={configuredByDeptAndType} plannedByType={{ employee: Math.max(0, targetHeadcount - targetOfficeCount), private: targetOfficeCount, flex: targetHybridWorkers }} visibility={visibility} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Focus Enclosed column */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-teal-600" />
+                          <span className="text-xs font-semibold text-slate-700">Focus Enclosed</span>
+                          <span className="text-[10px] text-slate-400 tabular-nums">{finalEditableTotals.focusEnclosedUSF.toLocaleString()} USF</span>
+                        </div>
+                        <button onClick={() => setAddSpaceDialog({ open: true, zone: "Focus Enclosed" })} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium hover:bg-slate-200 transition-colors">
+                          <Plus className="w-3 h-3" /> Add
+                        </button>
+                      </div>
+                      {zoneViewMode["Focus Enclosed"] === "table" ? (
+                        <ZoneTable zoneSpaceEntries={Object.entries(editableSpaces).filter(([_, s]) => s.zone === "Focus Enclosed")} focusMode={true} visibility={visibility} />
+                      ) : (
+                        <div className="p-4 grid grid-cols-1 gap-3">
+                          {Object.entries(editableSpaces).filter(([_, s]) => s.zone === "Focus Enclosed").map(([spaceKey, space]) => (
+                            <SpaceCard key={spaceKey} spaceKey={spaceKey} space={space} updateSpace={updateSpace} toggleDedicatedStatus={toggleDedicatedStatus} departments={departments} departmentExpansionState={departmentExpansionState} setDepartmentExpansionState={setDepartmentExpansionState} configuredByDeptAndType={configuredByDeptAndType} plannedByType={{ employee: Math.max(0, targetHeadcount - targetOfficeCount), private: targetOfficeCount, flex: targetHybridWorkers }} visibility={visibility} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
               <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
                 <div className="mb-6">
                   <div className="flex items-center justify-between gap-3 mb-4">
@@ -4677,6 +5016,7 @@ const WorkplaceProgrammingTool = () => {
                       zoneSpaceEntries={Object.entries(editableSpaces).filter(
                         ([_, space]) => space.zone === "Focus Open",
                       )}
+                      focusMode={false}
                       visibility={visibility}
                     />
                   ) : (
@@ -4744,6 +5084,7 @@ const WorkplaceProgrammingTool = () => {
                       zoneSpaceEntries={Object.entries(editableSpaces).filter(
                         ([_, space]) => space.zone === "Focus Enclosed",
                       )}
+                      focusMode={false}
                       visibility={visibility}
                     />
                   ) : (
@@ -4801,6 +5142,7 @@ const WorkplaceProgrammingTool = () => {
                   )}
                 </div>
               </div>
+              )}
 
               {["Collaborative", "Support", "Wellness"].map((zoneName) => {
                 const zoneSpaces = Object.entries(editableSpaces).filter(([_, space]) => space.zone === zoneName)
@@ -4830,7 +5172,7 @@ const WorkplaceProgrammingTool = () => {
                     />
 
                     {mode === "table" ? (
-                      <ZoneTable zoneSpaceEntries={zoneSpaces} visibility={visibility} />
+                      <ZoneTable zoneSpaceEntries={zoneSpaces} focusMode={canvasMode === "focus"} visibility={visibility} />
                     ) : (
                       <Droppable droppableId={zoneName}>
                         {(provided) => (
@@ -5087,7 +5429,176 @@ const WorkplaceProgrammingTool = () => {
               </Droppable>
             </div>
           </div>
-        </div>
+          </div>
+
+          </ResizablePanel>
+
+          {/* ── Config Targets Sidebar — resizable panel ── */}
+          {showTargetsSidebar && canvasMode === "workbench" && (
+            <>
+            <ResizableHandle withHandle className="bg-slate-200 hover:bg-teal-400 transition-colors" />
+            <ResizablePanel defaultSize={32} minSize={20} maxSize={55}>
+            <div className="h-full border-l border-slate-200 bg-white overflow-y-auto flex flex-col">
+              <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-slate-500" />
+                  <h2 className="text-sm font-semibold text-slate-900">Configuration Targets</h2>
+                </div>
+                <button
+                  onClick={() => setShowTargetsSidebar(false)}
+                  className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                  title="Close sidebar"
+                >
+                  <PanelRightClose className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                {(() => {
+                  const allocHeadcount = departments.reduce((s, d) => s + (d.headcount || 0), 0)
+                  const allocOffices = departments.reduce((s, d) => s + (d.officeCount || 0), 0)
+                  const allocHybrid = departments.reduce((s, d) => s + (d.hybridWorkers || 0), 0)
+                  const allocWorkstations = departments.reduce((s, d) => s + (d.workstations || 0), 0)
+                  const futureAllocHeadcount = departments.reduce((s, d) => s + (d.futureHeadcount ?? d.headcount ?? 0), 0)
+                  const futureAllocOffices = departments.reduce((s, d) => { const curr = d.headcount || 1; const fut = d.futureHeadcount ?? curr; return s + Math.round((d.officeCount || 0) * (fut / curr)) }, 0)
+                  const futureAllocWorkstations = departments.reduce((s, d) => { const curr = d.headcount || 1; const fut = d.futureHeadcount ?? curr; return s + Math.round((d.workstations || 0) * (fut / curr)) }, 0)
+                  const futureAllocHybrid = departments.reduce((s, d) => { const curr = d.headcount || 1; const fut = d.futureHeadcount ?? curr; return s + Math.round((d.hybridWorkers || 0) * (fut / curr)) }, 0)
+                  const configuredOffices = getWorkspaceTypeDistribution("private").configured
+                  const configuredWorkstations = getWorkspaceTypeDistribution("employee").configured
+                  const configuredHybrid = getWorkspaceTypeDistribution("flex").configured
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Company Targets</span>
+                        <button
+                          onClick={openRecalibratePreview}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Recalibrate{planForGrowth ? " Future" : ""}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <TargetTile label="Headcount" value={targetHeadcount} onChange={setTargetHeadcount} allocated={allocHeadcount} accent="blue" icon={<Users className="w-4 h-4 text-blue-700" />} growthMode={planForGrowth} futureValue={planForGrowth ? futureAllocHeadcount : undefined} futureAllocated={planForGrowth ? futureAllocHeadcount : undefined} showAllocations={visibility.allocations} />
+                        <TargetTile label="Offices" value={targetOfficeCount} onChange={setTargetOfficeCount} allocated={allocOffices} configured={configuredOffices} configuredLabel="Configured" accent="slate" icon={<Building className="w-4 h-4 text-slate-700" />} growthMode={planForGrowth} futureValue={planForGrowth ? futureAllocOffices : undefined} futureAllocated={planForGrowth ? futureAllocOffices : undefined} showAllocations={visibility.allocations} />
+                        <TargetTile label="Workstations" value={targetWorkstations} onChange={setTargetWorkstations} allocated={allocWorkstations} configured={configuredWorkstations} configuredLabel="Configured" accent="amber" icon={<Building2 className="w-4 h-4 text-amber-700" />} growthMode={planForGrowth} futureValue={planForGrowth ? futureAllocWorkstations : undefined} futureAllocated={planForGrowth ? futureAllocWorkstations : undefined} showAllocations={visibility.allocations} />
+                        <TargetTile label="Hybrid" value={targetHybridWorkers} onChange={setTargetHybridWorkers} allocated={allocHybrid} configured={configuredHybrid} configuredLabel="Configured" accent="emerald" icon={<Home className="w-4 h-4 text-emerald-700" />} growthMode={planForGrowth} futureValue={planForGrowth ? futureAllocHybrid : undefined} futureAllocated={planForGrowth ? futureAllocHybrid : undefined} showAllocations={visibility.allocations} />
+                      </div>
+
+                      {/* Program Status — gap analysis between targets and designed spaces */}
+                      {(() => {
+                        const rows = [
+                          { label: "Offices", configured: configuredOffices, target: targetOfficeCount, accent: "slate" },
+                          { label: "Workstations", configured: configuredWorkstations, target: targetWorkstations, accent: "amber" },
+                          { label: "Hybrid Seats", configured: configuredHybrid, target: targetHybridWorkers, accent: "emerald" },
+                        ] as const
+                        const anyGap = rows.some(r => r.target > 0 && r.configured < r.target)
+                        const allMet = rows.every(r => r.target === 0 || r.configured >= r.target)
+                        return (
+                          <div className={`rounded-xl border p-3 ${allMet ? "border-emerald-200 bg-emerald-50/50" : "border-amber-200 bg-amber-50/50"}`}>
+                            <div className="flex items-center justify-between mb-2.5">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Program Status</span>
+                              <span className={`text-[10px] font-semibold ${allMet ? "text-emerald-600" : "text-amber-600"}`}>
+                                {allMet ? "✓ On track" : `${rows.filter(r => r.target > 0 && r.configured < r.target).length} gap${rows.filter(r => r.target > 0 && r.configured < r.target).length > 1 ? "s" : ""}`}
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {rows.map(({ label, configured, target }) => {
+                                if (target === 0) return null
+                                const pct = Math.min(100, Math.round((configured / target) * 100))
+                                const gap = target - configured
+                                const met = gap <= 0
+                                return (
+                                  <div key={label}>
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <span className="text-[11px] text-slate-600">{label}</span>
+                                      <span className={`text-[11px] font-semibold tabular-nums ${met ? "text-emerald-700" : "text-amber-700"}`}>
+                                        {configured} / {target}
+                                        {!met && <span className="ml-1 font-normal text-amber-500">({gap} short)</span>}
+                                      </span>
+                                    </div>
+                                    <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full transition-all ${met ? "bg-emerald-500" : pct >= 75 ? "bg-amber-400" : "bg-amber-500"}`}
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* Department Management collapsible */}
+                      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                        <button
+                          onClick={() => setDeptBreakdownExpanded(!deptBreakdownExpanded)}
+                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            {deptBreakdownExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                            <span className="text-xs font-semibold text-slate-700">Department Management</span>
+                            <span className="text-xs text-slate-400">({departments.length})</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 tabular-nums">
+                            <span><span className="font-semibold text-slate-900">{allocHeadcount}</span>/{targetHeadcount} HC</span>
+                          </div>
+                        </button>
+                        {deptBreakdownExpanded && (
+                          <div className="divide-y divide-slate-100">
+                            {departments.map((dept) => (
+                              <div key={dept.id} className="flex items-center gap-3 px-4 py-2.5">
+                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dept.color}`} />
+                                <span className="flex-1 text-sm text-slate-700 min-w-0 truncate">{dept.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums shrink-0">
+                                  <span title="Headcount">{dept.headcount ?? 0} HC</span>
+                                  <span className="text-slate-300">·</span>
+                                  <span title="Offices">{dept.officeCount ?? 0} Off</span>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="px-4 py-2">
+                              <button
+                                onClick={addDepartment}
+                                className="inline-flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Add department
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Days in Office slider (config) */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Days in Office</span>
+                          <span className="text-sm font-semibold text-slate-900">{config.daysInOffice} day{config.daysInOffice !== 1 ? "s" : ""}/week</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={5}
+                          value={config.daysInOffice}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, daysInOffice: parseInt(e.target.value) }))}
+                          className="w-full accent-teal-600"
+                        />
+                        <div className="flex justify-between text-[10px] text-slate-400">
+                          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+            </ResizablePanel>
+            </>
+          )}
+        </ResizablePanelGroup>
+        )}
       </DragDropContext>
 
       {/* Recalibrate preview modal — review and selectively apply target-driven changes */}
@@ -5256,142 +5767,116 @@ const WorkplaceProgrammingTool = () => {
       })()}
 
       {showAdminPanel && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Admin Panel - Calculation Ratios</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowAdminPanel(false)
-                  setIsAdminAuthenticated(false)
-                  setAdminPinInput("")
-                }}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Engine Configuration</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Overrides apply live to Explore mode and Recalibrate</p>
+              </div>
+              <button
+                onClick={() => { setShowAdminPanel(false); setIsAdminAuthenticated(false); setAdminPinInput("") }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X className="h-4 w-4" />
-              </Button>
+              </button>
             </div>
 
             {!isAdminAuthenticated ? (
-              <div className="p-6">
-                <div className="max-w-sm mx-auto">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Enter PIN to access admin settings
-                  </label>
-                  <div className="flex space-x-2">
+              <div className="p-8">
+                <div className="max-w-xs mx-auto text-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                    <Settings className="w-5 h-5 text-slate-500" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-700 mb-4">Enter PIN to access engine settings</p>
+                  <div className="flex gap-2">
                     <input
                       type="password"
                       value={adminPinInput}
                       onChange={(e) => setAdminPinInput(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter PIN"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      placeholder="PIN"
                       onKeyPress={(e) => e.key === "Enter" && handleAdminAccess()}
                     />
-                    <Button onClick={handleAdminAccess}>Access</Button>
+                    <Button onClick={handleAdminAccess} className="bg-teal-600 hover:bg-teal-700 text-white">Access</Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                <div className="space-y-6">
-                  {/* RSF Benchmark */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">RSF Benchmark</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">RSF per Person</label>
+              <div className="overflow-y-auto flex-1 p-6 space-y-6">
+
+                {/* Space Ratios */}
+                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Space Ratios</h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">1 per N seats — lower number = more spaces generated</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-px bg-slate-100">
+                    {[
+                      { label: "Phone Booth", sub: "per workstation", key: "phoneBoothRatio" as const, defaultVal: 10 },
+                      { label: "Huddle Room", sub: "per workstation", key: "huddleRatio" as const, defaultVal: 15 },
+                      { label: "Medium Conf", sub: "per seat", key: "mediumConfRatio" as const, defaultVal: 40 },
+                      { label: "Large Conf", sub: "per seat", key: "largeConfRatio" as const, defaultVal: 80 },
+                      { label: "Open Collab", sub: "per seat", key: "openCollabRatio" as const, defaultVal: 25 },
+                      { label: "Work Café", sub: "SF per person", key: "workCafeSfPerSeat" as const, defaultVal: 7.5 },
+                    ].map(({ label, sub, key, defaultVal }) => (
+                      <div key={key} className="bg-white p-4">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">{label}</label>
+                        <p className="text-[10px] text-slate-400 mb-2">{sub}</p>
                         <input
                           type="number"
-                          value={rsfPerPerson}
-                          onChange={(e) => setRsfPerPerson(Number.parseInt(e.target.value) || 233)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={ratioConfig[key] ?? defaultVal}
+                          onChange={(e) => { const v = Number.parseFloat(e.target.value); setRatioConfig((prev) => ({ ...prev, [key]: v || defaultVal })) }}
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-teal-500"
                         />
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Engine Ratios — affect both Explore and Recalibrate */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-1">Engine Ratios</h3>
-                    <p className="text-xs text-gray-500 mb-4">Override the default ratios used by the calculation engine. Affects both Explore mode and Recalibrate.</p>
-                    <div className="grid grid-cols-3 gap-4">
-                      {[
-                        { label: "Phone Booth (per workstation)", key: "phoneBoothRatio" as const, defaultVal: 10 },
-                        { label: "Huddle Room (per workstation)", key: "huddleRatio" as const, defaultVal: 15 },
-                        { label: "Medium Conf (per seat)", key: "mediumConfRatio" as const, defaultVal: 40 },
-                        { label: "Large Conf (per seat)", key: "largeConfRatio" as const, defaultVal: 80 },
-                        { label: "Open Collab (per seat)", key: "openCollabRatio" as const, defaultVal: 25 },
-                        { label: "Work Cafe (SF per person)", key: "workCafeSfPerSeat" as const, defaultVal: 7.5 },
-                      ].map(({ label, key, defaultVal }) => (
-                        <div key={key}>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                          <input
-                            type="number"
-                            value={ratioConfig[key] ?? defaultVal}
-                            onChange={(e) => {
-                              const v = Number.parseFloat(e.target.value)
-                              setRatioConfig((prev) => ({ ...prev, [key]: v || defaultVal }))
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Zone Circulation Percentages */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Zone Circulation Percentages</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      {Object.entries(zoneCirculation).map(([zone, percentage]) => (
-                        <div key={zone}>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">{zone}</label>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              value={percentage}
-                              onChange={(e) =>
-                                setZoneCirculation((prev) => ({
-                                  ...prev,
-                                  [zone]: Number.parseInt(e.target.value) || 0,
-                                }))
-                              }
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-500">%</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Current Calculations Display */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Current Calculations</h3>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="font-medium">Recommended RSF:</span>{" "}
-                          {(targetHeadcount * rsfPerPerson).toLocaleString()}
-                        </div>
-                        <div>
-                          <span className="font-medium">Current RSF:</span>{" "}
-                          {newEditableTotals.totalRSF.toLocaleString()}
-                        </div>
-                        <div>
-                          <span className="font-medium">RSF Difference:</span>{" "}
-                          {newEditableTotals.rsfDifference > 0 ? "+" : ""}
-                          {newEditableTotals.rsfDifference.toLocaleString()}
-                        </div>
-                        <div>
-                          <span className="font-medium">Variance:</span>{" "}
-                          {newEditableTotals.rsfVariancePercent.toFixed(1)}%
-                        </div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
+
+                {/* Zone Circulation */}
+                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Zone Circulation Factors</h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Added on top of net assignable area per zone</p>
+                  </div>
+                  <div className="grid grid-cols-5 gap-px bg-slate-100">
+                    {Object.entries(zoneCirculation).map(([zone, pct]) => (
+                      <div key={zone} className="bg-white p-4">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-2 leading-tight">{zone}</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={pct}
+                            onChange={(e) => setZoneCirculation((prev) => ({ ...prev, [zone]: Number.parseInt(e.target.value) || 0 }))}
+                            className="flex-1 min-w-0 px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          />
+                          <span className="text-xs text-slate-400 shrink-0">%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live totals read-out */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Live Program Totals</h3>
+                  <div className="grid grid-cols-4 gap-4 text-sm">
+                    {[
+                      { label: "Total RSF", value: Math.round(finalEditableTotals.totalRSF || 0).toLocaleString() },
+                      { label: "Total USF", value: Math.round(finalEditableTotals.totalUSF || 0).toLocaleString() },
+                      { label: "RSF / Person", value: targetHeadcount > 0 ? Math.round((finalEditableTotals.totalRSF || 0) / targetHeadcount).toLocaleString() : "—" },
+                      { label: "Headcount", value: targetHeadcount.toLocaleString() },
+                    ].map(({ label, value }) => (
+                      <div key={label}>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+                        <p className="font-bold text-slate-900 tabular-nums">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
             )}
           </div>

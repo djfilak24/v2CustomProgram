@@ -74,6 +74,19 @@ function convertSpaceItemsToConfig(items: SpaceItem[]): GeneratedSpaceConfig[] {
     return 1
   }
 
+  const getWorkstationType = (item: SpaceItem): "employee" | "private" | "flex" | null => {
+    if (item.category !== "individual") return null
+    const name = item.name.toLowerCase()
+    if (name.includes("office")) {
+      return name.includes("unassigned") || name.includes("day") ? "flex" : "private"
+    }
+    if (name.includes("workstation") || name.includes("hoteling") || name.includes("flex")) {
+      return name.includes("resident") ? "employee" : "flex"
+    }
+    if (name.includes("touch") || name.includes("touchdown") || name.includes("workpoint")) return "flex"
+    return null
+  }
+
   return items
     .filter(item => item.quantity > 0)
     .map(item => ({
@@ -82,6 +95,7 @@ function convertSpaceItemsToConfig(items: SpaceItem[]): GeneratedSpaceConfig[] {
       quantity: item.quantity,
       sfEach: item.areaSf,
       capacity: getCapacity(item),
+      workstationType: getWorkstationType(item),
     }))
 }
 

@@ -136,7 +136,14 @@ export function convertProgramToSpaces(
     spaces[key] = makeSpace(key, item, zone, null, 0)
   }
 
-  const hybridWorkers = Math.max(0, inputs.totalHeadcount - inputs.fullyRemote - officeCount)
+  // For full-occupancy programs (5 days/week) everyone has a dedicated resident
+  // desk — flex/hoteling seats are not needed, so the hybrid target is 0.
+  // For hybrid schedules (< 5 days) the non-office, non-remote workers need
+  // shared flex seats and the count is meaningful.
+  const hybridWorkers =
+    inputs.daysInOffice >= 5
+      ? 0
+      : Math.max(0, inputs.totalHeadcount - inputs.fullyRemote - officeCount)
 
   return {
     spaces,

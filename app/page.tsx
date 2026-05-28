@@ -3,9 +3,6 @@
 import type React from "react"
 
   import { useState, useMemo, useEffect, useRef } from "react"
-import { DragDropContext, Droppable, Draggable, resetServerContext } from "react-beautiful-dnd"
-// Prevents hydration mismatch in Next.js App Router by resetting the DnD context counter
-resetServerContext()
   import {
   Building2,
   Info,
@@ -55,6 +52,26 @@ import { BriefingView } from "@/components/briefing-view"
     computeAllSeatDemandBlocks,
   } from "@/lib/fast-track-calculations"
   import type { SummaryInputs, RatioConfig } from "@/lib/fast-track-calculations"
+
+const DragDropContext = ({ children }: { children: React.ReactNode; [key: string]: any }) => <>{children}</>
+const Droppable = ({ children }: { children: (provided: any) => React.ReactNode; [key: string]: any }) => (
+  <>
+    {children({
+      droppableProps: {},
+      innerRef: undefined,
+      placeholder: null,
+    })}
+  </>
+)
+const Draggable = ({ children }: { children: (provided: any) => React.ReactNode; [key: string]: any }) => (
+  <>
+    {children({
+      draggableProps: {},
+      dragHandleProps: {},
+      innerRef: undefined,
+    })}
+  </>
+)
 
 // -----------------------------------------------------------------------------
 // NumberField: module-scope stable component for number input.

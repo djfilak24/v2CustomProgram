@@ -7,54 +7,37 @@ import {
   ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Check,
 } from "lucide-react"
 import {
-  SURVEY_STEPS, computeProfile, type Answer, type Lane,
+  SURVEY_STEPS, computeProfile, emptyState,
+  WORK_PATTERNS, WORK_PATTERN_DAYS, SEATING_POSTURES, OFFICE_POSTURES,
+  GROWTH_PRESETS, SUPPORT_TYPES,
+  type Lane, type StepId, type SurveyState,
 } from "@/lib/survey/sections"
 import { ProgressHeader } from "@/components/survey/progress-header"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { LaneToggle } from "@/components/survey/lane-toggle"
 import { ChoiceCard } from "@/components/survey/choice-card"
-import { ChoiceRow } from "@/components/survey/choice-row"
+import { DeptSpine } from "@/components/survey/dept-spine"
+import { PerDeptRows } from "@/components/survey/per-dept-rows"
+import { CollabTree } from "@/components/survey/collab-tree"
+import { IntroDemo } from "@/components/survey/intro-demo"
 
 type Phase = "hero" | "survey" | "done"
 
 export default function SurveyPage() {
   const [phase, setPhase] = useState<Phase>("hero")
+  const [showIntro, setShowIntro] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
   const [lane, setLane] = useState<Lane>("quick")
-  const [answers, setAnswers] = useState<Record<string, Answer>>({})
-  const [deferred, setDeferred] = useState<Set<string>>(new Set())
+  const [state, setState] = useState<SurveyState>(emptyState)
+  const [deferred, setDeferred] = useState<Set<StepId>>(new Set())
 
   const steps = SURVEY_STEPS
   const step = steps[stepIndex]
-  const scores = useMemo(() => computeProfile(steps, answers), [steps, answers])
+  const scores = useMemo(() => computeProfile(state), [state])
 
-  const setAnswer = (id: string, a: Answer) =>
-    setAnswers((prev) => ({ ...prev, [id]: a }))
+  const patch = (p: Partial<SurveyState>) => setState((prev) => ({ ...prev, ...p }))
 
-  const toggleCard = (optId: string) => {
-    const current = (answers[step.id] as Extract<Answer, { kind: "cards" }>)?.selected ?? []
-    let next: string[]
-    if (step.multi) {
-      next = current.includes(optId) ? current.filter((x) => x !== optId) : [...current, optId]
-    } else {
-      next = [optId]
-    }
-    setAnswer(step.id, { kind: "cards", selected: next })
-    clearDefer(step.id)
-  }
-
-  const setRadio = (choice: string) => {
-    const prev = answers[step.id] as Extract<Answer, { kind: "radio-number" }> | undefined
-    setAnswer(step.id, { kind: "radio-number", choice, count: prev?.count ?? null })
-    clearDefer(step.id)
-  }
-
-  const setCount = (count: number | null) => {
-    const prev = answers[step.id] as Extract<Answer, { kind: "radio-number" }> | undefined
-    setAnswer(step.id, { kind: "radio-number", choice: prev?.choice ?? null, count })
-  }
-
-  const clearDefer = (id: string) =>
+  const clearDefer = (id: StepId) =>
     setDeferred((prev) => {
       if (!prev.has(id)) return prev
       const next = new Set(prev)
@@ -64,11 +47,6 @@ export default function SurveyPage() {
 
   const deferStep = () => {
     setDeferred((prev) => new Set(prev).add(step.id))
-    setAnswers((prev) => {
-      const next = { ...prev }
-      delete next[step.id]
-      return next
-    })
     goNext()
   }
 
@@ -78,80 +56,48 @@ export default function SurveyPage() {
   }
   const goBack = () => setStepIndex((i) => Math.max(0, i - 1))
 
-  if (phase === "hero") return <Hero onBegin={() => setPhase("survey")} />
+  const beginSurvey = () => {
+    setPhase("survey")
+    setShowIntro(true)
+  }
+
+  if (phase === "hero") return <Hero onBegin={beginSurvey} />
   if (phase === "done") return <Done deferredCount={deferred.size} />
 
-  const answer = answers[step.id]
-  const cardSelected = (optId: string) =>
-    answer?.kind === "cards" && answer.selected.includes(optId)
-  const radioChoice = answer?.kind === "radio-number" ? answer.choice : null
-  const radioCount = answer?.kind === "radio-number" ? answer.count : null
+  // Detailed lane is only meaningful where the step defines a deeper editor.
+  const effectiveLane: Lane = step.hasDetailed ? lane : "quick"
 
   return (
     <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
+      {showIntro && <IntroDemo onDismiss={() => setShowIntro(false)} />}
+
       <ProgressHeader section={step.section} stepIndex={stepIndex} totalSteps={steps.length} />
 
       <main className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-[1fr_360px]">
-        {/* Question panel */}
         <div>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">{step.title}</h1>
               <p className="mt-2 text-white/55">{step.subtitle}</p>
             </div>
-            <LaneToggle lane={lane} onChange={setLane} />
+            {step.hasDetailed && <LaneToggle lane={lane} onChange={setLane} />}
           </div>
 
-          {lane === "detailed" && step.detailedHint && (
+          {effectiveLane === "detailed" && step.detailedHint && (
             <div className="mt-5 flex items-start gap-2 rounded-xl border border-[#00badc]/30 bg-[#00badc]/[0.07] px-4 py-3 text-sm text-white/75">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#00badc]" />
               <span><span className="font-semibold text-white">Go deeper:</span> {step.detailedHint}</span>
             </div>
           )}
 
-          {/* Card grid */}
-          {step.kind === "cards" && (
-            <div className="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {step.options!.map((opt) => (
-                <ChoiceCard
-                  key={opt.id}
-                  icon={opt.icon}
-                  label={opt.label}
-                  description={opt.description}
-                  stats={opt.stats}
-                  selected={cardSelected(opt.id)}
-                  onClick={() => toggleCard(opt.id)}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Radio + conditional number */}
-          {step.kind === "radio-number" && (
-            <div className="mt-7 space-y-3">
-              {step.options!.map((opt) => (
-                <ChoiceRow
-                  key={opt.id}
-                  label={opt.label}
-                  selected={radioChoice === opt.id}
-                  onClick={() => setRadio(opt.id)}
-                />
-              ))}
-              {radioChoice === "yes" && (
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                  <label className="text-sm font-medium text-white/70">{step.followupLabel}</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={radioCount ?? ""}
-                    onChange={(e) => setCount(e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
-                    placeholder="Enter number"
-                    className="mt-2 w-full rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2.5 text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
-                  />
-                </div>
-              )}
-            </div>
-          )}
+          <div className="mt-7">
+            <StepBody
+              step={step}
+              lane={effectiveLane}
+              state={state}
+              patch={patch}
+            />
+          </div>
 
           {/* Nav */}
           <div className="mt-9 flex items-center justify-between border-t border-white/10 pt-6">
@@ -165,17 +111,19 @@ export default function SurveyPage() {
             </button>
 
             <div className="flex items-center gap-3">
+              {step.canDefer && (
+                <button
+                  type="button"
+                  onClick={deferStep}
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white/50 transition-colors hover:text-white/80"
+                  title="We'll cover this together in the live session"
+                >
+                  <MessageCircle className="h-4 w-4" /> We&apos;ll talk live
+                </button>
+              )}
               <button
                 type="button"
-                onClick={deferStep}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white/50 transition-colors hover:text-white/80"
-                title="We'll cover this together in the live session"
-              >
-                <MessageCircle className="h-4 w-4" /> We'll talk live
-              </button>
-              <button
-                type="button"
-                onClick={goNext}
+                onClick={() => { clearDefer(step.id); goNext() }}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#00badc] px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
               >
                 {stepIndex === steps.length - 1 ? "Finish" : "Continue"}
@@ -196,6 +144,248 @@ export default function SurveyPage() {
   )
 }
 
+// ── Per-step bodies ──────────────────────────────────────────────────────────
+
+function StepBody({
+  step,
+  lane,
+  state,
+  patch,
+}: {
+  step: (typeof SURVEY_STEPS)[number]
+  lane: Lane
+  state: SurveyState
+  patch: (p: Partial<SurveyState>) => void
+}) {
+  switch (step.id) {
+    case "people":
+      return lane === "detailed" ? (
+        <DeptSpine departments={state.departments} onChange={(d) => patch({ departments: d })} />
+      ) : (
+        <div className="space-y-7">
+          <div className="max-w-sm">
+            <label className="text-sm font-medium text-white/70">Roughly how many people, total?</label>
+            <input
+              type="number"
+              min={0}
+              value={state.totalHeadcount ?? ""}
+              onChange={(e) => patch({ totalHeadcount: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
+              placeholder="e.g. 120"
+              className="mt-2 w-full rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2.5 text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+            />
+          </div>
+          <div>
+            <p className="mb-3 text-sm font-medium text-white/70">Expected growth over the next 3–5 years?</p>
+            <CardGrid
+              options={GROWTH_PRESETS}
+              selected={state.growthChoice ? [state.growthChoice] : []}
+              onToggle={(id) => patch({ growthChoice: id })}
+              cols={3}
+            />
+          </div>
+        </div>
+      )
+
+    case "work":
+      return lane === "detailed" ? (
+        <PerDeptRows
+          departments={state.departments}
+          values={state.perDeptDays}
+          onChange={(v) => patch({ perDeptDays: v })}
+          defaultValue={state.workChoice ? WORK_PATTERN_DAYS[state.workChoice] : 3}
+          min={0}
+          max={5}
+          suffix="days"
+          showHeadcount
+        />
+      ) : (
+        <CardGrid
+          options={WORK_PATTERNS}
+          selected={state.workChoice ? [state.workChoice] : []}
+          onToggle={(id) => patch({ workChoice: id })}
+          cols={3}
+        />
+      )
+
+    case "seating":
+      return lane === "detailed" ? (
+        <PerDeptRows
+          departments={state.departments}
+          values={state.dedicatedByDept}
+          onChange={(v) => patch({ dedicatedByDept: v })}
+          capToHeadcount
+          showHeadcount
+          suffix="seats"
+        />
+      ) : (
+        <CardGrid
+          options={SEATING_POSTURES}
+          selected={state.seatingChoice ? [state.seatingChoice] : []}
+          onToggle={(id) => patch({ seatingChoice: id })}
+          cols={3}
+        />
+      )
+
+    case "adjacency":
+      return (
+        <div className="max-w-2xl">
+          <label className="text-sm font-medium text-white/70">
+            Which teams collaborate most — and who should sit near whom?
+          </label>
+          <textarea
+            value={state.adjacencyNotes}
+            onChange={(e) => patch({ adjacencyNotes: e.target.value })}
+            rows={5}
+            placeholder="e.g. Product and Engineering work daily and should be adjacent. Sales needs to be near the client-facing meeting rooms."
+            className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+          />
+          <p className="mt-2 text-xs text-white/40">
+            Captured as adjacency notes for your live session — the tool handles stacking and adjacency planning.
+          </p>
+        </div>
+      )
+
+    case "offices":
+      return lane === "detailed" ? (
+        <PerDeptRows
+          departments={state.departments}
+          values={state.officesByDept}
+          onChange={(v) => patch({ officesByDept: v })}
+          capToHeadcount
+          showHeadcount
+          suffix="offices"
+        />
+      ) : (
+        <CardGrid
+          options={OFFICE_POSTURES}
+          selected={state.officeChoice ? [state.officeChoice] : []}
+          onToggle={(id) => patch({ officeChoice: id })}
+          cols={3}
+        />
+      )
+
+    case "collaboration":
+      return (
+        <CollabTree
+          lane={lane}
+          departments={state.departments}
+          selected={state.collabTypes}
+          byDept={state.collabByDept}
+          onToggleType={(id) =>
+            patch({
+              collabTypes: state.collabTypes.includes(id)
+                ? state.collabTypes.filter((x) => x !== id)
+                : [...state.collabTypes, id],
+            })
+          }
+          onChangeCounts={(id, counts) =>
+            patch({ collabByDept: { ...state.collabByDept, [id]: counts } })
+          }
+        />
+      )
+
+    case "support":
+      return (
+        <CardGrid
+          options={SUPPORT_TYPES}
+          selected={state.support}
+          onToggle={(id) =>
+            patch({
+              support: state.support.includes(id)
+                ? state.support.filter((x) => x !== id)
+                : [...state.support, id],
+            })
+          }
+          cols={3}
+          multi
+        />
+      )
+
+    case "feedback":
+      return (
+        <div className="grid max-w-2xl gap-5">
+          <TextField
+            label="What's working well today?"
+            value={state.loves}
+            onChange={(v) => patch({ loves: v })}
+            placeholder="Spaces or rituals your team loves and we should protect."
+          />
+          <TextField
+            label="What isn't working?"
+            value={state.painPoints}
+            onChange={(v) => patch({ painPoints: v })}
+            placeholder="Daily frustrations — not enough focus rooms, noisy open areas, etc."
+          />
+          <TextField
+            label="Anything over- or under-used?"
+            value={state.imbalances}
+            onChange={(v) => patch({ imbalances: v })}
+            placeholder="Spaces that sit empty, or are always booked."
+          />
+        </div>
+      )
+
+    default:
+      return null
+  }
+}
+
+function CardGrid({
+  options,
+  selected,
+  onToggle,
+  cols,
+}: {
+  options: { id: string; label: string; description?: string; icon?: string; stats?: string[] }[]
+  selected: string[]
+  onToggle: (id: string) => void
+  cols: 2 | 3
+  multi?: boolean
+}) {
+  return (
+    <div className={`grid grid-cols-2 gap-4 ${cols === 3 ? "sm:grid-cols-3" : ""}`}>
+      {options.map((opt) => (
+        <ChoiceCard
+          key={opt.id}
+          icon={opt.icon}
+          label={opt.label}
+          description={opt.description}
+          stats={opt.stats}
+          selected={selected.includes(opt.id)}
+          onClick={() => onToggle(opt.id)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function TextField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  return (
+    <div>
+      <label className="text-sm font-medium text-white/70">{label}</label>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        placeholder={placeholder}
+        className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+      />
+    </div>
+  )
+}
+
+// ── Hero + Done ──────────────────────────────────────────────────────────────
+
 function Hero({ onBegin }: { onBegin: () => void }) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0b1830] text-white">
@@ -205,7 +395,7 @@ function Hero({ onBegin }: { onBegin: () => void }) {
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="flex items-center justify-between px-8 py-6">
           <div className="flex items-center gap-3">
-            <Image src="/nelson-logo.svg" alt="NELSON" width={110} height={26} className="h-6 w-auto" priority />
+            <Image src="/nelson-logo.png" alt="NELSON" width={110} height={28} className="h-7 w-auto" priority />
             <span className="text-white/30">|</span>
             <span className="text-sm font-medium text-white/70">Workplace Strategy Discovery</span>
           </div>

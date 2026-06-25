@@ -3,7 +3,7 @@
 import {
   Briefcase, Building2, Lightbulb, Stethoscope, ShoppingBag, Wrench, Scale,
   Users, Calendar, Home, Phone, Presentation, Coffee, Sparkles, TrendingUp,
-  Minus, Check, type LucideIcon,
+  Minus, Check, UserCheck, Shuffle, Printer, Box, Heart, type LucideIcon,
 } from "lucide-react"
 
 const ICONS: Record<string, LucideIcon> = {
@@ -11,7 +11,8 @@ const ICONS: Record<string, LucideIcon> = {
   stethoscope: Stethoscope, "shopping-bag": ShoppingBag, wrench: Wrench,
   scale: Scale, users: Users, calendar: Calendar, home: Home, phone: Phone,
   presentation: Presentation, coffee: Coffee, sparkles: Sparkles,
-  "trending-up": TrendingUp, minus: Minus,
+  "trending-up": TrendingUp, minus: Minus, "user-check": UserCheck,
+  shuffle: Shuffle, printer: Printer, box: Box, heart: Heart,
 }
 
 /**

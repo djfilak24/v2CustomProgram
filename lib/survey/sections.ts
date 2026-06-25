@@ -1,10 +1,17 @@
 /**
- * Survey shell model — the data-driven steps and the live "Workplace Profile"
- * radar scoring. This is the SHELL: representative steps that exercise every
- * interaction (card grids, radio + follow-up, the Quick/Detailed lanes, the
- * radar, progress). The real per-field wiring to SurveyResult lands in the
- * spine + decision-tree steps (IMPROVEMENT_LOOP items 11–12).
+ * Survey model — the data-driven steps, the structured answer state, the live
+ * "Workplace Profile" radar scoring, and the mapper into a SurveyResult.
+ *
+ * This implements SURVEY_SPEC.md §3–4: the department spine (entered once,
+ * flows forward), the Quick / Detailed / Defer lanes, the collaboration
+ * decision tree, and the qualitative section. Everything captured is typed —
+ * narrative fields ride along to the handoff as notes, never driving a
+ * calculation (the one rule, SURVEY_SPEC §1).
  */
+
+import type { SurveyResult } from "./types"
+
+// ── Profile radar ────────────────────────────────────────────────────────────
 
 export type ProfileAxis =
   | "Collaboration"
@@ -28,127 +35,271 @@ export type ProfileScores = Record<ProfileAxis, number>
 /** Everyone starts here; the radar fills out as answers come in. */
 export const BASELINE_SCORE = 2.5
 
+// ── Lanes ────────────────────────────────────────────────────────────────────
+
 export type Lane = "quick" | "detailed"
 
-export type StepKind = "cards" | "radio-number"
+// ── The department spine ─────────────────────────────────────────────────────
 
-export interface StepOption {
+export interface SpineDept {
+  /** Stable id; keys every downstream per-dept map. */
+  id: string
+  name: string
+  /** Current in-office headcount. */
+  headcount: number
+  /** Future (3–5 yr) headcount — set in the detailed growth lane. */
+  futureHeadcount?: number
+}
+
+let _seq = 0
+export function newDeptId(): string {
+  _seq += 1
+  return `d${Date.now().toString(36)}${_seq}`
+}
+
+export function makeDept(name = "", headcount = 0): SpineDept {
+  return { id: newDeptId(), name, headcount }
+}
+
+/** Reasonable starter rows so the spine isn't an empty void on first open. */
+export function starterDepartments(): SpineDept[] {
+  return [
+    makeDept("Leadership", 8),
+    makeDept("Operations", 24),
+    makeDept("Sales & Marketing", 18),
+  ]
+}
+
+// ── Catalog constants (reused by the page renderer) ──────────────────────────
+
+export interface CardOption {
   id: string
   label: string
   description?: string
-  /** Key into the icon map in components/survey/choice-card.tsx. */
   icon?: string
-  /** Small stat lines shown on big cards (e.g. "70% in-office"). */
   stats?: string[]
-  /** How selecting this nudges the live Workplace Profile radar. */
-  profile?: Partial<ProfileScores>
 }
 
+/** Section 2 — company-wide work pattern (Quick lane). */
+export const WORK_PATTERNS: CardOption[] = [
+  { id: "office", label: "Mostly in-office", description: "4–5 days / week", icon: "building", stats: ["Higher density", "Assigned seats"] },
+  { id: "hybrid", label: "Balanced hybrid", description: "2–3 days / week", icon: "calendar", stats: ["Shared seats", "Flexible"] },
+  { id: "remote", label: "Mostly remote", description: "0–1 days / week", icon: "home", stats: ["Touchdown-led", "Low density"] },
+]
+
+/** Map a work-pattern choice to in-office days/week. */
+export const WORK_PATTERN_DAYS: Record<string, number> = { office: 5, hybrid: 3, remote: 1 }
+
+/** Section 2 — dedicated vs. flex posture (Quick lane). */
+export const SEATING_POSTURES: CardOption[] = [
+  { id: "assigned", label: "Everyone assigned", description: "A desk for every person", icon: "user-check" },
+  { id: "mixed", label: "A mix", description: "Some assigned, some shared", icon: "users" },
+  { id: "shared", label: "Mostly shared", description: "Free-address / hot-desking", icon: "shuffle" },
+]
+
+/** Quick-lane share of people who keep a dedicated seat, by posture. */
+export const POSTURE_DEDICATED_RATIO: Record<string, number> = { assigned: 1, mixed: 0.6, shared: 0.25 }
+
+/** Section 3a — private office posture (Quick lane). */
+export const OFFICE_POSTURES: CardOption[] = [
+  { id: "leaders", label: "Leadership only", description: "Execs / directors", icon: "briefcase" },
+  { id: "some", label: "Some roles", description: "Plus select roles", icon: "building" },
+  { id: "none", label: "Open plan", description: "No private offices", icon: "users" },
+]
+
+/** Section 3b — collaboration space types (these names resolve to SPACE_PRESETS on import). */
+export const COLLAB_TYPES: CardOption[] = [
+  { id: "Huddle Room", label: "Huddle rooms", description: "2–4 people, quick syncs", icon: "users" },
+  { id: "Project Room", label: "Project rooms", description: "Dedicated team space", icon: "presentation" },
+  { id: "Phone Room", label: "Phone / focus rooms", description: "Heads-down, calls", icon: "phone" },
+  { id: "Open Collaboration Lounge", label: "Open lounges", description: "Casual, social", icon: "coffee" },
+  { id: "Conference Room", label: "Conference rooms", description: "Larger meetings", icon: "presentation" },
+]
+
+/** Section 3c — support spaces checklist (names resolve to SPACE_PRESETS). */
+export const SUPPORT_TYPES: CardOption[] = [
+  { id: "Copy/Print", label: "Copy / print", icon: "printer" },
+  { id: "Storage", label: "Storage", icon: "box" },
+  { id: "Break Room", label: "Break room", icon: "coffee" },
+  { id: "Wellness Room", label: "Wellness / mother's room", icon: "heart" },
+  { id: "Reception", label: "Reception / front of house", icon: "building" },
+  { id: "Mail Room", label: "Mail room", icon: "box" },
+]
+
+/** Section 1 — company growth presets (Quick lane). */
+export const GROWTH_PRESETS: CardOption[] = [
+  { id: "stable", label: "Stable", description: "±5% headcount", icon: "minus" },
+  { id: "growing", label: "Growing", description: "+10–25% headcount", icon: "trending-up" },
+  { id: "rapid", label: "Rapid / reshaping", description: "+25% or shifting mix", icon: "sparkles" },
+]
+
+export const GROWTH_PRESET_PCT: Record<string, number> = { stable: 5, growing: 18, rapid: 30 }
+
+// ── Steps ────────────────────────────────────────────────────────────────────
+
+export type StepId =
+  | "people"
+  | "work"
+  | "seating"
+  | "adjacency"
+  | "offices"
+  | "collaboration"
+  | "support"
+  | "feedback"
+
 export interface SurveyStep {
-  id: string
+  id: StepId
   /** Short label shown in the progress bar. */
   section: string
   title: string
   subtitle: string
-  kind: StepKind
-  /** cards: allow multiple selections. */
-  multi?: boolean
-  options?: StepOption[]
-  /** radio-number: label for the conditional number input. */
-  followupLabel?: string
-  /** What the Detailed lane unlocks here (shown when lane === "detailed"). */
+  /** One-line explanation of what going deeper unlocks here. */
   detailedHint?: string
+  /** Whether the Detailed lane has a distinct editor on this step. */
+  hasDetailed: boolean
+  /** Whether "We'll talk live" (defer) is offered. */
+  canDefer: boolean
 }
 
-/**
- * Representative shell steps. Content is illustrative — the point is the
- * interaction model and feel, per the inspiration.
- */
 export const SURVEY_STEPS: SurveyStep[] = [
   {
-    id: "industry",
-    section: "Industry",
-    title: "What industry are you in?",
-    subtitle: "Select all that apply so we can tune the starting benchmarks.",
-    kind: "cards",
-    multi: true,
-    detailedHint: "Add a sub-vertical and any regulatory notes per selection.",
-    options: [
-      { id: "legal", label: "Legal", description: "Law firms, legal services", icon: "scale", profile: { Privacy: 4, Amenity: 1 } },
-      { id: "finance", label: "Finance", description: "Banking, financial services", icon: "building", profile: { Privacy: 3, Density: 2 } },
-      { id: "tech", label: "Tech / Media", description: "Technology, media, creative", icon: "lightbulb", profile: { Collaboration: 4, Flexibility: 3, Growth: 3 } },
-      { id: "consulting", label: "Consulting", description: "Professional services", icon: "briefcase", profile: { Flexibility: 3, Collaboration: 2 } },
-      { id: "healthcare", label: "Healthcare", description: "Medical, healthcare services", icon: "stethoscope", profile: { Privacy: 3, Amenity: 2 } },
-      { id: "consumer", label: "Consumer Goods", description: "Retail, consumer products", icon: "shopping-bag", profile: { Amenity: 3, Collaboration: 2 } },
-    ],
+    id: "people",
+    section: "Your People",
+    title: "Who's in your organization?",
+    subtitle: "Your departments anchor everything — we ask once, then carry them forward.",
+    detailedHint: "List each department with its current and 3–5 year headcount (some grow, some shrink).",
+    hasDetailed: true,
+    canDefer: false,
   },
   {
-    id: "cadence",
-    section: "Work Patterns",
+    id: "work",
+    section: "How Teams Work",
     title: "How does your team work?",
     subtitle: "A typical week in the office sets how much we plan to share seats.",
-    kind: "cards",
-    multi: false,
-    detailedHint: "Set in-office days per department instead of company-wide.",
-    options: [
-      { id: "full", label: "Mostly in-office", description: "4–5 days / week", icon: "building", stats: ["Higher density", "Assigned seats"], profile: { Density: 4, Privacy: 2 } },
-      { id: "hybrid", label: "Balanced hybrid", description: "2–3 days / week", icon: "calendar", stats: ["Shared seats", "Flexible"], profile: { Flexibility: 4, Collaboration: 2 } },
-      { id: "remote", label: "Mostly remote", description: "0–1 days / week", icon: "home", stats: ["Touchdown-led", "Low density"], profile: { Flexibility: 5, Density: -1 } },
-    ],
+    detailedHint: "Set in-office days per department instead of one company-wide number.",
+    hasDetailed: true,
+    canDefer: true,
   },
   {
-    id: "private-offices",
-    section: "Space Types",
-    title: "Do you need private offices?",
-    subtitle: "For leadership or roles that need enclosed, assigned space.",
-    kind: "radio-number",
-    followupLabel: "Roughly how many private offices?",
-    detailedHint: "Assign private offices per department with ± steppers.",
-    options: [
-      { id: "yes", label: "Yes, we need private offices", profile: { Privacy: 4 } },
-      { id: "no", label: "No, open workspace is sufficient", profile: { Collaboration: 3, Density: 2 } },
-    ],
+    id: "seating",
+    section: "How Teams Work",
+    title: "Who needs a dedicated desk, who can share?",
+    subtitle: "Dedicated seats vs. flexible, shared space — the core hybrid trade-off.",
+    detailedHint: "Set how many people keep a dedicated seat per department.",
+    hasDetailed: true,
+    canDefer: true,
+  },
+  {
+    id: "adjacency",
+    section: "How Teams Work",
+    title: "Which teams work closely together?",
+    subtitle: "Cross-functional collaboration tells us who to seat near whom.",
+    detailedHint: "Captured as adjacency notes for the live session — the tool plans the rest.",
+    hasDetailed: false,
+    canDefer: true,
+  },
+  {
+    id: "offices",
+    section: "Your Space",
+    title: "Who needs private offices?",
+    subtitle: "Enclosed, assigned space — for leadership or roles that require it.",
+    detailedHint: "Assign a private-office count per department with ± steppers.",
+    hasDetailed: true,
+    canDefer: true,
   },
   {
     id: "collaboration",
-    section: "Space Types",
+    section: "Your Space",
     title: "What collaboration spaces matter most?",
     subtitle: "Pick the shared spaces your teams actually use.",
-    kind: "cards",
-    multi: true,
-    detailedHint: "Set a count per type, per department (the decision tree).",
-    options: [
-      { id: "huddle", label: "Huddle rooms", description: "2–4 people, quick syncs", icon: "users", profile: { Collaboration: 3 } },
-      { id: "project", label: "Project rooms", description: "Dedicated team space", icon: "presentation", profile: { Collaboration: 3, Privacy: 1 } },
-      { id: "phone", label: "Phone / focus rooms", description: "Heads-down, calls", icon: "phone", profile: { Privacy: 3, Flexibility: 1 } },
-      { id: "lounge", label: "Open lounges", description: "Casual, social", icon: "coffee", profile: { Amenity: 3, Collaboration: 2 } },
-    ],
+    detailedHint: "Set a count per type, per department — the full decision tree.",
+    hasDetailed: true,
+    canDefer: true,
   },
   {
-    id: "growth",
-    section: "Growth",
-    title: "What does the next 3–5 years look like?",
-    subtitle: "Growth here becomes your planning headcount for fit planning.",
-    kind: "cards",
-    multi: false,
-    detailedHint: "Set future headcount per department — some grow, some shrink.",
-    options: [
-      { id: "stable", label: "Stable", description: "±5% headcount", icon: "minus", profile: { Growth: 1 } },
-      { id: "growing", label: "Growing", description: "+10–25% headcount", icon: "trending-up", profile: { Growth: 4, Density: 1 } },
-      { id: "rapid", label: "Rapid / reshaping", description: "+25% or shifting team mix", icon: "sparkles", profile: { Growth: 6, Flexibility: 2 } },
-    ],
+    id: "support",
+    section: "Your Space",
+    title: "Which support spaces are must-haves?",
+    subtitle: "The shared infrastructure that keeps the floor running.",
+    hasDetailed: false,
+    canDefer: true,
+  },
+  {
+    id: "feedback",
+    section: "What's Working",
+    title: "What's working, and what isn't?",
+    subtitle: "The one place narrative is the point — it rides along to your live session.",
+    hasDetailed: false,
+    canDefer: true,
   },
 ]
 
-export type Answer =
-  | { kind: "cards"; selected: string[] }
-  | { kind: "radio-number"; choice: string | null; count: number | null }
+// ── Structured survey state ──────────────────────────────────────────────────
 
-/** Compute the live radar scores from current answers. Clamped 0–10. */
-export function computeProfile(
-  steps: SurveyStep[],
-  answers: Record<string, Answer>,
-): ProfileScores {
+export interface SurveyState {
+  // Section 1 — people + growth
+  totalHeadcount: number | null
+  growthChoice: string | null
+  departments: SpineDept[]
+  // Section 2 — work patterns
+  workChoice: string | null
+  perDeptDays: Record<string, number>
+  // Section 2 — seating
+  seatingChoice: string | null
+  dedicatedByDept: Record<string, number>
+  // adjacency
+  adjacencyNotes: string
+  // Section 3a — offices
+  officeChoice: string | null
+  officesByDept: Record<string, number>
+  // Section 3b — collaboration
+  collabTypes: string[]
+  /** type id -> dept id -> count (detailed lane). */
+  collabByDept: Record<string, Record<string, number>>
+  // Section 3c — support
+  support: string[]
+  // Section 4 — qualitative
+  loves: string
+  painPoints: string
+  imbalances: string
+}
+
+export function emptyState(): SurveyState {
+  return {
+    totalHeadcount: null,
+    growthChoice: null,
+    departments: starterDepartments(),
+    workChoice: null,
+    perDeptDays: {},
+    seatingChoice: null,
+    dedicatedByDept: {},
+    adjacencyNotes: "",
+    officeChoice: null,
+    officesByDept: {},
+    collabTypes: [],
+    collabByDept: {},
+    support: [],
+    loves: "",
+    painPoints: "",
+    imbalances: "",
+  }
+}
+
+/** Σ of department headcounts, or the quick-lane single number when no depts. */
+export function effectiveHeadcount(s: SurveyState, lane: Lane): number {
+  if (lane === "detailed" && s.departments.length > 0) {
+    return s.departments.reduce((sum, d) => sum + (d.headcount || 0), 0)
+  }
+  return s.totalHeadcount ?? s.departments.reduce((sum, d) => sum + (d.headcount || 0), 0)
+}
+
+// ── Live profile scoring (from the real, structured answers) ──────────────────
+
+function clamp(n: number): number {
+  return Math.max(0, Math.min(10, Math.round(n * 10) / 10))
+}
+
+export function computeProfile(s: SurveyState): ProfileScores {
   const scores: ProfileScores = {
     Collaboration: BASELINE_SCORE,
     Flexibility: BASELINE_SCORE,
@@ -157,21 +308,120 @@ export function computeProfile(
     Privacy: BASELINE_SCORE,
     Amenity: BASELINE_SCORE,
   }
-  for (const step of steps) {
-    const a = answers[step.id]
-    if (!a || !step.options) continue
-    const chosenIds =
-      a.kind === "cards" ? a.selected : a.choice ? [a.choice] : []
-    for (const id of chosenIds) {
-      const opt = step.options.find((o) => o.id === id)
-      if (!opt?.profile) continue
-      for (const [axis, delta] of Object.entries(opt.profile)) {
-        scores[axis as ProfileAxis] += delta as number
-      }
-    }
+
+  // Work pattern → density / flexibility.
+  if (s.workChoice === "office") { scores.Density += 4; scores.Privacy += 1 }
+  else if (s.workChoice === "hybrid") { scores.Flexibility += 3.5; scores.Collaboration += 1.5; scores.Density += 1 }
+  else if (s.workChoice === "remote") { scores.Flexibility += 5.5; scores.Density -= 1 }
+
+  // Seating posture → flexibility vs privacy/density.
+  if (s.seatingChoice === "assigned") { scores.Privacy += 2.5; scores.Density += 1.5 }
+  else if (s.seatingChoice === "mixed") { scores.Flexibility += 1.5 }
+  else if (s.seatingChoice === "shared") { scores.Flexibility += 3; scores.Density += 1.5; scores.Privacy -= 0.5 }
+
+  // Growth → company preset or per-dept deltas.
+  if (s.growthChoice === "stable") scores.Growth += 1
+  else if (s.growthChoice === "growing") { scores.Growth += 4; scores.Density += 1 }
+  else if (s.growthChoice === "rapid") { scores.Growth += 6.5; scores.Flexibility += 1.5 }
+  const withFuture = s.departments.filter((d) => d.futureHeadcount !== undefined)
+  if (withFuture.length > 0) {
+    const cur = withFuture.reduce((a, d) => a + d.headcount, 0) || 1
+    const fut = withFuture.reduce((a, d) => a + (d.futureHeadcount ?? d.headcount), 0)
+    const pct = ((fut - cur) / cur) * 100
+    scores.Growth += Math.max(0, Math.min(6.5, pct / 5))
   }
-  for (const axis of PROFILE_AXES) {
-    scores[axis] = Math.max(0, Math.min(10, Math.round(scores[axis] * 10) / 10))
+
+  // Offices → privacy.
+  if (s.officeChoice === "leaders") scores.Privacy += 2
+  else if (s.officeChoice === "some") scores.Privacy += 3.5
+  else if (s.officeChoice === "none") { scores.Collaboration += 2; scores.Density += 1.5 }
+  const officeTotal = Object.values(s.officesByDept).reduce((a, b) => a + (b || 0), 0)
+  if (officeTotal > 0) scores.Privacy += Math.min(3, officeTotal / 5)
+
+  // Collaboration selections → collaboration / privacy / amenity.
+  for (const t of s.collabTypes) {
+    if (t === "Huddle Room" || t === "Project Room" || t === "Conference Room") scores.Collaboration += 1.5
+    if (t === "Phone Room") scores.Privacy += 1.5
+    if (t === "Open Collaboration Lounge") { scores.Amenity += 2; scores.Collaboration += 1 }
   }
+
+  // Support spaces → amenity.
+  for (const t of s.support) {
+    if (t === "Break Room" || t === "Wellness Room") scores.Amenity += 1.5
+    else scores.Amenity += 0.5
+  }
+
+  for (const axis of PROFILE_AXES) scores[axis] = clamp(scores[axis])
   return scores
+}
+
+// ── Build a SurveyResult from state (the handoff payload, SURVEY_SPEC §5) ─────
+
+export function buildSurveyResult(
+  s: SurveyState,
+  lane: Lane,
+  deferred: Set<StepId>,
+  meta: { clientName: string; completedBy: string },
+): SurveyResult {
+  const useDepts = lane === "detailed" && s.departments.length > 0
+  const departments = useDepts
+    ? s.departments
+        .filter((d) => d.name.trim())
+        .map((d) => ({
+          id: d.id,
+          name: d.name.trim(),
+          headcount: Math.max(0, Math.round(d.headcount || 0)),
+          ...(d.futureHeadcount !== undefined ? { futureHeadcount: Math.max(0, Math.round(d.futureHeadcount)) } : {}),
+        }))
+    : []
+
+  const totalHeadcount = useDepts
+    ? departments.reduce((a, d) => a + d.headcount, 0)
+    : s.totalHeadcount ?? 0
+
+  // Per-dept maps are keyed by spine id in state; re-key by name for the result
+  // so the payload is human-meaningful and independent of ephemeral ids.
+  const byName = (m: Record<string, number>): Record<string, number> => {
+    const out: Record<string, number> = {}
+    for (const d of s.departments) {
+      const v = m[d.id]
+      if (v && d.name.trim()) out[d.name.trim()] = v
+    }
+    return out
+  }
+
+  const daysInOffice = s.workChoice ? WORK_PATTERN_DAYS[s.workChoice] ?? 3 : 3
+
+  const collaboration = s.collabTypes.map((type) => ({
+    type,
+    byDept: byName(s.collabByDept[type] ?? {}),
+  }))
+
+  return {
+    meta: { clientName: meta.clientName, completedBy: meta.completedBy, completedAt: new Date().toISOString() },
+    people: {
+      departments,
+      totalHeadcount,
+      ...(s.growthChoice ? { companyGrowthPct: GROWTH_PRESET_PCT[s.growthChoice] } : {}),
+    },
+    work: {
+      daysInOffice,
+      ...(useDepts && Object.keys(s.perDeptDays).length ? { perDeptDays: byName(s.perDeptDays) } : {}),
+      fullyRemote: 0,
+      ...(useDepts && Object.keys(s.dedicatedByDept).length ? { dedicatedByDept: byName(s.dedicatedByDept) } : {}),
+      ...(s.adjacencyNotes.trim() ? { adjacencyNotes: s.adjacencyNotes.trim() } : {}),
+    },
+    spaces: {
+      privateOfficesByDept: byName(s.officesByDept),
+      collaboration,
+      support: s.support,
+    },
+    qualitative: {
+      ...(s.loves.trim() ? { loves: s.loves.trim() } : {}),
+      ...(s.painPoints.trim() ? { painPoints: s.painPoints.trim() } : {}),
+      ...(s.imbalances.trim() ? { imbalances: s.imbalances.trim() } : {}),
+    },
+    special: {},
+    deferred: [...deferred],
+  }
 }

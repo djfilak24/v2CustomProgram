@@ -249,6 +249,19 @@ export function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`
 }
 
+/**
+ * Priority colour ramp for ranked adjacencies — index 0 is the highest priority
+ * (bright cyan) fading toward muted slate for lower-priority connections. Shared
+ * by the adjacency graph and the summary so list and lines stay in sync.
+ */
+export function adjacencyColor(index: number, total: number): string {
+  const from = [34, 211, 238] // #22d3ee — top priority
+  const to = [100, 116, 139] // #64748b — lowest priority
+  const t = total <= 1 ? 0 : Math.min(1, index / (total - 1))
+  const c = from.map((f, k) => Math.round(f + (to[k] - f) * t))
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`
+}
+
 export interface SurveyState {
   // Section 1 — people + growth
   totalHeadcount: number | null

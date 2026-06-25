@@ -5,7 +5,7 @@ import Link from "next/link"
 import { WorkplaceProfile } from "./workplace-profile"
 import {
   SURVEY_STEPS, WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES, GROWTH_PRESETS,
-  COLLAB_TYPES, SUPPORT_TYPES,
+  COLLAB_TYPES, SUPPORT_TYPES, adjacencyColor,
   type SurveyState, type LaneMap, type StepId, type ProfileScores, type CardOption,
 } from "@/lib/survey/sections"
 
@@ -42,9 +42,9 @@ export function Summary({
     return { label: COLLAB_TYPES.find((c) => c.id === id)?.label ?? id, total }
   })
 
-  const adjacencies = state.adjacencyPairs.map((k) => {
+  const adjacencies = state.adjacencyPairs.map((k, i) => {
     const [a, b] = k.split("|")
-    return `${nameOf(a)} ↔ ${nameOf(b)}`
+    return { label: `${nameOf(a)} ↔ ${nameOf(b)}`, color: adjacencyColor(i, state.adjacencyPairs.length), rank: i + 1 }
   })
 
   const deferredTitles = SURVEY_STEPS.filter((s) => deferred.has(s.id)).map((s) => s.title)
@@ -65,20 +65,21 @@ export function Summary({
 
   return (
     <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-4 py-1.5 text-sm font-medium text-[#00badc]">
-            Your workplace snapshot
-          </span>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight">Here&apos;s what you told us</h1>
-          <p className="mx-auto mt-3 max-w-xl text-white/60">
-            A quick review before we open your starting program. Everything here pre-populates the tool —
-            nothing is locked in.
-          </p>
+      <div className="mx-auto w-full max-w-[1700px] px-6 py-7 lg:px-10">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3 py-1 text-xs font-medium text-[#00badc]">
+              Your workplace snapshot
+            </span>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">Here&apos;s what you told us</h1>
+            <p className="mt-1 max-w-2xl text-sm text-white/60">
+              A quick review before we open your starting program. Everything here pre-populates the tool — nothing is locked in.
+            </p>
+          </div>
         </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div className="space-y-6">
+        <div className="mt-6 grid items-start gap-5 lg:grid-cols-2 xl:grid-cols-[1fr_1fr_360px]">
+          <div className="space-y-5">
             {/* People */}
             <Card title="Your people">
               {useDepts ? (
@@ -117,16 +118,37 @@ export function Summary({
               )}
             </Card>
 
+            {/* Notes */}
+            {(state.loves.trim() || state.painPoints.trim() || state.imbalances.trim()) && (
+              <Card title="What's working & what isn't">
+                {state.loves.trim() && <Note label="Working well" value={state.loves} />}
+                {state.painPoints.trim() && <Note label="Not working" value={state.painPoints} />}
+                {state.imbalances.trim() && <Note label="Over / under-used" value={state.imbalances} />}
+              </Card>
+            )}
+          </div>
+
+          <div className="space-y-5">
             {/* Ways of working */}
             <Card title="Ways of working">
               <Row label="In-office cadence" value={daysSummary ?? "—"} />
               <Row label="Seats" value={labelFor(SEATING_POSTURES, state.seatingChoice) ?? "—"} />
               {adjacencies.length > 0 && (
                 <div className="pt-1">
-                  <div className="mb-1.5 text-sm text-white/50">Teams that work closely</div>
+                  <div className="mb-1.5 text-sm text-white/50">
+                    Teams that work closely <span className="text-white/30">· ranked by priority</span>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {adjacencies.map((a) => (
-                      <span key={a} className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-white/75">{a}</span>
+                      <span key={a.label} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-xs text-white/80">
+                        <span
+                          className="flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold text-slate-900"
+                          style={{ backgroundColor: a.color }}
+                        >
+                          {a.rank}
+                        </span>
+                        {a.label}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -161,19 +183,10 @@ export function Summary({
                 </div>
               )}
             </Card>
-
-            {/* Notes */}
-            {(state.loves.trim() || state.painPoints.trim() || state.imbalances.trim()) && (
-              <Card title="What's working & what isn't">
-                {state.loves.trim() && <Note label="Working well" value={state.loves} />}
-                {state.painPoints.trim() && <Note label="Not working" value={state.painPoints} />}
-                {state.imbalances.trim() && <Note label="Over / under-used" value={state.imbalances} />}
-              </Card>
-            )}
           </div>
 
           {/* Right rail */}
-          <aside className="space-y-6">
+          <aside className="space-y-5">
             <WorkplaceProfile scores={scores} />
             {deferredTitles.length > 0 && (
               <div className="rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-5">
@@ -189,7 +202,7 @@ export function Summary({
         </div>
 
         {/* Actions */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"
             onClick={onBack}

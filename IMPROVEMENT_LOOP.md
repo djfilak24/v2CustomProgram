@@ -52,11 +52,9 @@ it into its own component file. No big-bang rewrite.
 
 ### Phase 1 — Stabilize & de-dupe (current)
 
-- [ ] **1. Unify SF-each stepper increment.** Card view uses `±1`
-  (`page.tsx:2210/2220`), table view uses `±10` (`page.tsx:2835/2855`). Make them
-  consistent. Decide the right step (likely `±5` or a shift-for-coarse pattern);
-  default to matching card view's fine control unless a coarse option is added to
-  both. Apply to both surfaces.
+- [x] **1. Unify SF-each stepper increment.** ✅ Both card and table steppers now
+  default to `±1` with `Shift-click = ±10` (coarse). Identical behavior across
+  surfaces; tooltip hints discoverability.
 - [ ] **2. Department Manager allocation correctness pass.** Audit per-department
   allocation steppers in the Workbench table (~line 2890) and card view. Confirm
   allocations: never exceed quantity×capacity, stay in sync between table and card
@@ -89,4 +87,6 @@ it into its own component file. No big-bang rewrite.
 
 _(newest first — append one line per shipped item)_
 
+- **#1 SF stepper unified** — card + table both default ±1, Shift-click ±10. Was
+  inconsistent (card ±1, table ±10). Tests unchanged (24 pass / 3 pre-existing fail).
 - _loop start: branch created, baseline captured, ABOUT.md + this file added._

@@ -2207,7 +2207,8 @@ const WorkplaceProgrammingTool = () => {
             <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">SF ea</div>
             <div className="flex items-center gap-0.5">
               <button
-                onClick={() => { const sf = Math.max(1, space.sfEach - 1); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
+                title="Shift-click for ±10"
+                onClick={(e) => { const sf = Math.max(1, space.sfEach - (e.shiftKey ? 10 : 1)); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
                 className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0"
               >−</button>
               <input
@@ -2217,7 +2218,8 @@ const WorkplaceProgrammingTool = () => {
                 className="w-0 flex-1 text-center text-sm font-semibold text-slate-900 tabular-nums bg-transparent border-none outline-none"
               />
               <button
-                onClick={() => { const sf = space.sfEach + 1; updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
+                title="Shift-click for ±10"
+                onClick={(e) => { const sf = space.sfEach + (e.shiftKey ? 10 : 1); updateSpace(spaceKey, { sfEach: sf, totalArea: space.quantity * sf }) }}
                 className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0"
               >+</button>
             </div>
@@ -2831,8 +2833,9 @@ const WorkplaceProgrammingTool = () => {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
-                          onClick={() => {
-                            const n = Math.max(1, space.sfEach - 10)
+                          title="Shift-click for ±10"
+                          onClick={(e) => {
+                            const n = Math.max(1, space.sfEach - (e.shiftKey ? 10 : 1))
                             updateSpace(spaceKey, { sfEach: n, totalArea: space.quantity * n })
                           }}
                           className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs"
@@ -2851,8 +2854,9 @@ const WorkplaceProgrammingTool = () => {
                         />
                         <button
                           type="button"
-                          onClick={() => {
-                            const n = space.sfEach + 10
+                          title="Shift-click for ±10"
+                          onClick={(e) => {
+                            const n = space.sfEach + (e.shiftKey ? 10 : 1)
                             updateSpace(spaceKey, { sfEach: n, totalArea: space.quantity * n })
                           }}
                           className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs"

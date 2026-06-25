@@ -62,9 +62,13 @@ it into its own component file. No big-bang rewrite.
   which is now centralized for card, table, numeric entry, and recalibrate.
   _Note: this UI-state logic isn't unit-tested (lives in page.tsx); candidate for
   extraction + test when the table/cards are pulled out (items 6–7)._
-- [ ] **3. Single config-targets surface.** Targets currently render as BOTH a
-  card-in-canvas and a sidebar. Collapse to one source of truth (the sidebar).
-  Extract into `components/config-targets.tsx`. Remove the redundant in-canvas card.
+- [x] **3. Single config-targets surface.** ✅ The in-canvas card (lines ~4601–5473)
+  was a full duplicate of the sidebar (Company Targets + Program Status +
+  Department Management) shown only when the sidebar was closed — the "arbitrary
+  pop-up". Gated off so the sidebar is the single home; closing it now hides
+  targets (full-width canvas) with the "Targets" toggle to reopen. Build verified.
+  _The dead JSX is intentionally left for physical removal during extraction
+  (items 6–7) per "don't randomly delete 870 lines" — fully reversible meanwhile._
 - [ ] **4. Make config-vs-input visually distinct.** Apply a consistent visual
   treatment so "configuration" (ratios/policy/targets) reads differently from
   "input" (the client's actual rooms/numbers). See ABOUT.md §7.
@@ -90,6 +94,9 @@ it into its own component file. No big-bang rewrite.
 
 _(newest first — append one line per shipped item)_
 
+- **#3 Single targets surface** — gated off the in-canvas Configuration Targets
+  duplicate; sidebar is now the single source. Closing it hides targets instead of
+  popping a redundant card into the canvas. Build verified clean.
 - **#2 Dept allocation reconcile** — lowering a space's quantity no longer leaves
   stale over-allocations; `updateSpace` trims largest dept allocations to fit.
 - **#1 SF stepper unified** — card + table both default ±1, Shift-click ±10. Was

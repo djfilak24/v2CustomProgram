@@ -4598,7 +4598,17 @@ const WorkplaceProgrammingTool = () => {
               </div>
             )}
 
-            {canvasMode === "workbench" && !showTargetsSidebar && (
+            {/*
+              Configuration Targets now live ONLY in the sidebar (single source of
+              truth). This in-canvas card was a full duplicate (Company Targets +
+              Program Status + Department Management) that rendered when the sidebar
+              was closed — which is why targets felt like they "popped up"
+              arbitrarily. It is gated off here so closing the sidebar simply hides
+              targets (reopen via the "Targets" toggle). The dead JSX below is
+              removed physically during the ConfigTargets/DepartmentManager
+              extraction — see IMPROVEMENT_LOOP.md items 6-7.
+            */}
+            {false && canvasMode === "workbench" && !showTargetsSidebar && (
             <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border border-slate-200 shadow-sm mb-8">
               <div
                 className="flex items-center justify-between p-6 cursor-pointer hover:bg-gradient-to-br hover:from-slate-100 hover:to-blue-100 transition-colors rounded-t-xl"

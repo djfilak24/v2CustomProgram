@@ -45,8 +45,20 @@ export interface SurveyResult {
   work: {
     /** Company-wide in-office days/week (Quick lane). 1–5. <5 implies hybrid. */
     daysInOffice: number
-    /** Per-dept override of days/week (Detailed lane), keyed by department id. */
+    /**
+     * Per-dept override of days/week (Detailed lane), keyed by department id.
+     * Holds a single representative value (the band minimum) for seeding; see
+     * `perDeptDaysRange` for the full recorded range.
+     */
     perDeptDays?: Record<string, number>
+    /**
+     * Full per-dept in-office day ranges (Detailed lane), keyed by department id.
+     * When a client gives a range ("1–3 days"), the end evaluation can take the
+     * min or max as appropriate. Exact answers have min === max.
+     */
+    perDeptDaysRange?: Record<string, { min: number; max: number }>
+    /** Departments the client marked "not sure" on cadence (to confirm live). */
+    daysUnsureDepts?: string[]
     /** Headcount that is fully remote (never seated). */
     fullyRemote: number
     /** Per-dept count of people needing a dedicated/assigned seat (Detailed). */

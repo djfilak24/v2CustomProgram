@@ -2,15 +2,14 @@
 
 import { useMemo, useState } from "react"
 import Image from "next/image"
-import Link from "next/link"
 import {
-  ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Check,
+  ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle,
 } from "lucide-react"
 import {
-  SURVEY_STEPS, computeProfile, emptyState,
-  WORK_PATTERNS, WORK_PATTERN_DAYS, SEATING_POSTURES, OFFICE_POSTURES,
+  SURVEY_STEPS, computeProfile, emptyState, emptyLanes,
+  WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES,
   GROWTH_PRESETS, SUPPORT_TYPES,
-  type Lane, type StepId, type SurveyState,
+  type Lane, type LaneMap, type StepId, type SurveyState, type DayValue,
 } from "@/lib/survey/sections"
 import { ProgressHeader } from "@/components/survey/progress-header"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
@@ -18,16 +17,19 @@ import { LaneToggle } from "@/components/survey/lane-toggle"
 import { ChoiceCard } from "@/components/survey/choice-card"
 import { DeptSpine } from "@/components/survey/dept-spine"
 import { PerDeptRows } from "@/components/survey/per-dept-rows"
+import { DaysRows } from "@/components/survey/days-rows"
 import { CollabTree } from "@/components/survey/collab-tree"
+import { AdjacencyGraph } from "@/components/survey/adjacency-graph"
 import { IntroDemo } from "@/components/survey/intro-demo"
+import { Summary } from "@/components/survey/summary"
 
-type Phase = "hero" | "survey" | "done"
+type Phase = "hero" | "survey" | "summary"
 
 export default function SurveyPage() {
   const [phase, setPhase] = useState<Phase>("hero")
   const [showIntro, setShowIntro] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
-  const [lane, setLane] = useState<Lane>("quick")
+  const [lanes, setLanes] = useState<LaneMap>(emptyLanes)
   const [state, setState] = useState<SurveyState>(emptyState)
   const [deferred, setDeferred] = useState<Set<StepId>>(new Set())
 
@@ -52,7 +54,7 @@ export default function SurveyPage() {
 
   const goNext = () => {
     if (stepIndex < steps.length - 1) setStepIndex((i) => i + 1)
-    else setPhase("done")
+    else setPhase("summary")
   }
   const goBack = () => setStepIndex((i) => Math.max(0, i - 1))
 
@@ -62,10 +64,20 @@ export default function SurveyPage() {
   }
 
   if (phase === "hero") return <Hero onBegin={beginSurvey} />
-  if (phase === "done") return <Done deferredCount={deferred.size} />
+  if (phase === "summary")
+    return (
+      <Summary
+        state={state}
+        lanes={lanes}
+        deferred={deferred}
+        scores={scores}
+        onBack={() => { setPhase("survey"); setStepIndex(steps.length - 1) }}
+      />
+    )
 
-  // Detailed lane is only meaningful where the step defines a deeper editor.
-  const effectiveLane: Lane = step.hasDetailed ? lane : "quick"
+  // Detailed lane is per-question, and only meaningful where the step defines a
+  // deeper editor.
+  const effectiveLane: Lane = step.hasDetailed ? lanes[step.id] : "quick"
 
   return (
     <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
@@ -80,7 +92,12 @@ export default function SurveyPage() {
               <h1 className="text-3xl font-bold tracking-tight">{step.title}</h1>
               <p className="mt-2 text-white/55">{step.subtitle}</p>
             </div>
-            {step.hasDetailed && <LaneToggle lane={lane} onChange={setLane} />}
+            {step.hasDetailed && (
+              <LaneToggle
+                lane={lanes[step.id]}
+                onChange={(l) => setLanes((prev) => ({ ...prev, [step.id]: l }))}
+              />
+            )}
           </div>
 
           {effectiveLane === "detailed" && step.detailedHint && (
@@ -188,15 +205,10 @@ function StepBody({
 
     case "work":
       return lane === "detailed" ? (
-        <PerDeptRows
+        <DaysRows
           departments={state.departments}
           values={state.perDeptDays}
-          onChange={(v) => patch({ perDeptDays: v })}
-          defaultValue={state.workChoice ? WORK_PATTERN_DAYS[state.workChoice] : 3}
-          min={0}
-          max={5}
-          suffix="days"
-          showHeadcount
+          onChange={(v: Record<string, DayValue>) => patch({ perDeptDays: v })}
         />
       ) : (
         <CardGrid
@@ -228,21 +240,11 @@ function StepBody({
 
     case "adjacency":
       return (
-        <div className="max-w-2xl">
-          <label className="text-sm font-medium text-white/70">
-            Which teams collaborate most — and who should sit near whom?
-          </label>
-          <textarea
-            value={state.adjacencyNotes}
-            onChange={(e) => patch({ adjacencyNotes: e.target.value })}
-            rows={5}
-            placeholder="e.g. Product and Engineering work daily and should be adjacent. Sales needs to be near the client-facing meeting rooms."
-            className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
-          />
-          <p className="mt-2 text-xs text-white/40">
-            Captured as adjacency notes for your live session — the tool handles stacking and adjacency planning.
-          </p>
-        </div>
+        <AdjacencyGraph
+          departments={state.departments}
+          pairs={state.adjacencyPairs}
+          onChange={(pairs) => patch({ adjacencyPairs: pairs })}
+        />
       )
 
     case "offices":
@@ -395,7 +397,7 @@ function Hero({ onBegin }: { onBegin: () => void }) {
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="flex items-center justify-between px-8 py-6">
           <div className="flex items-center gap-3">
-            <Image src="/nelson-logo.png" alt="NELSON" width={110} height={28} className="h-7 w-auto" priority />
+            <Image src="/nelson-logo.png" alt="NELSON" width={110} height={28} className="h-7 w-auto brightness-0 invert" priority />
             <span className="text-white/30">|</span>
             <span className="text-sm font-medium text-white/70">Workplace Strategy Discovery</span>
           </div>
@@ -431,31 +433,3 @@ function Hero({ onBegin }: { onBegin: () => void }) {
   )
 }
 
-function Done({ deferredCount }: { deferredCount: number }) {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0b1830] bg-[radial-gradient(1000px_500px_at_50%_-10%,rgba(0,186,220,0.12),transparent)] px-6 text-center text-white">
-      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#00badc]/15 text-[#00badc]">
-        <Check className="h-8 w-8" strokeWidth={2.5} />
-      </span>
-      <h1 className="mt-6 text-4xl font-bold tracking-tight">That&apos;s a great head start</h1>
-      <p className="mt-4 max-w-lg text-white/65">
-        Your answers will pre-populate your program so we walk into the live
-        session validating a real starting point — not starting from zero.
-        {deferredCount > 0 && (
-          <> We flagged <span className="font-semibold text-white">{deferredCount}</span> item{deferredCount > 1 ? "s" : ""} to cover together.</>
-        )}
-      </p>
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
-        >
-          See your starting program <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-      <p className="mt-6 text-xs text-white/40">
-        (Shell preview — seeding the tool from these answers is the next build step.)
-      </p>
-    </div>
-  )
-}

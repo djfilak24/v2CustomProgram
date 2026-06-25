@@ -236,6 +236,19 @@ export const SURVEY_STEPS: SurveyStep[] = [
 
 // ── Structured survey state ──────────────────────────────────────────────────
 
+/** A per-department in-office cadence: an exact/range day band, or "not sure". */
+export type DayRange = { min: number; max: number }
+export type DayValue = DayRange | "unsure"
+
+export function isUnsure(v: DayValue | undefined): v is "unsure" {
+  return v === "unsure"
+}
+
+/** A connection between two departments, keyed "idA|idB" with idA < idB. */
+export function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
 export interface SurveyState {
   // Section 1 — people + growth
   totalHeadcount: number | null
@@ -243,12 +256,12 @@ export interface SurveyState {
   departments: SpineDept[]
   // Section 2 — work patterns
   workChoice: string | null
-  perDeptDays: Record<string, number>
+  perDeptDays: Record<string, DayValue>
   // Section 2 — seating
   seatingChoice: string | null
   dedicatedByDept: Record<string, number>
-  // adjacency
-  adjacencyNotes: string
+  // adjacency — connections between departments (visual graph)
+  adjacencyPairs: string[]
   // Section 3a — offices
   officeChoice: string | null
   officesByDept: Record<string, number>
@@ -273,7 +286,7 @@ export function emptyState(): SurveyState {
     perDeptDays: {},
     seatingChoice: null,
     dedicatedByDept: {},
-    adjacencyNotes: "",
+    adjacencyPairs: [],
     officeChoice: null,
     officesByDept: {},
     collabTypes: [],
@@ -283,6 +296,16 @@ export function emptyState(): SurveyState {
     painPoints: "",
     imbalances: "",
   }
+}
+
+/** Per-question lanes — each step independently Quick or Go-deeper. */
+export type LaneMap = Record<StepId, Lane>
+
+export function emptyLanes(): LaneMap {
+  return SURVEY_STEPS.reduce((acc, s) => {
+    acc[s.id] = "quick"
+    return acc
+  }, {} as LaneMap)
 }
 
 /** Σ of department headcounts, or the quick-lane single number when no depts. */
@@ -309,10 +332,21 @@ export function computeProfile(s: SurveyState): ProfileScores {
     Amenity: BASELINE_SCORE,
   }
 
-  // Work pattern → density / flexibility.
-  if (s.workChoice === "office") { scores.Density += 4; scores.Privacy += 1 }
-  else if (s.workChoice === "hybrid") { scores.Flexibility += 3.5; scores.Collaboration += 1.5; scores.Density += 1 }
-  else if (s.workChoice === "remote") { scores.Flexibility += 5.5; scores.Density -= 1 }
+  // Work pattern → density / flexibility. Quick choice, or the average of the
+  // per-department day bands when the detailed lane was used instead.
+  let avgDays: number | null = s.workChoice ? WORK_PATTERN_DAYS[s.workChoice] ?? null : null
+  if (avgDays === null) {
+    const bands = Object.values(s.perDeptDays).filter((v): v is DayRange => v !== "unsure" && v !== undefined)
+    if (bands.length) avgDays = bands.reduce((a, b) => a + (b.min + b.max) / 2, 0) / bands.length
+  }
+  if (avgDays !== null) {
+    if (avgDays >= 4) { scores.Density += 4; scores.Privacy += 1 }
+    else if (avgDays >= 2) { scores.Flexibility += 3.5; scores.Collaboration += 1.5; scores.Density += 1 }
+    else { scores.Flexibility += 5.5; scores.Density -= 1 }
+  }
+
+  // Department adjacencies → collaboration intensity.
+  if (s.adjacencyPairs.length) scores.Collaboration += Math.min(3, s.adjacencyPairs.length * 0.75)
 
   // Seating posture → flexibility vs privacy/density.
   if (s.seatingChoice === "assigned") { scores.Privacy += 2.5; scores.Density += 1.5 }
@@ -359,43 +393,62 @@ export function computeProfile(s: SurveyState): ProfileScores {
 
 export function buildSurveyResult(
   s: SurveyState,
-  lane: Lane,
+  lanes: LaneMap,
   deferred: Set<StepId>,
   meta: { clientName: string; completedBy: string },
 ): SurveyResult {
-  const useDepts = lane === "detailed" && s.departments.length > 0
+  const namedDepts = s.departments.filter((d) => d.name.trim())
+  const useDepts = lanes.people === "detailed" && namedDepts.length > 0
+
   const departments = useDepts
-    ? s.departments
-        .filter((d) => d.name.trim())
-        .map((d) => ({
-          id: d.id,
-          name: d.name.trim(),
-          headcount: Math.max(0, Math.round(d.headcount || 0)),
-          ...(d.futureHeadcount !== undefined ? { futureHeadcount: Math.max(0, Math.round(d.futureHeadcount)) } : {}),
-        }))
+    ? namedDepts.map((d) => ({
+        id: d.id,
+        name: d.name.trim(),
+        headcount: Math.max(0, Math.round(d.headcount || 0)),
+        ...(d.futureHeadcount !== undefined ? { futureHeadcount: Math.max(0, Math.round(d.futureHeadcount)) } : {}),
+      }))
     : []
 
   const totalHeadcount = useDepts
     ? departments.reduce((a, d) => a + d.headcount, 0)
     : s.totalHeadcount ?? 0
 
-  // Per-dept maps are keyed by spine id in state; re-key by name for the result
-  // so the payload is human-meaningful and independent of ephemeral ids.
-  const byName = (m: Record<string, number>): Record<string, number> => {
+  // Per-dept maps are keyed by spine id (matching SurveyDepartment.id, which is
+  // what seedToolFromSurvey looks up). Only departments with names are kept.
+  const valid = new Set(namedDepts.map((d) => d.id))
+  const byId = (m: Record<string, number>): Record<string, number> => {
     const out: Record<string, number> = {}
-    for (const d of s.departments) {
-      const v = m[d.id]
-      if (v && d.name.trim()) out[d.name.trim()] = v
-    }
+    for (const [id, v] of Object.entries(m)) if (v && valid.has(id)) out[id] = v
     return out
+  }
+  const nameOf = (id: string) => namedDepts.find((d) => d.id === id)?.name.trim() ?? id
+
+  // Days: pick a single representative (the band minimum — the conservative,
+  // most-sharing case) for the tool seed, but preserve full ranges + "not sure"
+  // so the end-of-survey evaluation can take min/max as it sees fit.
+  const perDeptDays: Record<string, number> = {}
+  const perDeptDaysRange: Record<string, DayRange> = {}
+  const daysUnsure: string[] = []
+  if (lanes.work === "detailed") {
+    for (const d of namedDepts) {
+      const v = s.perDeptDays[d.id]
+      if (v === undefined) continue
+      if (v === "unsure") { daysUnsure.push(nameOf(d.id)); continue }
+      perDeptDays[d.id] = v.min
+      perDeptDaysRange[d.id] = v
+    }
   }
 
   const daysInOffice = s.workChoice ? WORK_PATTERN_DAYS[s.workChoice] ?? 3 : 3
 
   const collaboration = s.collabTypes.map((type) => ({
     type,
-    byDept: byName(s.collabByDept[type] ?? {}),
+    byDept: lanes.collaboration === "detailed" ? byId(s.collabByDept[type] ?? {}) : {},
   }))
+
+  const adjacencyNotes = s.adjacencyPairs
+    .map((k) => { const [a, b] = k.split("|"); return `${nameOf(a)} ↔ ${nameOf(b)}` })
+    .join("; ")
 
   return {
     meta: { clientName: meta.clientName, completedBy: meta.completedBy, completedAt: new Date().toISOString() },
@@ -406,13 +459,15 @@ export function buildSurveyResult(
     },
     work: {
       daysInOffice,
-      ...(useDepts && Object.keys(s.perDeptDays).length ? { perDeptDays: byName(s.perDeptDays) } : {}),
+      ...(Object.keys(perDeptDays).length ? { perDeptDays } : {}),
+      ...(Object.keys(perDeptDaysRange).length ? { perDeptDaysRange } : {}),
+      ...(daysUnsure.length ? { daysUnsureDepts: daysUnsure } : {}),
       fullyRemote: 0,
-      ...(useDepts && Object.keys(s.dedicatedByDept).length ? { dedicatedByDept: byName(s.dedicatedByDept) } : {}),
-      ...(s.adjacencyNotes.trim() ? { adjacencyNotes: s.adjacencyNotes.trim() } : {}),
+      ...(lanes.seating === "detailed" && Object.keys(s.dedicatedByDept).length ? { dedicatedByDept: byId(s.dedicatedByDept) } : {}),
+      ...(adjacencyNotes ? { adjacencyNotes } : {}),
     },
     spaces: {
-      privateOfficesByDept: byName(s.officesByDept),
+      privateOfficesByDept: lanes.offices === "detailed" ? byId(s.officesByDept) : {},
       collaboration,
       support: s.support,
     },

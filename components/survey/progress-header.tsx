@@ -22,7 +22,7 @@ export function ProgressHeader({
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1830]/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
         <div className="flex items-center gap-3">
-          <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto" priority />
+          <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto brightness-0 invert" priority />
         </div>
         <div className="text-right">
           <div className="text-sm font-semibold text-white">Workplace Strategy Discovery</div>

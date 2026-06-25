@@ -83,12 +83,18 @@ it into its own component file. No big-bang rewrite.
 - [ ] **7. Extract ProgramTable / SpaceCard** rendering into dedicated files.
 - [ ] **8. Extract canvas-mode toolbar** (Focus/Workbench/Briefing switch).
 
-### Phase 3 — Vision foundation (do NOT start without user go-ahead)
+### Phase 3 — Survey → program vision (spec'd in SURVEY_SPEC.md)
 
-- [ ] **9. Intake survey** (5-min) that pre-populates inputs. *Needs product
-  spec from user before build.*
-- [ ] **10. Live department-by-department meeting flow.** *Needs spec.*
-- [ ] **11. Fit-planning handoff export** (program + notes). *Needs spec.*
+Spec done (`SURVEY_SPEC.md`). Two open decisions before build: delivery model
+(recommend new `/survey` route, zero-backend) + per-dept depth default. Build order:
+
+- [ ] **9. `SurveyResult` type + `seedToolFromSurvey()` mapper** (pure data + unit
+  tests). De-risks everything downstream; no UI.
+- [ ] **10. Survey shell** — sections, progress, Quick/Detailed/Defer lane control.
+- [ ] **11. Department spine** — define depts once, forward-populate every section.
+- [ ] **12. Section 3b collaboration decision-tree** (the showcase interaction).
+- [ ] **13. Sample-program preview** (Briefing mode + canned scenario).
+- [ ] **14. Handoff** — import a `SurveyResult` into the live tool.
 
 ---
 

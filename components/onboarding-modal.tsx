@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
+import Link from "next/link"
 import { ChevronLeft, X, Minus, Plus, Info, Check, Users, CalendarDays, Building2, UserX, DollarSign, Percent, ArrowRight, Sparkles, HelpCircle, Compass, BarChart3, Grid3X3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -226,21 +227,21 @@ export function OnboardingModal({ isOpen, onClose, onComplete }: OnboardingModal
                   </div>
                 </button>
 
-                {/* I Need Help */}
-                <button
-                  disabled
-                  className="rounded-lg border-2 border-slate-200 p-5 text-left opacity-60 cursor-not-allowed"
+                {/* I Need Help → Workplace Strategy Discovery survey */}
+                <Link
+                  href="/survey"
+                  className="rounded-lg border-2 border-slate-200 p-5 text-left hover:border-sky-400 hover:bg-sky-50/50 transition-all group block"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
-                      <HelpCircle className="h-6 w-6 text-slate-400" />
+                    <div className="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center group-hover:bg-sky-200 transition-colors">
+                      <HelpCircle className="h-6 w-6 text-sky-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-slate-700">I Need Help</h3>
-                      <span className="inline-block mt-1 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">Coming Soon</span>
+                      <h3 className="font-semibold text-slate-900">I Need Help</h3>
+                      <p className="text-sm text-slate-600">Take the 5-minute discovery survey to pre-build your program</p>
                     </div>
                   </div>
-                </button>
+                </Link>
 
                 {/* Just Exploring */}
                 <button

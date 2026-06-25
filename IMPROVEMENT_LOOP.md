@@ -95,7 +95,14 @@ Spec done (`SURVEY_SPEC.md`). Two open decisions before build: delivery model
   collaboration / support seed spaces with allocations, narrative+deferred → notes.
   Spaces emitted by preset name (resolved via SPACE_PRESETS on import) to avoid
   catalog drift.
-- [ ] **10. Survey shell** — sections, progress, Quick/Detailed/Defer lane control.
+- [x] **10. Survey shell** ✅ `/survey` route — immersive dark-navy NELSON
+  experience matching the inspiration: hero (office photo + cyan headline + 3–5 min
+  pill), always-visible progress (section · Step X/N · %), big chunky icon choice
+  cards + radio rows with conditional follow-up, the **Quick / Go deeper** lane
+  toggle (with per-step "Go deeper" hint), the live **Workplace Profile radar**
+  (recharts, builds per answer), and a first-class "We'll talk live" defer. Wired
+  the onboarding "I Need Help" button → `/survey`. Data-driven via
+  `lib/survey/sections.ts`. Build verified; screenshotted hero + 2 steps.
 - [ ] **11. Department spine** — define depts once, forward-populate every section.
 - [ ] **12. Section 3b collaboration decision-tree** (the showcase interaction).
 - [ ] **13. Sample-program preview** (Briefing mode + canned scenario).
@@ -107,6 +114,9 @@ Spec done (`SURVEY_SPEC.md`). Two open decisions before build: delivery model
 
 _(newest first — append one line per shipped item)_
 
+- **#10 Survey shell** — immersive dark-navy `/survey` flow matching the
+  inspiration: hero, persistent progress, chunky icon cards, Quick/Go-deeper lanes,
+  live Workplace Profile radar, defer. "I Need Help" entry wired. Build verified.
 - **#9 Survey data foundation** — `lib/survey/` SurveyResult type +
   seedToolFromSurvey() mapper, 8 passing tests. Growth is first-class (per-dept
   grow/shrink → planning headcount for fit planning). Pure data, no UI.

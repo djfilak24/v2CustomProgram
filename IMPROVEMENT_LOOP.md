@@ -69,9 +69,11 @@ it into its own component file. No big-bang rewrite.
   targets (full-width canvas) with the "Targets" toggle to reopen. Build verified.
   _The dead JSX is intentionally left for physical removal during extraction
   (items 6–7) per "don't randomly delete 870 lines" — fully reversible meanwhile._
-- [ ] **4. Make config-vs-input visually distinct.** Apply a consistent visual
-  treatment so "configuration" (ratios/policy/targets) reads differently from
-  "input" (the client's actual rooms/numbers). See ABOUT.md §7.
+- [~] **4. Make config-vs-input visually distinct.** PARTIAL: added a clarifying
+  subtitle to the sidebar config header ("What to aim for · not the live program")
+  to seat the mental model. Fuller treatment (distinct visual language for the
+  config layer vs. the input/program layer across the whole canvas) is held for
+  user review — it's taste-sensitive and the user likes the current UI.
 - [ ] **5. Polish the program bar.** The top program bar is cramped. Improve
   hierarchy/spacing so the headline program metrics are legible at a glance.
 

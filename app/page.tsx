@@ -5492,7 +5492,10 @@ const WorkplaceProgrammingTool = () => {
               <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
                 <div className="flex items-center gap-2">
                   <Settings className="w-4 h-4 text-slate-500" />
-                  <h2 className="text-sm font-semibold text-slate-900">Configuration Targets</h2>
+                  <div className="flex flex-col leading-tight">
+                    <h2 className="text-sm font-semibold text-slate-900">Configuration Targets</h2>
+                    <span className="text-[10px] text-slate-400">What to aim for · not the live program</span>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowTargetsSidebar(false)}

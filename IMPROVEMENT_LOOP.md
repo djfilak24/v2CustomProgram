@@ -88,8 +88,13 @@ it into its own component file. No big-bang rewrite.
 Spec done (`SURVEY_SPEC.md`). Two open decisions before build: delivery model
 (recommend new `/survey` route, zero-backend) + per-dept depth default. Build order:
 
-- [ ] **9. `SurveyResult` type + `seedToolFromSurvey()` mapper** (pure data + unit
-  tests). De-risks everything downstream; no UI.
+- [x] **9. `SurveyResult` type + `seedToolFromSurvey()` mapper** ✅ Built in
+  `lib/survey/` (types.ts + seedToolFromSurvey.ts) with 8 passing unit tests.
+  Proven: department spine → inputs/percentOffices, per-dept grow AND shrink →
+  futureHeadcount + planning headcount, company-growth fallback, private-office /
+  collaboration / support seed spaces with allocations, narrative+deferred → notes.
+  Spaces emitted by preset name (resolved via SPACE_PRESETS on import) to avoid
+  catalog drift.
 - [ ] **10. Survey shell** — sections, progress, Quick/Detailed/Defer lane control.
 - [ ] **11. Department spine** — define depts once, forward-populate every section.
 - [ ] **12. Section 3b collaboration decision-tree** (the showcase interaction).
@@ -102,6 +107,9 @@ Spec done (`SURVEY_SPEC.md`). Two open decisions before build: delivery model
 
 _(newest first — append one line per shipped item)_
 
+- **#9 Survey data foundation** — `lib/survey/` SurveyResult type +
+  seedToolFromSurvey() mapper, 8 passing tests. Growth is first-class (per-dept
+  grow/shrink → planning headcount for fit planning). Pure data, no UI.
 - **#3 Single targets surface** — gated off the in-canvas Configuration Targets
   duplicate; sidebar is now the single source. Closing it hides targets instead of
   popping a redundant card into the canvas. Build verified clean.

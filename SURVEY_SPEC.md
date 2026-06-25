@@ -61,9 +61,10 @@ to the tool's real types (`Department`, `OnboardingInputs`, `EditableSpace`).
 ### Section 1 — Your People  →  `Department[]` + `totalHeadcount`
 - **Quick:** total headcount (one number). Departments optional.
 - **Detailed:** add departments with current HC (`Department.name`, `.headcount`).
-- **1b Future (3–5 yr):** per-dept future HC → `Department.futureHeadcount`.
-  Quick lane = single growth % applied to all; Detailed = per-dept.
-- Growth/shrink/reorg flags → handoff notes.
+- **1b Future (3–5 yr) — GROWTH, first-class (see §4.5):** per-dept future HC →
+  `Department.futureHeadcount`. Quick = single company growth % applied to all;
+  Detailed = per-dept grow/shrink.
+- Reorg flags → handoff notes.
 - ➜ Tool: seeds `departments[]`, `targetHeadcount` = Σ headcount.
 
 ### Section 2 — How Your Teams Work  →  `daysInOffice`, `fullyRemote`, hybrid
@@ -89,6 +90,26 @@ to the tool's real types (`Department`, `OnboardingInputs`, `EditableSpace`).
 - **3c Support spaces:** checklist (copy/print, storage, break, wellness,
   mother's room) → `EditableSpace` in Support/Wellness zones (default qty 1).
 - ➜ Tool: private offices, collaborative + support spaces with allocations.
+
+### 4.5 — Growth is a first-class dimension (drives fit-planning headcount)
+
+Growth is not a side note — it is the bridge from "today's people" to **planning
+headcount**, which is what the fit-planning team designs against. It must be
+captured at BOTH levels because real orgs grow unevenly (and, increasingly, AI is
+reshaping team makeup — some teams grow, some shrink):
+
+- **Company level:** a single growth % (Quick lane). Applies uniformly.
+- **Department level:** per-dept future HC — some `+`, some `−` (Detailed lane).
+  This is the realistic case and what produces a defensible planning headcount.
+
+Mapping into the tool's existing growth machinery (already built — do not
+reinvent): per-dept `futureHeadcount` feeds `planForGrowth` future KPIs and the
+Current → Future deltas in the Configuration Targets. The survey simply *seeds*
+`Department.futureHeadcount`; the tool already derives future offices/workstations/
+hybrid from it.
+
+- ➜ Tool: `Department.futureHeadcount` per dept; enables growth mode on import;
+  planning headcount = Σ futureHeadcount (falls back to current where unset).
 
 ### Section 4 — What's Working / What Isn't  →  notes (qualitative)
 - Loves / pain points / over-under-used. All free text BY DESIGN (this is the
@@ -121,6 +142,8 @@ interface SurveyResult {
   people: {
     departments: { name: string; headcount: number; futureHeadcount?: number }[]
     totalHeadcount: number            // = Σ headcount (or Quick-lane single number)
+    companyGrowthPct?: number         // Quick-lane growth applied uniformly when a
+                                      // dept has no explicit futureHeadcount
   }
   work: {
     daysInOffice: number              // company-wide (Quick) ...
@@ -155,18 +178,22 @@ Sets expectations and motivates the homework.
 
 ---
 
-## 7. Open architectural decisions (need user call)
+## 7. Decisions (locked)
 
-1. **Where the survey lives & how data returns to the tool.** Options:
-   - **(A) New route in this app** (`/survey`), zero-backend: result encoded to a
-     shareable link or downloadable JSON the broker imports. Fastest MVP.
-   - **(B) Same route + lightweight backend** (Vercel KV / DB) keyed by a code:
-     client submits, broker opens by code. Cleaner UX, needs infra.
-   - **(C) Standalone micro-app.** Most isolation, most overhead.
-   - _Recommendation: (A) now, designed so (B) is a drop-in later._
-2. **Per-department depth default.** Start everyone in the Quick (company-wide)
-   lane and let them opt into per-department detail? (Recommended — protects the
-   5-minute budget.)
+1. **Delivery = Option A.** New `/survey` route in this app, zero-backend. Result
+   becomes a **shareable link** under the published URL. Designed so a real backend
+   (Option B) drops in later without reworking the survey.
+2. **Entry point = the "I Need Help" button.** On the onboarding intent screen
+   (`onboarding-modal.tsx` ~line 229) the middle button is currently `disabled` /
+   "Coming Soon". It becomes the entry to this survey flow — i.e. the three-door
+   decision tree is: "I know my needs" (manual) · **"I need help" (survey)** ·
+   "Just exploring" (demo data).
+3. **Quick-by-default, depth always visible.** Everyone starts in the Quick
+   (company-wide) lane to protect the 5-minute budget, BUT the Detailed lane is
+   visibly offered on each question (not hidden behind a toggle). At survey start
+   we explicitly point out that going deeper is optional, with a **short demo**
+   showing how a nested answer (e.g. departments → per-dept counts) supports the
+   final program. Defer remains always available.
 
 ---
 

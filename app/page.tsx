@@ -1639,13 +1639,32 @@ const WorkplaceProgrammingTool = () => {
   }
 
   const updateSpace = (spaceKey: string, updates: Partial<EditableSpace>) => {
-    setEditableSpaces((prev) => ({
-      ...prev,
-      [spaceKey]: {
-        ...prev[spaceKey],
-        ...updates,
-      },
-    }))
+    setEditableSpaces((prev) => {
+      const existing = prev[spaceKey]
+      if (!existing) return prev
+      const merged = { ...existing, ...updates }
+
+      // Reconcile department allocations whenever quantity changes. Without this,
+      // lowering a space's quantity leaves stale per-department allocations that
+      // sum above the new quantity — silently over-allocating and corrupting the
+      // configuredByDeptAndType rollups. Trim the largest allocations down to fit.
+      if (updates.quantity !== undefined && Array.isArray(merged.departmentAllocations)) {
+        const cap = Math.max(0, merged.quantity || 0)
+        const allocs = merged.departmentAllocations.map((a) => ({ ...a }))
+        let total = allocs.reduce((s, a) => s + a.count, 0)
+        while (total > cap && allocs.length > 0) {
+          let maxIdx = 0
+          for (let i = 1; i < allocs.length; i++) {
+            if (allocs[i].count > allocs[maxIdx].count) maxIdx = i
+          }
+          allocs[maxIdx].count -= 1
+          total -= 1
+        }
+        merged.departmentAllocations = allocs.filter((a) => a.count > 0)
+      }
+
+      return { ...prev, [spaceKey]: merged }
+    })
   }
 
   /**

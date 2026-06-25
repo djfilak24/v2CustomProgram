@@ -55,10 +55,13 @@ it into its own component file. No big-bang rewrite.
 - [x] **1. Unify SF-each stepper increment.** ✅ Both card and table steppers now
   default to `±1` with `Shift-click = ±10` (coarse). Identical behavior across
   surfaces; tooltip hints discoverability.
-- [ ] **2. Department Manager allocation correctness pass.** Audit per-department
-  allocation steppers in the Workbench table (~line 2890) and card view. Confirm
-  allocations: never exceed quantity×capacity, stay in sync between table and card
-  views, and roll up correctly into `configuredByDeptAndType`. Fix discrepancies.
+- [x] **2. Department Manager allocation correctness pass.** ✅ Fixed silent
+  over-allocation: `updateSpace` now reconciles `departmentAllocations` when
+  quantity drops (trims largest allocations to fit). The per-stepper clamps
+  (`updateDeptAlloc`) were already correct; the gap was the quantity-change path,
+  which is now centralized for card, table, numeric entry, and recalibrate.
+  _Note: this UI-state logic isn't unit-tested (lives in page.tsx); candidate for
+  extraction + test when the table/cards are pulled out (items 6–7)._
 - [ ] **3. Single config-targets surface.** Targets currently render as BOTH a
   card-in-canvas and a sidebar. Collapse to one source of truth (the sidebar).
   Extract into `components/config-targets.tsx`. Remove the redundant in-canvas card.
@@ -87,6 +90,8 @@ it into its own component file. No big-bang rewrite.
 
 _(newest first — append one line per shipped item)_
 
+- **#2 Dept allocation reconcile** — lowering a space's quantity no longer leaves
+  stale over-allocations; `updateSpace` trims largest dept allocations to fit.
 - **#1 SF stepper unified** — card + table both default ±1, Shift-click ±10. Was
   inconsistent (card ±1, table ±10). Tests unchanged (24 pass / 3 pre-existing fail).
 - _loop start: branch created, baseline captured, ABOUT.md + this file added._

@@ -46,6 +46,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { BriefingView } from "@/components/briefing-view"
   import { OnboardingModal, type GeneratedSpaceConfig, type OnboardingInputs } from "@/components/onboarding-modal"
   import { FastTrackExplorer } from "@/components/fast-track-explorer"
+  import { seedToolFromSurvey } from "@/lib/survey/seedToolFromSurvey"
+  import { loadSurveySeed, clearSurveySeed } from "@/lib/survey/seedStorage"
+  import type { SurveyResult } from "@/lib/survey/types"
   import { convertProgramToSpaces } from "@/lib/convert-program-to-spaces"
   import {
     computeSpaceProgram,
@@ -1250,6 +1253,86 @@ const WorkplaceProgrammingTool = () => {
 
     setShowOnboarding(false)
   }
+
+  // ── Survey → tool handoff ───────────────────────────────────────────────────
+  // If the Workplace Strategy Discovery survey left a seed in localStorage, build
+  // a starting program from it (reusing the same engine path as onboarding) and
+  // land the user directly in the canvas. Zero-backend (SURVEY_SPEC Option A).
+  const DEPT_COLOR_CLASSES = [
+    "bg-cyan-500", "bg-blue-500", "bg-violet-500", "bg-pink-500", "bg-orange-500",
+    "bg-emerald-500", "bg-amber-500", "bg-red-500", "bg-teal-500", "bg-purple-500",
+  ]
+  const applySurveySeed = (survey: SurveyResult) => {
+    const seeded = seedToolFromSurvey(survey)
+    const summaryInputs: SummaryInputs = {
+      clientName: seeded.inputs.clientName || "",
+      programmedBy: seeded.inputs.programmedBy || "",
+      totalHeadcount: seeded.inputs.totalHeadcount,
+      fullyRemote: seeded.inputs.fullyRemote,
+      percentOffices: seeded.inputs.percentOffices,
+      grossRent: 50,
+      daysInOffice: seeded.inputs.daysInOffice,
+      rentableFactor: 0.22,
+    }
+    try {
+      const blocks = computeAllSeatDemandBlocks(summaryInputs.totalHeadcount, summaryInputs.fullyRemote)
+      const program = computeSpaceProgram(summaryInputs, blocks, undefined, ratioConfig)
+      const result = convertProgramToSpaces(program, summaryInputs)
+      setEditableSpaces(result.spaces as Record<string, EditableSpace>)
+      setTargetHeadcount(summaryInputs.totalHeadcount)
+      setTargetOfficeCount(result.targets.officeCount)
+      setTargetWorkstations(result.targets.workstationCount)
+      setTargetHybridWorkers(result.targets.hybridWorkers)
+      setLoadFactor(1 + summaryInputs.rentableFactor)
+      setConfig((prev) => ({
+        ...prev,
+        percentOffices: summaryInputs.percentOffices,
+        daysInOffice: summaryInputs.daysInOffice,
+        fullyRemoteEmployees:
+          summaryInputs.totalHeadcount > 0
+            ? Math.round((summaryInputs.fullyRemote / summaryInputs.totalHeadcount) * 100)
+            : 0,
+      }))
+    } catch {
+      const hc = summaryInputs.totalHeadcount
+      const officeCount = Math.round(hc * (summaryInputs.percentOffices / 100))
+      setTargetHeadcount(hc)
+      setTargetOfficeCount(officeCount)
+      setTargetWorkstations(Math.max(0, hc - officeCount))
+    }
+
+    if (seeded.departments.length > 0) {
+      setDepartments(
+        seeded.departments.map((d, i) => ({
+          id: d.id,
+          name: d.name,
+          color: DEPT_COLOR_CLASSES[i % DEPT_COLOR_CLASSES.length],
+          headcount: d.headcount,
+          officeCount: d.officeCount,
+          hybridWorkers: d.hybridWorkers,
+          workstations: d.workstations,
+          futureHeadcount: d.futureHeadcount ?? d.headcount,
+        })),
+      )
+    }
+    setPlanForGrowth(seeded.planForGrowth)
+    setOnboardingInputs({
+      totalHeadcount: summaryInputs.totalHeadcount,
+      fullyRemote: summaryInputs.fullyRemote,
+      percentOffices: summaryInputs.percentOffices,
+      daysInOffice: summaryInputs.daysInOffice,
+    } as OnboardingInputs)
+    setShowFastTrackExplorer(false)
+    setShowOnboarding(false)
+  }
+
+  useEffect(() => {
+    const seed = loadSurveySeed()
+    if (!seed) return
+    clearSurveySeed()
+    applySurveySeed(seed)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [departments, setDepartments] = useState<Department[]>([
     { id: "1", name: "Engineering", color: "bg-blue-500", headcount: 0, officeCount: 0, hybridWorkers: 0, workstations: 0 },

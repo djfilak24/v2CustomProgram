@@ -30,7 +30,7 @@ export const BASELINE_SCORE = 2.5
 
 export type Lane = "quick" | "detailed"
 
-export type StepKind = "cards" | "radio-number"
+export type StepKind = "cards" | "radio-number" | "number"
 
 export interface StepOption {
   id: string
@@ -56,6 +56,9 @@ export interface SurveyStep {
   options?: StepOption[]
   /** radio-number: label for the conditional number input. */
   followupLabel?: string
+  /** number: label + placeholder for a single numeric input. */
+  numberLabel?: string
+  numberPlaceholder?: string
   /** What the Detailed lane unlocks here (shown when lane === "detailed"). */
   detailedHint?: string
 }
@@ -65,6 +68,16 @@ export interface SurveyStep {
  * interaction model and feel, per the inspiration.
  */
 export const SURVEY_STEPS: SurveyStep[] = [
+  {
+    id: "headcount",
+    section: "Your People",
+    title: "How many people are in the office today?",
+    subtitle: "A rough total is perfect — we'll break it down by department together.",
+    kind: "number",
+    numberLabel: "Approximate headcount",
+    numberPlaceholder: "e.g. 120",
+    detailedHint: "List departments and headcount individually (the department spine).",
+  },
   {
     id: "industry",
     section: "Industry",
@@ -143,6 +156,7 @@ export const SURVEY_STEPS: SurveyStep[] = [
 export type Answer =
   | { kind: "cards"; selected: string[] }
   | { kind: "radio-number"; choice: string | null; count: number | null }
+  | { kind: "number"; value: number | null }
 
 /** Compute the live radar scores from current answers. Clamped 0–10. */
 export function computeProfile(
@@ -174,4 +188,61 @@ export function computeProfile(
     scores[axis] = Math.max(0, Math.min(10, Math.round(scores[axis] * 10) / 10))
   }
   return scores
+}
+
+function cardSingle(a?: Answer): string | null {
+  return a?.kind === "cards" ? a.selected[0] ?? null : null
+}
+
+/**
+ * Map the shell's answers into a SurveyResult (consumed by seedToolFromSurvey).
+ * In the Quick lane the whole org is one synthetic "Company-wide" department so
+ * the department-spine machinery works uniformly; the real per-department spine
+ * (IMPROVEMENT_LOOP #11) will replace this with named departments.
+ */
+export function buildSurveyResult(
+  answers: Record<string, Answer>,
+  deferred: string[],
+): import("./types").SurveyResult {
+  const hcAns = answers["headcount"]
+  const headcount =
+    hcAns?.kind === "number" && hcAns.value ? Math.max(1, Math.round(hcAns.value)) : 100
+
+  const growthId = cardSingle(answers["growth"])
+  const companyGrowthPct =
+    growthId === "rapid" ? 30 : growthId === "growing" ? 18 : growthId === "stable" ? 5 : 0
+  const future = Math.round(headcount * (1 + companyGrowthPct / 100))
+
+  const cadenceId = cardSingle(answers["cadence"])
+  const daysInOffice =
+    cadenceId === "full" ? 5 : cadenceId === "remote" ? 1 : cadenceId === "hybrid" ? 3 : 4
+
+  const po = answers["private-offices"]
+  const officeCount =
+    po?.kind === "radio-number" && po.choice === "yes" ? po.count ?? 0 : 0
+
+  return {
+    meta: { clientName: "", completedBy: "", completedAt: new Date().toISOString() },
+    people: {
+      departments: [
+        {
+          id: "company",
+          name: "Company-wide",
+          headcount,
+          ...(future !== headcount ? { futureHeadcount: future } : {}),
+        },
+      ],
+      totalHeadcount: headcount,
+      companyGrowthPct,
+    },
+    work: { daysInOffice, fullyRemote: 0 },
+    spaces: {
+      privateOfficesByDept: officeCount > 0 ? { company: officeCount } : {},
+      collaboration: [],
+      support: [],
+    },
+    qualitative: {},
+    special: {},
+    deferred,
+  }
 }

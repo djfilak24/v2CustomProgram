@@ -43,7 +43,7 @@ export function ChoiceCard({
       className={`group relative flex w-full flex-col items-center gap-3 rounded-2xl border p-6 text-center transition-all ${
         selected
           ? "border-[#00badc] bg-[#00badc]/10 shadow-[0_0_0_1px_#00badc]"
-          : "border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06]"
+          : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/25 dark:hover:bg-white/[0.06]"
       }`}
     >
       {selected && (
@@ -55,20 +55,22 @@ export function ChoiceCard({
       {Icon && (
         <span
           className={`flex h-12 w-12 items-center justify-center rounded-full transition-colors ${
-            selected ? "bg-[#00badc]/20 text-[#00badc]" : "bg-white/[0.06] text-white/60 group-hover:text-white/80"
+            selected
+              ? "bg-[#00badc]/20 text-[#0096b3] dark:text-[#00badc]"
+              : "bg-slate-100 text-slate-500 group-hover:text-slate-700 dark:bg-white/[0.06] dark:text-white/60 dark:group-hover:text-white/80"
           }`}
         >
           <Icon className="h-6 w-6" />
         </span>
       )}
 
-      <span className="text-base font-semibold text-white">{label}</span>
-      {description && <span className="text-sm text-white/55">{description}</span>}
+      <span className="text-base font-semibold text-slate-900 dark:text-white">{label}</span>
+      {description && <span className="text-sm text-slate-500 dark:text-white/55">{description}</span>}
 
       {stats && stats.length > 0 && (
         <span className="mt-1 flex flex-col gap-0.5">
           {stats.map((s) => (
-            <span key={s} className="text-xs text-white/45">{s}</span>
+            <span key={s} className="text-xs text-slate-400 dark:text-white/45">{s}</span>
           ))}
         </span>
       )}

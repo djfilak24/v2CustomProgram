@@ -8,7 +8,7 @@ import {
 import {
   SURVEY_STEPS, computeProfile, emptyState, emptyLanes,
   WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES,
-  GROWTH_PRESETS, SUPPORT_TYPES,
+  GROWTH_PRESETS,
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue,
 } from "@/lib/survey/sections"
 import { ProgressHeader } from "@/components/survey/progress-header"
@@ -18,6 +18,8 @@ import { ChoiceCard } from "@/components/survey/choice-card"
 import { DeptSpine } from "@/components/survey/dept-spine"
 import { PerDeptRows } from "@/components/survey/per-dept-rows"
 import { DedicatedSeatingRows } from "@/components/survey/dedicated-seating-rows"
+import { SpaceListRow } from "@/components/survey/space-list-row"
+import { SUPPORT_CATALOG } from "@/lib/survey/catalog"
 import { DaysRows } from "@/components/survey/days-rows"
 import { CollabTree } from "@/components/survey/collab-tree"
 import { AdjacencyGraph } from "@/components/survey/adjacency-graph"
@@ -298,19 +300,26 @@ function StepBody({
 
     case "support":
       return (
-        <CardGrid
-          options={SUPPORT_TYPES}
-          selected={state.support}
-          onToggle={(id) =>
-            patch({
-              support: state.support.includes(id)
-                ? state.support.filter((x) => x !== id)
-                : [...state.support, id],
-            })
-          }
-          cols={3}
-          multi
-        />
+        <div className="grid gap-2.5 lg:grid-cols-2">
+          {SUPPORT_CATALOG.map((sp) => (
+            <SpaceListRow
+              key={sp.id}
+              icon={sp.icon}
+              label={sp.label}
+              sfEach={sp.sfEach}
+              capacity={sp.capacity}
+              ratio={sp.ratio}
+              selected={state.support.includes(sp.id)}
+              onToggle={() =>
+                patch({
+                  support: state.support.includes(sp.id)
+                    ? state.support.filter((x) => x !== sp.id)
+                    : [...state.support, sp.id],
+                })
+              }
+            />
+          ))}
+        </div>
       )
 
     case "feedback":

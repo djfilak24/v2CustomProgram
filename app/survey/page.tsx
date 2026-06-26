@@ -8,8 +8,8 @@ import {
 import {
   SURVEY_STEPS, computeProfile, emptyState, emptyLanes,
   WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES,
-  GROWTH_PRESETS,
-  type Lane, type LaneMap, type StepId, type SurveyState, type DayValue,
+  GROWTH_PRESETS, PEOPLE_MODES,
+  type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
 } from "@/lib/survey/sections"
 import { ProgressHeader } from "@/components/survey/progress-header"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
@@ -181,7 +181,25 @@ function StepBody({
   switch (step.id) {
     case "people":
       return lane === "detailed" ? (
-        <DeptSpine departments={state.departments} onChange={(d) => patch({ departments: d })} />
+        <div className="space-y-6">
+          <div>
+            <p className="mb-3 text-sm font-medium text-white/70">How much detail do you want on your people?</p>
+            <CardGrid
+              options={PEOPLE_MODES}
+              selected={[state.peopleMode]}
+              onToggle={(id) => patch({ peopleMode: id as PeopleMode })}
+              cols={3}
+            />
+            <p className="mt-2 text-xs text-white/40">
+              Naming people once here lets later steps assign desks, offices, and in-office days down to the person.
+            </p>
+          </div>
+          <DeptSpine
+            departments={state.departments}
+            mode={state.peopleMode}
+            onChange={(d) => patch({ departments: d })}
+          />
+        </div>
       ) : (
         <div className="space-y-7">
           <div className="max-w-sm">

@@ -41,15 +41,38 @@ export type Lane = "quick" | "detailed"
 
 // ── The department spine ─────────────────────────────────────────────────────
 
+export interface Employee {
+  id: string
+  name: string
+}
+
 export interface SpineDept {
   /** Stable id; keys every downstream per-dept map. */
   id: string
   name: string
-  /** Current in-office headcount. */
+  /** Current in-office headcount. In "full" roster mode this tracks employees.length. */
   headcount: number
   /** Future (3–5 yr) headcount — set in the detailed growth lane. */
   futureHeadcount?: number
+  /** Named roster (leaders or full team), used by the people decision tree. */
+  employees?: Employee[]
 }
+
+export function makeEmployee(name = ""): Employee {
+  return { id: newDeptId() + "e", name }
+}
+
+/**
+ * People-detail decision tree: how granular the roster is. "full" derives
+ * headcount from the named roster; "leaders"/"simple" keep manual headcount.
+ */
+export type PeopleMode = "simple" | "leaders" | "full"
+
+export const PEOPLE_MODES: CardOption[] = [
+  { id: "simple", label: "Keep it simple", description: "Headcount by department", icon: "users" },
+  { id: "leaders", label: "Name your leaders", description: "Leaders named, rest by headcount", icon: "user-check" },
+  { id: "full", label: "Full team roster", description: "Everyone named, by department", icon: "shuffle" },
+]
 
 let _seq = 0
 export function newDeptId(): string {
@@ -335,6 +358,8 @@ export interface SurveyState {
   totalHeadcount: number | null
   growthChoice: string | null
   departments: SpineDept[]
+  /** People-detail decision tree (simple headcount / named leaders / full roster). */
+  peopleMode: PeopleMode
   // Existing conditions — current furniture + sizes (baseline)
   existing: ExistingConditions
   // Section 2 — work patterns
@@ -365,6 +390,7 @@ export function emptyState(): SurveyState {
     totalHeadcount: null,
     growthChoice: null,
     departments: starterDepartments(),
+    peopleMode: "simple",
     existing: emptyExisting(),
     workChoice: null,
     perDeptDays: {},

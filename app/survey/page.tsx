@@ -83,9 +83,9 @@ export default function SurveyPage() {
     <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
       {showIntro && <IntroDemo onDismiss={() => setShowIntro(false)} />}
 
-      <ProgressHeader section={step.section} stepIndex={stepIndex} totalSteps={steps.length} />
+      <ProgressHeader stepIndex={stepIndex} onJump={(i) => setStepIndex(i)} />
 
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-[1fr_360px]">
+      <main className="mx-auto grid max-w-[1760px] grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-10 lg:px-10 xl:gap-14">
         <div>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

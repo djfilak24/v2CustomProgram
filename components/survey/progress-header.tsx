@@ -1,47 +1,92 @@
 "use client"
 
 import Image from "next/image"
+import { Check } from "lucide-react"
+import { SURVEY_STEPS } from "@/lib/survey/sections"
 
 /**
- * Sticky survey chrome: NELSON brand, the discovery title, and the always-visible
- * progress bar (section label + Step X of N + %). Respondents always know where
- * they are relative to done.
+ * Sticky survey chrome: NELSON brand + a sectioned step tracker. Steps are
+ * grouped by section, each rendered as a dot (done / current / upcoming) so the
+ * respondent always sees where they are and what's ahead. Past steps are
+ * clickable to jump back. Full-bleed on large screens.
  */
 export function ProgressHeader({
-  section,
   stepIndex,
-  totalSteps,
+  onJump,
 }: {
-  section: string
   stepIndex: number
-  totalSteps: number
+  onJump?: (index: number) => void
 }) {
-  const pct = Math.round(((stepIndex + 1) / totalSteps) * 100)
+  const total = SURVEY_STEPS.length
+  const pct = Math.round(((stepIndex + 1) / total) * 100)
+
+  // Group consecutive steps by section, preserving each step's global index.
+  const groups: { section: string; steps: { index: number }[] }[] = []
+  SURVEY_STEPS.forEach((s, i) => {
+    const last = groups[groups.length - 1]
+    if (last && last.section === s.section) last.steps.push({ index: i })
+    else groups.push({ section: s.section, steps: [{ index: i }] })
+  })
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1830]/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto brightness-0 invert" priority />
-        </div>
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1830]/85 backdrop-blur-md">
+      <div className="mx-auto flex max-w-[1760px] items-center justify-between gap-6 px-6 py-3.5 lg:px-10">
+        <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto brightness-0 invert" priority />
         <div className="text-right">
           <div className="text-sm font-semibold text-white">Workplace Strategy Discovery</div>
-          <div className="text-xs text-white/50">
-            Step {stepIndex + 1} of {totalSteps}
-          </div>
+          <div className="text-xs text-white/50">Step {stepIndex + 1} of {total} · {pct}%</div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 pb-3">
-        <div className="mb-1.5 flex items-center justify-between text-xs">
-          <span className="font-medium text-white/70">{section}</span>
-          <span className="tabular-nums text-white/50">{pct}%</span>
-        </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full bg-[#00badc] transition-all duration-500 ease-out"
-            style={{ width: `${pct}%` }}
-          />
+      {/* Sectioned step tracker */}
+      <div className="mx-auto max-w-[1760px] px-6 pb-3 lg:px-10">
+        <div className="flex items-center gap-3 overflow-x-auto">
+          {groups.map((g, gi) => {
+            const groupActive = g.steps.some((s) => s.index === stepIndex)
+            const groupDone = g.steps.every((s) => s.index < stepIndex)
+            return (
+              <div key={g.section} className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                      groupActive ? "text-[#00badc]" : groupDone ? "text-white/55" : "text-white/30"
+                    }`}
+                  >
+                    {g.section}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {g.steps.map(({ index }) => {
+                      const done = index < stepIndex
+                      const current = index === stepIndex
+                      const clickable = onJump && index <= stepIndex
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          disabled={!clickable}
+                          onClick={() => clickable && onJump?.(index)}
+                          aria-label={`Step ${index + 1}: ${SURVEY_STEPS[index].title}`}
+                          title={SURVEY_STEPS[index].title}
+                          className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold transition-all ${
+                            current
+                              ? "bg-[#00badc] text-slate-900 ring-4 ring-[#00badc]/20"
+                              : done
+                                ? "bg-[#00badc]/80 text-slate-900 hover:bg-[#00badc]"
+                                : "bg-white/10 text-white/40"
+                          } ${clickable ? "cursor-pointer" : "cursor-default"}`}
+                        >
+                          {done ? <Check className="h-3 w-3" strokeWidth={3} /> : index + 1}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {gi < groups.length - 1 && (
+                  <span className={`h-px w-5 shrink-0 ${groupDone ? "bg-[#00badc]/50" : "bg-white/10"}`} />
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </header>

@@ -4,9 +4,10 @@ import { ArrowRight, ArrowLeft, MessageCircle, TrendingUp, TrendingDown } from "
 import { WorkplaceProfile } from "./workplace-profile"
 import {
   SURVEY_STEPS, WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES, GROWTH_PRESETS,
-  COLLAB_TYPES, SUPPORT_TYPES, adjacencyColor, buildSurveyResult,
+  adjacencyColor, buildSurveyResult,
   type SurveyState, type LaneMap, type StepId, type ProfileScores, type CardOption,
 } from "@/lib/survey/sections"
+import { COLLAB_CATALOG, SUPPORT_CATALOG } from "@/lib/survey/catalog"
 import { saveSurveySeed } from "@/lib/survey/seedStorage"
 
 const labelFor = (catalog: CardOption[], id: string | null) =>
@@ -39,7 +40,7 @@ export function Summary({
   const collab = state.collabTypes.map((id) => {
     const counts = state.collabByDept[id] ?? {}
     const total = Object.values(counts).reduce((a, b) => a + (b || 0), 0)
-    return { label: COLLAB_TYPES.find((c) => c.id === id)?.label ?? id, total }
+    return { label: COLLAB_CATALOG.find((c) => c.id === id)?.label ?? id, total }
   })
 
   const adjacencies = state.adjacencyPairs.map((k, i) => {
@@ -176,7 +177,7 @@ export function Summary({
                   <div className="flex flex-wrap gap-2">
                     {state.support.map((id) => (
                       <span key={id} className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-white/75">
-                        {SUPPORT_TYPES.find((s) => s.id === id)?.label ?? id}
+                        {SUPPORT_CATALOG.find((s) => s.id === id)?.label ?? id}
                       </span>
                     ))}
                   </div>

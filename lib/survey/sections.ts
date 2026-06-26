@@ -279,7 +279,7 @@ export const SURVEY_STEPS: SurveyStep[] = [
     id: "collaboration",
     section: "Your Space",
     title: "What collaboration spaces matter most?",
-    subtitle: "Pick the shared spaces your teams actually use.",
+    subtitle: "Spaces you have today or expect to use — pick what's relevant; SF and ratios are how we'll size them.",
     detailedHint: "Set a count per type, per department — the full decision tree.",
     hasDetailed: true,
     canDefer: true,
@@ -288,7 +288,7 @@ export const SURVEY_STEPS: SurveyStep[] = [
     id: "support",
     section: "Your Space",
     title: "Which support spaces are must-haves?",
-    subtitle: "The shared infrastructure that keeps the floor running.",
+    subtitle: "The shared infrastructure that keeps the floor running — what you have today or will need.",
     hasDetailed: false,
     canDefer: true,
   },
@@ -456,16 +456,17 @@ export function computeProfile(s: SurveyState): ProfileScores {
   const officeTotal = Object.values(s.officesByDept).reduce((a, b) => a + (b || 0), 0)
   if (officeTotal > 0) scores.Privacy += Math.min(3, officeTotal / 5)
 
-  // Collaboration selections → collaboration / privacy / amenity.
+  // Collaboration selections → collaboration / privacy / amenity (tolerant of
+  // the engine-mirrored catalog ids).
   for (const t of s.collabTypes) {
-    if (t === "Huddle Room" || t === "Project Room" || t === "Conference Room") scores.Collaboration += 1.5
-    if (t === "Phone Room") scores.Privacy += 1.5
-    if (t === "Open Collaboration Lounge") { scores.Amenity += 2; scores.Collaboration += 1 }
+    if (/conference|huddle|project|training/i.test(t)) scores.Collaboration += 1.5
+    if (/phone|focus/i.test(t)) scores.Privacy += 1.5
+    if (/open collab|lounge/i.test(t)) { scores.Amenity += 2; scores.Collaboration += 1 }
   }
 
   // Support spaces → amenity.
   for (const t of s.support) {
-    if (t === "Break Room" || t === "Wellness Room") scores.Amenity += 1.5
+    if (/wellness|mother|caf|pantry|library/i.test(t)) scores.Amenity += 1.5
     else scores.Amenity += 0.5
   }
 

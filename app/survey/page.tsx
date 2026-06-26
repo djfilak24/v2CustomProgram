@@ -17,7 +17,7 @@ import { LaneToggle } from "@/components/survey/lane-toggle"
 import { ChoiceCard } from "@/components/survey/choice-card"
 import { DeptSpine } from "@/components/survey/dept-spine"
 import { PerDeptRows } from "@/components/survey/per-dept-rows"
-import { DedicatedSeatingRows } from "@/components/survey/dedicated-seating-rows"
+import { DeptAllocationRows } from "@/components/survey/dept-allocation-rows"
 import { SpaceListRow } from "@/components/survey/space-list-row"
 import { ExistingConditionsStep } from "@/components/survey/existing-conditions"
 import { SUPPORT_CATALOG } from "@/lib/survey/catalog"
@@ -235,19 +235,20 @@ function StepBody({
     case "seating":
       return (
         <div className="space-y-5">
-          <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/65">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+          <div className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/[0.07] px-4 py-3 text-sm text-white/80">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
             <span>
-              A <span className="font-medium text-white">dedicated desk</span> isn&apos;t a private office —
-              it&apos;s an assigned workstation. We&apos;ll flag who needs an enclosed{" "}
-              <span className="font-medium text-white">office</span> on the next screen.
+              <span className="font-semibold text-white">This isn&apos;t about offices.</span> A dedicated
+              desk is an <span className="font-medium text-white">assigned workstation</span> in the open plan —
+              not an enclosed room. Private offices are a separate question on the next screen.
             </span>
           </div>
           {lane === "detailed" ? (
-            <DedicatedSeatingRows
+            <DeptAllocationRows
               departments={state.departments}
               values={state.dedicatedByDept}
               onChange={(v) => patch({ dedicatedByDept: v })}
+              summarize={(v, hc) => `${v} dedicated · ${Math.max(0, hc - v)} flex`}
             />
           ) : (
             <CardGrid
@@ -270,22 +271,31 @@ function StepBody({
       )
 
     case "offices":
-      return lane === "detailed" ? (
-        <PerDeptRows
-          departments={state.departments}
-          values={state.officesByDept}
-          onChange={(v) => patch({ officesByDept: v })}
-          capToHeadcount
-          showHeadcount
-          suffix="offices"
-        />
-      ) : (
-        <CardGrid
-          options={OFFICE_POSTURES}
-          selected={state.officeChoice ? [state.officeChoice] : []}
-          onToggle={(id) => patch({ officeChoice: id })}
-          cols={3}
-        />
+      return (
+        <div className="space-y-5">
+          <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/65">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+            <span>
+              Enclosed, assigned <span className="font-medium text-white">private offices</span> — typically for
+              leadership or roles that need them. How many per team?
+            </span>
+          </div>
+          {lane === "detailed" ? (
+            <DeptAllocationRows
+              departments={state.departments}
+              values={state.officesByDept}
+              onChange={(v) => patch({ officesByDept: v })}
+              summarize={(v, hc) => `${v} ${v === 1 ? "office" : "offices"} of ${hc}`}
+            />
+          ) : (
+            <CardGrid
+              options={OFFICE_POSTURES}
+              selected={state.officeChoice ? [state.officeChoice] : []}
+              onToggle={(id) => patch({ officeChoice: id })}
+              cols={3}
+            />
+          )}
+        </div>
       )
 
     case "collaboration":
@@ -420,10 +430,11 @@ function TextField({
 function Hero({ onBegin }: { onBegin: () => void }) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0b1830] text-white">
-      {/* Let the office image speak — a neutral (non-blue), lighter scrim keeps
-          the headline legible without diluting the space's own palette. */}
+      {/* Let the office image speak — a neutral (non-blue) scrim, dark enough to
+          keep the headline crisp without burying the space's own palette. */}
       <Image src="/office-2.jpg" alt="" fill priority className="pointer-events-none object-cover" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/25 to-black/75" />
+      <div className="pointer-events-none absolute inset-0 bg-black/25" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/80" />
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="flex items-center justify-between px-8 py-6">

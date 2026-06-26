@@ -1,8 +1,8 @@
 /**
- * Survey-facing space catalog — the SF sizing and planning ratios our engine
- * uses, surfaced so respondents can see what each space costs and how we size it
- * when they pick. Ids match COLLAB_TYPES / SUPPORT_TYPES (and resolve to the
- * tool's SPACE_PRESETS on import). Values mirror the Fast-Track engine defaults.
+ * Survey-facing space catalog — mirrors the Fast-Track engine's full collaborative
+ * and support space lists (name, SF, planning ratio) so respondents see and pick
+ * from the same set the engine programs. Ids match the engine space names. Keep
+ * in sync with lib/fast-track-calculations.ts.
  */
 export interface CatalogSpace {
   id: string
@@ -17,18 +17,33 @@ export interface CatalogSpace {
 }
 
 export const COLLAB_CATALOG: CatalogSpace[] = [
-  { id: "Huddle Room", label: "Huddle room", icon: "users", sfEach: 140, capacity: 4, ratio: "≈ 1 per 15 seats" },
+  { id: "Phone Room / Focus Booth", label: "Phone / focus booth", icon: "phone", sfEach: 48, capacity: 1, ratio: "≈ 1 per 12 workstations" },
+  { id: "Huddle Room / Flex", label: "Huddle room / flex", icon: "users", sfEach: 140, capacity: 4, ratio: "≈ 1 per 15 workstations" },
   { id: "Project Room", label: "Project room", icon: "presentation", sfEach: 150, capacity: 6, ratio: "by team / project" },
-  { id: "Phone Room", label: "Phone / focus room", icon: "phone", sfEach: 48, capacity: 1, ratio: "≈ 1 per 12 seats" },
-  { id: "Open Collaboration Lounge", label: "Open lounge", icon: "coffee", sfEach: 150, capacity: 6, ratio: "≈ 1 per 25 seats" },
-  { id: "Conference Room", label: "Conference room", icon: "presentation", sfEach: 280, capacity: 8, ratio: "≈ 1 per 40 seats" },
+  { id: "Medium Conference", label: "Medium conference", icon: "presentation", sfEach: 280, capacity: 8, ratio: "1 per 40 seats" },
+  { id: "Large Conference", label: "Large conference", icon: "presentation", sfEach: 400, capacity: 12, ratio: "1 per 80 seats" },
+  { id: "Training Room", label: "Training room", icon: "presentation", sfEach: 600, capacity: 20, ratio: "1 per 80 seats" },
+  { id: "Open Collaboration Space", label: "Open collaboration", icon: "coffee", sfEach: 150, capacity: 6, ratio: "1 per 25 seats" },
 ]
 
 export const SUPPORT_CATALOG: CatalogSpace[] = [
-  { id: "Copy/Print", label: "Copy / print", icon: "printer", sfEach: 80, ratio: "≈ 1 per 50 seats" },
-  { id: "Storage", label: "Storage", icon: "box", sfEach: 150, ratio: "≈ 1 per 100 seats" },
-  { id: "Break Room", label: "Break room / pantry", icon: "coffee", sfEach: 120, capacity: 6, ratio: "≈ 1 per 80 seats" },
-  { id: "Wellness Room", label: "Wellness / mother's room", icon: "heart", sfEach: 80, capacity: 1, ratio: "≈ 1 per 200 seats" },
   { id: "Reception", label: "Reception / front of house", icon: "building", sfEach: 250, ratio: "1 (front of house)" },
-  { id: "Mail Room", label: "Mail room", icon: "box", sfEach: 120, ratio: "≈ 1 per 200 seats" },
+  { id: "Work Cafe", label: "Work café", icon: "coffee", sfEach: 270, ratio: "7.5 SF / person" },
+  { id: "Pantry / Kitchenette", label: "Pantry / kitchenette", icon: "coffee", sfEach: 100, ratio: "1 per 80 seats" },
+  { id: "Multipurpose Room", label: "Multipurpose / town hall", icon: "presentation", sfEach: 1200, ratio: "1 per 750 seats" },
+  { id: "Interview Room", label: "Interview room", icon: "users", sfEach: 140, ratio: "1 per 250 seats" },
+  { id: "Quiet Library", label: "Quiet library", icon: "box", sfEach: 500, ratio: "1 per 400 seats" },
+  { id: "Wellness Room Suite", label: "Wellness suite", icon: "heart", sfEach: 300, ratio: "1 per 200 seats" },
+  { id: "Mothers Room", label: "Mother's room", icon: "heart", sfEach: 80, ratio: "1 per 50 seats" },
+  { id: "Printer / Copy Area", label: "Printer / copy area", icon: "printer", sfEach: 80, ratio: "1 per 50 seats" },
+  { id: "Mail Room", label: "Mail room", icon: "box", sfEach: 300, ratio: "1 per 200 seats" },
+  { id: "File Room", label: "File room", icon: "box", sfEach: 200, ratio: "1 per 100 seats" },
+  { id: "Coats / Storage Closet", label: "Coats / storage closet", icon: "box", sfEach: 40, ratio: "1 per 50 seats" },
+  { id: "Kitchen Storage", label: "Kitchen storage", icon: "box", sfEach: 100, ratio: "1 per 100 seats" },
+  { id: "Facilities Storage", label: "Facilities storage", icon: "box", sfEach: 150, ratio: "1 per 100 seats" },
+  { id: "Workplace Lockers", label: "Workplace lockers", icon: "box", sfEach: 5, ratio: "1 per 3 unassigned seats" },
+  { id: "MDF / Server Room", label: "MDF / server room", icon: "box", sfEach: 150, ratio: "1 per 150 seats" },
+  { id: "IDF", label: "IDF / network closet", icon: "box", sfEach: 80, ratio: "1 per 150 seats" },
+  { id: "IT / Tech Storage", label: "IT / tech storage", icon: "box", sfEach: 120, ratio: "1 per 300 seats" },
+  { id: "IT Help Desk", label: "IT help desk", icon: "building", sfEach: 100, ratio: "1 per 500 seats" },
 ]

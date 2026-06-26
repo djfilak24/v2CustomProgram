@@ -1,13 +1,13 @@
 "use client"
 
 import { ArrowRight, ArrowLeft, MessageCircle, TrendingUp, TrendingDown } from "lucide-react"
-import Link from "next/link"
 import { WorkplaceProfile } from "./workplace-profile"
 import {
   SURVEY_STEPS, WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES, GROWTH_PRESETS,
-  COLLAB_TYPES, SUPPORT_TYPES, adjacencyColor,
+  COLLAB_TYPES, SUPPORT_TYPES, adjacencyColor, buildSurveyResult,
   type SurveyState, type LaneMap, type StepId, type ProfileScores, type CardOption,
 } from "@/lib/survey/sections"
+import { saveSurveySeed } from "@/lib/survey/seedStorage"
 
 const labelFor = (catalog: CardOption[], id: string | null) =>
   id ? catalog.find((c) => c.id === id)?.label ?? id : null
@@ -210,15 +210,21 @@ export function Summary({
           >
             <ArrowLeft className="h-4 w-4" /> Back to edit
           </button>
-          <Link
-            href="/"
+          <button
+            type="button"
+            onClick={() => {
+              // Hand the structured answers to the tool, then open it. The tool
+              // reads this seed on load and pre-populates a starting program.
+              saveSurveySeed(buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" }))
+              window.location.href = "/"
+            }}
             className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
           >
             See your starting program <ArrowRight className="h-4 w-4" />
-          </Link>
+          </button>
         </div>
         <p className="mt-4 text-center text-xs text-white/40">
-          (Shell preview — seeding the tool from these answers is the next build step.)
+          Everything you entered pre-populates the tool — nothing is locked in.
         </p>
       </div>
     </div>

@@ -78,7 +78,7 @@
 
 @theme inline {
   /* Updated font variables for NELSON brand fonts - Poppins and Didot */
-  --font-sans: "Poppins", var(--font-geist-sans);
+  --font-sans: var(--font-poppins), "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Didot", serif;
   --font-mono: var(--font-geist-mono);
   --color-background: var(--background);

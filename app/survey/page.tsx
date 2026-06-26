@@ -391,8 +391,10 @@ function TextField({
 function Hero({ onBegin }: { onBegin: () => void }) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0b1830] text-white">
-      <Image src="/office-2.jpg" alt="" fill priority className="object-cover opacity-40" />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0b1830]/80 via-[#0b1830]/55 to-[#0b1830]/95" />
+      {/* Let the office image speak — a neutral (non-blue), lighter scrim keeps
+          the headline legible without diluting the space's own palette. */}
+      <Image src="/office-2.jpg" alt="" fill priority className="pointer-events-none object-cover" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/25 to-black/75" />
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="flex items-center justify-between px-8 py-6">

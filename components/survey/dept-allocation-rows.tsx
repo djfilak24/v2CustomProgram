@@ -50,8 +50,14 @@ export function DeptAllocationRows({
         const hc = d.headcount || 0
         const roster = d.employees ?? []
         const perPerson = roster.length > 0 && !!employeeSelections
+        const checked = perPerson ? roster.filter((e) => employeeSelections![e.id]).length : 0
+        // Full roster (everyone named) → count = checked. Partial roster ("leaders")
+        // → keep a total stepper for the unnamed remainder, floored at the checked
+        // named people. No roster → plain stepper.
+        const fullRoster = perPerson && roster.length >= hc
+        const showStepper = !perPerson || !fullRoster
         const val = perPerson
-          ? roster.filter((e) => employeeSelections![e.id]).length
+          ? (fullRoster ? checked : Math.max(values[d.id] ?? 0, checked))
           : Math.min(values[d.id] ?? 0, hc)
         const ratio = hc > 0 ? val / hc : 0
         const big = hc >= maxHc * 0.66
@@ -82,18 +88,23 @@ export function DeptAllocationRows({
               </button>
 
               <div className="flex shrink-0 items-center gap-3">
-                {perPerson ? (
-                  <span className="text-sm text-white/80">
-                    <span className="font-semibold text-white">{val}</span>
-                    <span className="text-white/50"> of {hc}</span>
-                  </span>
-                ) : (
+                {showStepper ? (
                   <>
-                    <Stepper value={val} onChange={(n) => set(d.id, Math.min(n, hc))} min={0} max={hc} />
+                    <Stepper
+                      value={val}
+                      onChange={(n) => set(d.id, Math.min(n, hc))}
+                      min={perPerson ? checked : 0}
+                      max={hc}
+                    />
                     <span className="whitespace-nowrap text-sm text-white/50">
                       of <span className="font-semibold text-white/80">{hc}</span>
                     </span>
                   </>
+                ) : (
+                  <span className="text-sm text-white/80">
+                    <span className="font-semibold text-white">{val}</span>
+                    <span className="text-white/50"> of {hc}</span>
+                  </span>
                 )}
               </div>
             </div>

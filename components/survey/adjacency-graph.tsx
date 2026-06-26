@@ -62,7 +62,7 @@ export function AdjacencyGraph({
   const idx = new Map(named.map((d, i) => [d.id, i]))
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <div className="grid gap-6 lg:grid-cols-[480px_minmax(0,1fr)]">
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto h-auto w-full max-w-[460px]">
           {/* connections, drawn low-priority first so the top ones sit on top */}
@@ -107,7 +107,7 @@ export function AdjacencyGraph({
                   dominantBaseline="middle" textAnchor={right ? "start" : "end"}
                   className="fill-white/80 text-[12px] font-medium"
                 >
-                  {d.name.length > 16 ? d.name.slice(0, 15) + "…" : d.name}
+                  {d.name.length > 22 ? d.name.slice(0, 21) + "…" : d.name}
                 </text>
               </g>
             )
@@ -153,7 +153,7 @@ export function AdjacencyGraph({
                   >
                     {i + 1}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-white/85">
+                  <span className="min-w-0 flex-1 text-white/85">
                     {nameOf(a)} <span style={{ color }}>↔</span> {nameOf(b)}
                   </span>
                   <div className="flex shrink-0 items-center">

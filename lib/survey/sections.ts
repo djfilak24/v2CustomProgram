@@ -440,8 +440,13 @@ export function deptAllocated(
   byEmployee: Record<string, boolean>,
 ): number {
   const roster = d.employees ?? []
-  if (roster.length > 0) return roster.filter((e) => byEmployee[e.id]).length
-  return values[d.id] ?? 0
+  if (roster.length === 0) return values[d.id] ?? 0
+  const checked = roster.filter((e) => byEmployee[e.id]).length
+  const hc = d.headcount || 0
+  // Full roster → exactly the checked people. Partial ("leaders") → the total
+  // count (stepper), floored at the explicitly checked named people.
+  if (roster.length >= hc) return checked
+  return Math.max(values[d.id] ?? 0, checked)
 }
 
 /** Σ of department headcounts, or the quick-lane single number when no depts. */

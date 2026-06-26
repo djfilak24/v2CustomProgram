@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import Image from "next/image"
 import {
-  ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle,
+  ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info,
 } from "lucide-react"
 import {
   SURVEY_STEPS, computeProfile, emptyState, emptyLanes,
@@ -17,6 +17,7 @@ import { LaneToggle } from "@/components/survey/lane-toggle"
 import { ChoiceCard } from "@/components/survey/choice-card"
 import { DeptSpine } from "@/components/survey/dept-spine"
 import { PerDeptRows } from "@/components/survey/per-dept-rows"
+import { DedicatedSeatingRows } from "@/components/survey/dedicated-seating-rows"
 import { DaysRows } from "@/components/survey/days-rows"
 import { CollabTree } from "@/components/survey/collab-tree"
 import { AdjacencyGraph } from "@/components/survey/adjacency-graph"
@@ -220,22 +221,31 @@ function StepBody({
       )
 
     case "seating":
-      return lane === "detailed" ? (
-        <PerDeptRows
-          departments={state.departments}
-          values={state.dedicatedByDept}
-          onChange={(v) => patch({ dedicatedByDept: v })}
-          capToHeadcount
-          showHeadcount
-          suffix="seats"
-        />
-      ) : (
-        <CardGrid
-          options={SEATING_POSTURES}
-          selected={state.seatingChoice ? [state.seatingChoice] : []}
-          onToggle={(id) => patch({ seatingChoice: id })}
-          cols={3}
-        />
+      return (
+        <div className="space-y-5">
+          <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/65">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+            <span>
+              A <span className="font-medium text-white">dedicated desk</span> isn&apos;t a private office —
+              it&apos;s an assigned workstation. We&apos;ll flag who needs an enclosed{" "}
+              <span className="font-medium text-white">office</span> on the next screen.
+            </span>
+          </div>
+          {lane === "detailed" ? (
+            <DedicatedSeatingRows
+              departments={state.departments}
+              values={state.dedicatedByDept}
+              onChange={(v) => patch({ dedicatedByDept: v })}
+            />
+          ) : (
+            <CardGrid
+              options={SEATING_POSTURES}
+              selected={state.seatingChoice ? [state.seatingChoice] : []}
+              onToggle={(id) => patch({ seatingChoice: id })}
+              cols={3}
+            />
+          )}
+        </div>
       )
 
     case "adjacency":

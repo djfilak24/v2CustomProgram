@@ -82,6 +82,9 @@ export default function SurveyPage() {
   // Detailed lane is per-question, and only meaningful where the step defines a
   // deeper editor.
   const effectiveLane: Lane = step.hasDetailed ? lanes[step.id] : "quick"
+  // The adjacency graph wants room to breathe — give it the full width (no radar
+  // rail) so department names don't get truncated.
+  const wide = step.id === "adjacency"
 
   return (
     <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
@@ -89,7 +92,11 @@ export default function SurveyPage() {
 
       <ProgressHeader stepIndex={stepIndex} onJump={(i) => setStepIndex(i)} />
 
-      <main className="mx-auto grid max-w-[1760px] grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-10 lg:px-10 xl:gap-14">
+      <main
+        className={`mx-auto grid max-w-[1760px] grid-cols-1 gap-8 px-6 py-10 lg:gap-10 lg:px-10 xl:gap-14 ${
+          wide ? "" : "lg:grid-cols-[minmax(0,1fr)_380px]"
+        }`}
+      >
         <div>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -154,12 +161,14 @@ export default function SurveyPage() {
           </div>
         </div>
 
-        {/* Live profile sidebar */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-32">
-            <WorkplaceProfile scores={scores} />
-          </div>
-        </aside>
+        {/* Live profile sidebar (hidden where the step needs full width) */}
+        {!wide && (
+          <aside className="hidden lg:block">
+            <div className="sticky top-32">
+              <WorkplaceProfile scores={scores} />
+            </div>
+          </aside>
+        )}
       </main>
     </div>
   )

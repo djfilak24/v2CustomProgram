@@ -350,6 +350,10 @@ function StepBody({
           onChangeCounts={(id, counts) =>
             patch({ collabByDept: { ...state.collabByDept, [id]: counts } })
           }
+          existing={state.existingCollab}
+          onChangeExisting={(id, n) =>
+            patch({ existingCollab: { ...state.existingCollab, [id]: n } })
+          }
         />
       )
 
@@ -372,6 +376,8 @@ function StepBody({
                     : [...state.support, sp.id],
                 })
               }
+              today={state.existingSupport[sp.id]}
+              onTodayChange={(n) => patch({ existingSupport: { ...state.existingSupport, [sp.id]: n } })}
             />
           ))}
         </div>

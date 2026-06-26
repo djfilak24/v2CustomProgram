@@ -23,6 +23,8 @@ export function SpaceListRow({
   ratio,
   selected,
   onToggle,
+  today,
+  onTodayChange,
   children,
 }: {
   icon: string
@@ -32,6 +34,9 @@ export function SpaceListRow({
   ratio: string
   selected: boolean
   onToggle: () => void
+  /** Optional "how many exist today" count, shown when selected. */
+  today?: number
+  onTodayChange?: (n: number) => void
   children?: React.ReactNode
 }) {
   const Icon = ICONS[icon] ?? Box
@@ -67,6 +72,24 @@ export function SpaceListRow({
           {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
         </span>
       </button>
+      {selected && onTodayChange && (
+        <div className="flex items-center justify-between gap-3 border-t border-white/[0.07] px-5 py-2.5">
+          <span className="text-xs text-white/50">How many do you have today?</span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onTodayChange(Math.max(0, (today ?? 0) - 1))}
+              className="flex h-6 w-6 items-center justify-center rounded-md bg-white/[0.06] text-white/70 hover:bg-white/10"
+            >−</button>
+            <span className="w-7 text-center text-sm font-semibold tabular-nums text-white">{today ?? 0}</span>
+            <button
+              type="button"
+              onClick={() => onTodayChange((today ?? 0) + 1)}
+              className="flex h-6 w-6 items-center justify-center rounded-md bg-white/[0.06] text-white/70 hover:bg-white/10"
+            >+</button>
+          </div>
+        </div>
+      )}
       {selected && children}
     </div>
   )

@@ -1,20 +1,20 @@
 "use client"
 
-import { HelpCircle } from "lucide-react"
+import { HelpCircle, Plus, X } from "lucide-react"
 import { Stepper } from "./stepper"
 import { isUnsure, type DayRange, type DayValue, type SpineDept } from "@/lib/survey/sections"
 
 /**
- * Per-department in-office cadence editor with flexibility built in: each team
- * can be an exact number, a RANGE (e.g. "1–3 days" — when a team's pattern isn't
- * fixed), or "Not sure" (deferred to the live session). Ranges are preserved so
- * the end-of-survey evaluation can take the min or max as appropriate.
+ * Per-department in-office cadence. Defaults to a single number (4 days) with one
+ * stepper; "Add range" reveals a second stepper only when a team's pattern varies;
+ * "Not sure" defers to the live session. Ranges/unsure are preserved so the end
+ * evaluation can take min/max as appropriate.
  */
 export function DaysRows({
   departments,
   values,
   onChange,
-  defaultDay = 3,
+  defaultDay = 4,
 }: {
   departments: SpineDept[]
   values: Record<string, DayValue>
@@ -37,6 +37,9 @@ export function DaysRows({
 
   return (
     <div className="space-y-2">
+      <p className="px-1 text-xs text-white/40">
+        Standard is 4 days a week — adjust any team, add a range if it varies, or defer.
+      </p>
       {departments.map((d) => {
         const unsure = isUnsure(values[d.id])
         const { min, max } = band(d.id)
@@ -48,10 +51,7 @@ export function DaysRows({
           >
             <div className="min-w-0">
               <div className="truncate text-sm font-medium text-white">{d.name || "Untitled department"}</div>
-              <div className="text-xs text-white/40">
-                {d.headcount} people
-                {!unsure && isRange && <span className="ml-2 text-[#00badc]">range</span>}
-              </div>
+              <div className="text-xs text-white/40">{d.headcount} people</div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -65,16 +65,29 @@ export function DaysRows({
                     value={min}
                     min={0}
                     max={5}
-                    onChange={(n) => set(d.id, { min: n, max: Math.max(n, max) })}
+                    suffix={isRange ? undefined : "days"}
+                    onChange={(n) => set(d.id, { min: n, max: isRange ? Math.max(n, max) : n })}
                   />
-                  <span className="text-xs text-white/40">to</span>
-                  <Stepper
-                    value={max}
-                    min={0}
-                    max={5}
-                    suffix="days"
-                    onChange={(n) => set(d.id, { min: Math.min(min, n), max: n })}
-                  />
+                  {isRange && (
+                    <>
+                      <span className="text-xs text-white/40">to</span>
+                      <Stepper
+                        value={max}
+                        min={0}
+                        max={5}
+                        suffix="days"
+                        onChange={(n) => set(d.id, { min: Math.min(min, n), max: n })}
+                      />
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => set(d.id, isRange ? { min, max: min } : { min, max: Math.min(5, min + 1) })}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/12 px-2 py-1.5 text-xs font-medium text-white/45 transition-colors hover:border-white/25 hover:text-white/80"
+                    title={isRange ? "Use a single number" : "Varies? Add a range"}
+                  >
+                    {isRange ? <><X className="h-3 w-3" /> Range</> : <><Plus className="h-3 w-3" /> Range</>}
+                  </button>
                 </div>
               )}
 

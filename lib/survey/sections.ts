@@ -381,8 +381,12 @@ export interface SurveyState {
   collabTypes: string[]
   /** type id -> dept id -> count (detailed lane). */
   collabByDept: Record<string, Record<string, number>>
+  /** Collaboration spaces that exist today (type id -> current count). */
+  existingCollab: Record<string, number>
   // Section 3c — support
   support: string[]
+  /** Support spaces that exist today (type id -> current count). */
+  existingSupport: Record<string, number>
   // Section 4 — qualitative
   loves: string
   painPoints: string
@@ -407,7 +411,9 @@ export function emptyState(): SurveyState {
     officesByDept: {},
     collabTypes: [],
     collabByDept: {},
+    existingCollab: {},
     support: [],
+    existingSupport: {},
     loves: "",
     painPoints: "",
     imbalances: "",
@@ -630,6 +636,12 @@ export function buildSurveyResult(
       ...(s.existing.reuseConfTables !== null ? { reuseConfTables: s.existing.reuseConfTables } : {}),
       ...(s.existing.existingWorkstations !== null ? { existingWorkstations: s.existing.existingWorkstations } : {}),
       ...(s.existing.existingOffices !== null ? { existingOffices: s.existing.existingOffices } : {}),
+      ...(Object.values(s.existingCollab).some((v) => v > 0)
+        ? { existingCollab: Object.fromEntries(Object.entries(s.existingCollab).filter(([, v]) => v > 0)) }
+        : {}),
+      ...(Object.values(s.existingSupport).some((v) => v > 0)
+        ? { existingSupport: Object.fromEntries(Object.entries(s.existingSupport).filter(([, v]) => v > 0)) }
+        : {}),
     },
     deferred: [...deferred],
   }

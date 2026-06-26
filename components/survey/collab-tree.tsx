@@ -18,6 +18,8 @@ export function CollabTree({
   byDept,
   onToggleType,
   onChangeCounts,
+  existing,
+  onChangeExisting,
 }: {
   lane: Lane
   departments: SpineDept[]
@@ -25,6 +27,8 @@ export function CollabTree({
   byDept: Record<string, Record<string, number>>
   onToggleType: (typeId: string) => void
   onChangeCounts: (typeId: string, counts: Record<string, number>) => void
+  existing: Record<string, number>
+  onChangeExisting: (typeId: string, n: number) => void
 }) {
   // Both lanes use the same chunky list rows (icon + SF + ratio). The detailed
   // lane additionally expands each selected type into per-department counts.
@@ -44,6 +48,8 @@ export function CollabTree({
             ratio={t.ratio}
             selected={isOn}
             onToggle={() => onToggleType(t.id)}
+            today={existing[t.id]}
+            onTodayChange={(n) => onChangeExisting(t.id, n)}
           >
             {lane === "detailed" && (
               <div className="border-t border-white/10 px-5 py-3">

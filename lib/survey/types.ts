@@ -106,6 +106,10 @@ export interface SurveyResult {
     reuseConfTables?: boolean
     existingWorkstations?: number
     existingOffices?: number
+    /** Collaboration spaces in place today (type id → count). */
+    existingCollab?: Record<string, number>
+    /** Support spaces in place today (type id → count). */
+    existingSupport?: Record<string, number>
   }
 
   /** Questions explicitly deferred to the live session. */

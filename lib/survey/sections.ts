@@ -368,6 +368,10 @@ export interface SurveyState {
   // Section 2 — seating
   seatingChoice: string | null
   dedicatedByDept: Record<string, number>
+  /** Per-person desk assignment (employee id → gets a dedicated desk). */
+  deskByEmployee: Record<string, boolean>
+  /** Per-person office assignment (employee id → gets a private office). */
+  officeByEmployee: Record<string, boolean>
   // adjacency — connections between departments (visual graph)
   adjacencyPairs: string[]
   // Section 3a — offices
@@ -396,6 +400,8 @@ export function emptyState(): SurveyState {
     perDeptDays: {},
     seatingChoice: null,
     dedicatedByDept: {},
+    deskByEmployee: {},
+    officeByEmployee: {},
     adjacencyPairs: [],
     officeChoice: null,
     officesByDept: {},
@@ -416,6 +422,20 @@ export function emptyLanes(): LaneMap {
     acc[s.id] = "quick"
     return acc
   }, {} as LaneMap)
+}
+
+/**
+ * Allocated count for a department — derived from per-person checks when the
+ * department has a named roster, otherwise the numeric per-department value.
+ */
+export function deptAllocated(
+  d: SpineDept,
+  values: Record<string, number>,
+  byEmployee: Record<string, boolean>,
+): number {
+  const roster = d.employees ?? []
+  if (roster.length > 0) return roster.filter((e) => byEmployee[e.id]).length
+  return values[d.id] ?? 0
 }
 
 /** Σ of department headcounts, or the quick-lane single number when no depts. */
@@ -561,6 +581,17 @@ export function buildSurveyResult(
     .map((k) => { const [a, b] = k.split("|"); return `${nameOf(a)} ↔ ${nameOf(b)}` })
     .join("; ")
 
+  // Dedicated desks / private offices — per-person checks when a roster exists,
+  // else the per-department numeric value.
+  const dedicatedByDept: Record<string, number> = {}
+  const officesByDept: Record<string, number> = {}
+  for (const d of namedDepts) {
+    const ded = deptAllocated(d, s.dedicatedByDept, s.deskByEmployee)
+    if (ded > 0) dedicatedByDept[d.id] = ded
+    const off = deptAllocated(d, s.officesByDept, s.officeByEmployee)
+    if (off > 0) officesByDept[d.id] = off
+  }
+
   return {
     meta: { clientName: meta.clientName, completedBy: meta.completedBy, completedAt: new Date().toISOString() },
     people: {
@@ -574,11 +605,11 @@ export function buildSurveyResult(
       ...(Object.keys(perDeptDaysRange).length ? { perDeptDaysRange } : {}),
       ...(daysUnsure.length ? { daysUnsureDepts: daysUnsure } : {}),
       fullyRemote: 0,
-      ...(lanes.seating === "detailed" && Object.keys(s.dedicatedByDept).length ? { dedicatedByDept: byId(s.dedicatedByDept) } : {}),
+      ...(lanes.seating === "detailed" && Object.keys(dedicatedByDept).length ? { dedicatedByDept } : {}),
       ...(adjacencyNotes ? { adjacencyNotes } : {}),
     },
     spaces: {
-      privateOfficesByDept: lanes.offices === "detailed" ? byId(s.officesByDept) : {},
+      privateOfficesByDept: lanes.offices === "detailed" ? officesByDept : {},
       collaboration,
       support: s.support,
     },

@@ -276,6 +276,10 @@ function StepBody({
               values={state.dedicatedByDept}
               onChange={(v) => patch({ dedicatedByDept: v })}
               summarize={(v, hc) => `${v} dedicated · ${Math.max(0, hc - v)} flex`}
+              employeeSelections={state.deskByEmployee}
+              onToggleEmployee={(id) =>
+                patch({ deskByEmployee: { ...state.deskByEmployee, [id]: !state.deskByEmployee[id] } })
+              }
             />
           ) : (
             <CardGrid
@@ -313,6 +317,10 @@ function StepBody({
               values={state.officesByDept}
               onChange={(v) => patch({ officesByDept: v })}
               summarize={(v, hc) => `${v} ${v === 1 ? "office" : "offices"} of ${hc}`}
+              employeeSelections={state.officeByEmployee}
+              onToggleEmployee={(id) =>
+                patch({ officeByEmployee: { ...state.officeByEmployee, [id]: !state.officeByEmployee[id] } })
+              }
             />
           ) : (
             <CardGrid

@@ -1278,7 +1278,25 @@ const WorkplaceProgrammingTool = () => {
       const blocks = computeAllSeatDemandBlocks(summaryInputs.totalHeadcount, summaryInputs.fullyRemote)
       const program = computeSpaceProgram(summaryInputs, blocks, undefined, ratioConfig)
       const result = convertProgramToSpaces(program, summaryInputs)
-      setEditableSpaces(result.spaces as Record<string, EditableSpace>)
+      // Baseline workstation/office SF from the survey's existing-conditions sizes,
+      // so the starting program reflects the client's real footprints.
+      const wsSF = survey.existing?.workstationSF
+      const offSF = survey.existing?.officeSF
+      let seededSpaces = result.spaces as Record<string, EditableSpace>
+      if (wsSF || offSF) {
+        seededSpaces = Object.fromEntries(
+          Object.entries(seededSpaces).map(([k, sp]) => {
+            if (wsSF && (sp.workstationType === "employee" || sp.workstationType === "flex")) {
+              return [k, { ...sp, sfEach: wsSF, totalArea: (sp.quantity || 0) * wsSF }]
+            }
+            if (offSF && sp.workstationType === "private") {
+              return [k, { ...sp, sfEach: offSF, totalArea: (sp.quantity || 0) * offSF }]
+            }
+            return [k, sp]
+          }),
+        ) as Record<string, EditableSpace>
+      }
+      setEditableSpaces(seededSpaces)
       setTargetHeadcount(summaryInputs.totalHeadcount)
       setTargetOfficeCount(result.targets.officeCount)
       setTargetWorkstations(result.targets.workstationCount)

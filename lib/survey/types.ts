@@ -92,6 +92,22 @@ export interface SurveyResult {
     storage?: string
   }
 
+  /**
+   * Existing conditions — today's furniture posture and standard sizes. Sets the
+   * baseline program (workstation/office SF) and feeds the existing-vs-proposed
+   * comparison. Asked early so later steps can pull existing counts forward.
+   */
+  existing?: {
+    furniture?: "reuse" | "mixed" | "new"
+    /** Workstation footprint SF (e.g. 6×8 = 48). Baselines workstation sizing. */
+    workstationSF?: number
+    /** Private-office footprint SF (e.g. 10×12 = 120). Baselines office sizing. */
+    officeSF?: number
+    reuseConfTables?: boolean
+    existingWorkstations?: number
+    existingOffices?: number
+  }
+
   /** Questions explicitly deferred to the live session. */
   deferred: DeferredQuestionId[]
 }

@@ -19,6 +19,7 @@ import { DeptSpine } from "@/components/survey/dept-spine"
 import { PerDeptRows } from "@/components/survey/per-dept-rows"
 import { DedicatedSeatingRows } from "@/components/survey/dedicated-seating-rows"
 import { SpaceListRow } from "@/components/survey/space-list-row"
+import { ExistingConditionsStep } from "@/components/survey/existing-conditions"
 import { SUPPORT_CATALOG } from "@/lib/survey/catalog"
 import { DaysRows } from "@/components/survey/days-rows"
 import { CollabTree } from "@/components/survey/collab-tree"
@@ -204,6 +205,15 @@ function StepBody({
             />
           </div>
         </div>
+      )
+
+    case "existing":
+      return (
+        <ExistingConditionsStep
+          value={state.existing}
+          onChange={(v) => patch({ existing: v })}
+          lane={lane}
+        />
       )
 
     case "work":

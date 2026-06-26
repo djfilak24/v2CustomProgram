@@ -135,10 +135,69 @@ export const GROWTH_PRESETS: CardOption[] = [
 
 export const GROWTH_PRESET_PCT: Record<string, number> = { stable: 5, growing: 18, rapid: 30 }
 
+// ── Existing conditions (current furniture + sizes) ──────────────────────────
+
+export interface SizeOption { id: string; label: string; sf: number }
+
+/** Standard workstation footprints (W × D). */
+export const WORKSTATION_SIZES: SizeOption[] = [
+  { id: "6x6", label: "6′ × 6′", sf: 36 },
+  { id: "6x7", label: "6′ × 7′", sf: 42 },
+  { id: "6x8", label: "6′ × 8′", sf: 48 },
+  { id: "8x8", label: "8′ × 8′", sf: 64 },
+  { id: "8x10", label: "8′ × 10′", sf: 80 },
+]
+
+/** Standard private-office footprints. */
+export const OFFICE_SIZES: SizeOption[] = [
+  { id: "10x10", label: "10′ × 10′", sf: 100 },
+  { id: "10x12", label: "10′ × 12′", sf: 120 },
+  { id: "12x12", label: "12′ × 12′", sf: 144 },
+  { id: "12x15", label: "12′ × 15′", sf: 180 },
+  { id: "15x15", label: "15′ × 15′", sf: 225 },
+]
+
+export const sizeSf = (catalog: SizeOption[], id: string | null): number | undefined =>
+  id ? catalog.find((o) => o.id === id)?.sf : undefined
+
+export type ReusePosture = "reuse" | "mixed" | "new"
+
+export const REUSE_POSTURES: CardOption[] = [
+  { id: "reuse", label: "Reusing most", description: "Keep existing furniture", icon: "recycle" },
+  { id: "mixed", label: "A mix", description: "Some kept, some new", icon: "shuffle" },
+  { id: "new", label: "All new", description: "Fresh furniture standard", icon: "sparkles" },
+]
+
+export interface ExistingConditions {
+  /** Overall furniture posture (reuse vs. new). */
+  furniture: ReusePosture | null
+  /** WORKSTATION_SIZES id of today's (or planned) workstation footprint. */
+  workstationSize: string | null
+  /** OFFICE_SIZES id of today's (or planned) office footprint. */
+  officeSize: string | null
+  /** Re-using existing conference tables? */
+  reuseConfTables: boolean | null
+  /** Counts that exist today — optional, pulled forward into later steps. */
+  existingWorkstations: number | null
+  existingOffices: number | null
+}
+
+export function emptyExisting(): ExistingConditions {
+  return {
+    furniture: null,
+    workstationSize: null,
+    officeSize: null,
+    reuseConfTables: null,
+    existingWorkstations: null,
+    existingOffices: null,
+  }
+}
+
 // ── Steps ────────────────────────────────────────────────────────────────────
 
 export type StepId =
   | "people"
+  | "existing"
   | "work"
   | "seating"
   | "adjacency"
@@ -170,6 +229,15 @@ export const SURVEY_STEPS: SurveyStep[] = [
     detailedHint: "List each department with its current and 3–5 year headcount (some grow, some shrink).",
     hasDetailed: true,
     canDefer: false,
+  },
+  {
+    id: "existing",
+    section: "Existing Conditions",
+    title: "What's in place today?",
+    subtitle: "Your current furniture and sizes set our baseline — we'll show a before/after as we build.",
+    detailedHint: "Add today's workstation and office counts so later steps start from real numbers.",
+    hasDetailed: true,
+    canDefer: true,
   },
   {
     id: "work",
@@ -267,6 +335,8 @@ export interface SurveyState {
   totalHeadcount: number | null
   growthChoice: string | null
   departments: SpineDept[]
+  // Existing conditions — current furniture + sizes (baseline)
+  existing: ExistingConditions
   // Section 2 — work patterns
   workChoice: string | null
   perDeptDays: Record<string, DayValue>
@@ -295,6 +365,7 @@ export function emptyState(): SurveyState {
     totalHeadcount: null,
     growthChoice: null,
     departments: starterDepartments(),
+    existing: emptyExisting(),
     workChoice: null,
     perDeptDays: {},
     seatingChoice: null,
@@ -490,6 +561,18 @@ export function buildSurveyResult(
       ...(s.imbalances.trim() ? { imbalances: s.imbalances.trim() } : {}),
     },
     special: {},
+    existing: {
+      ...(s.existing.furniture ? { furniture: s.existing.furniture } : {}),
+      ...(sizeSf(WORKSTATION_SIZES, s.existing.workstationSize) !== undefined
+        ? { workstationSF: sizeSf(WORKSTATION_SIZES, s.existing.workstationSize) }
+        : {}),
+      ...(sizeSf(OFFICE_SIZES, s.existing.officeSize) !== undefined
+        ? { officeSF: sizeSf(OFFICE_SIZES, s.existing.officeSize) }
+        : {}),
+      ...(s.existing.reuseConfTables !== null ? { reuseConfTables: s.existing.reuseConfTables } : {}),
+      ...(s.existing.existingWorkstations !== null ? { existingWorkstations: s.existing.existingWorkstations } : {}),
+      ...(s.existing.existingOffices !== null ? { existingOffices: s.existing.existingOffices } : {}),
+    },
     deferred: [...deferred],
   }
 }

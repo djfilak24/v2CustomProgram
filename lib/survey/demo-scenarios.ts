@@ -1,0 +1,127 @@
+/**
+ * Presenter demo scenarios — complete SurveyResult fixtures the presenter can
+ * seed to show a full end-to-end product on any path, regardless of what a given
+ * prospect filled in. Entry: /review?demo=<key> or /survey (demo control), or
+ * the demo button. Add a scenario = add a fixture here; no code changes.
+ */
+import type { SurveyResult } from "./types"
+
+export interface DemoScenario {
+  label: string
+  blurb: string
+  result: SurveyResult
+}
+
+const now = "2026-06-25T00:00:00Z"
+
+const tech: SurveyResult = {
+  meta: { clientName: "Northwind Labs", completedBy: "Demo", completedAt: now },
+  people: {
+    departments: [
+      { id: "eng", name: "Engineering", headcount: 48, futureHeadcount: 70 },
+      { id: "prod", name: "Product & Design", headcount: 22, futureHeadcount: 30 },
+      { id: "gtm", name: "Sales & Marketing", headcount: 30, futureHeadcount: 40 },
+      { id: "ops", name: "Operations & People", headcount: 12, futureHeadcount: 15 },
+      { id: "lead", name: "Leadership", headcount: 8, futureHeadcount: 10 },
+    ],
+    totalHeadcount: 120,
+    companyGrowthPct: 25,
+  },
+  work: { daysInOffice: 3, fullyRemote: 14 },
+  spaces: {
+    privateOfficesByDept: { lead: 6, ops: 2 },
+    collaboration: [
+      { type: "Huddle Room / Flex", byDept: { eng: 3, prod: 2 } },
+      { type: "Phone Room / Focus Booth", byDept: { eng: 4 } },
+      { type: "Medium Conference", byDept: { gtm: 2 } },
+    ],
+    support: ["Reception", "Work Cafe", "Pantry / Kitchenette", "Wellness Room Suite", "Mothers Room"],
+  },
+  qualitative: {
+    loves: "The open café — it's where the whole company actually mixes.",
+    painPoints: "Never enough focus rooms; calls happen in stairwells.",
+  },
+  special: {},
+  existing: {
+    furniture: "mixed", workstationSF: 36, officeSF: 120,
+    existingWorkstations: 96, existingOffices: 6,
+    existingCollab: { "Huddle Room / Flex": 3, "Medium Conference": 2, "Open Collaboration Space": 1 },
+    existingSupport: { Reception: 1, "Work Cafe": 1, "Pantry / Kitchenette": 1 },
+  },
+  deferred: [],
+}
+
+const law: SurveyResult = {
+  meta: { clientName: "Hartwell & Cross LLP", completedBy: "Demo", completedAt: now },
+  people: {
+    departments: [
+      { id: "ptr", name: "Partners", headcount: 14, futureHeadcount: 16 },
+      { id: "assoc", name: "Associates", headcount: 26, futureHeadcount: 30 },
+      { id: "para", name: "Paralegals", headcount: 12, futureHeadcount: 13 },
+      { id: "admin", name: "Administration", headcount: 8, futureHeadcount: 8 },
+    ],
+    totalHeadcount: 60,
+    companyGrowthPct: 8,
+  },
+  work: { daysInOffice: 5, fullyRemote: 2 },
+  spaces: {
+    privateOfficesByDept: { ptr: 14, assoc: 20 },
+    collaboration: [
+      { type: "Medium Conference", byDept: { ptr: 2 } },
+      { type: "Large Conference", byDept: { ptr: 1 } },
+      { type: "Phone Room / Focus Booth", byDept: { assoc: 3 } },
+    ],
+    support: ["Reception", "Pantry / Kitchenette", "File Room", "Mail Room", "Interview Room"],
+  },
+  qualitative: { painPoints: "Records storage is overflowing; not enough conference rooms for client meetings." },
+  special: {},
+  existing: {
+    furniture: "reuse", workstationSF: 48, officeSF: 144,
+    existingWorkstations: 22, existingOffices: 34,
+    existingCollab: { "Medium Conference": 2, "Large Conference": 1 },
+    existingSupport: { Reception: 1, "File Room": 2, "Mail Room": 1, "Pantry / Kitchenette": 1 },
+  },
+  deferred: [],
+}
+
+const enterprise: SurveyResult = {
+  meta: { clientName: "Meridian Financial", completedBy: "Demo", completedAt: now },
+  people: {
+    departments: [
+      { id: "fin", name: "Finance", headcount: 90, futureHeadcount: 96 },
+      { id: "risk", name: "Risk & Compliance", headcount: 70, futureHeadcount: 85 },
+      { id: "tech", name: "Technology", headcount: 110, futureHeadcount: 130 },
+      { id: "ops", name: "Operations", headcount: 85, futureHeadcount: 80 },
+      { id: "corp", name: "Corporate & Legal", headcount: 35, futureHeadcount: 38 },
+      { id: "exec", name: "Executive", headcount: 10, futureHeadcount: 11 },
+    ],
+    totalHeadcount: 400,
+    companyGrowthPct: 8,
+  },
+  work: { daysInOffice: 4, fullyRemote: 24 },
+  spaces: {
+    privateOfficesByDept: { exec: 10, corp: 8, fin: 6 },
+    collaboration: [
+      { type: "Huddle Room / Flex", byDept: { tech: 6, fin: 4 } },
+      { type: "Medium Conference", byDept: { risk: 4 } },
+      { type: "Large Conference", byDept: { exec: 2 } },
+      { type: "Training Room", byDept: { risk: 1 } },
+    ],
+    support: ["Reception", "Work Cafe", "Pantry / Kitchenette", "Quiet Library", "Wellness Room Suite", "Mail Room", "File Room", "Multipurpose Room"],
+  },
+  qualitative: {},
+  special: {},
+  existing: {
+    furniture: "mixed", workstationSF: 42, officeSF: 144,
+    existingWorkstations: 360, existingOffices: 30,
+    existingCollab: { "Huddle Room / Flex": 8, "Medium Conference": 6, "Large Conference": 2 },
+    existingSupport: { Reception: 1, "Work Cafe": 1, "Pantry / Kitchenette": 4, "Mail Room": 1 },
+  },
+  deferred: [],
+}
+
+export const DEMO_SCENARIOS: Record<string, DemoScenario> = {
+  tech: { label: "Tech Startup · 120", blurb: "High collaboration, hybrid, fast growth", result: tech },
+  law: { label: "Law Firm · 60", blurb: "Office-dense, privacy, stable", result: law },
+  enterprise: { label: "Enterprise · 400", blurb: "Mixed hybrid, large floorplate", result: enterprise },
+}

@@ -1,0 +1,119 @@
+/**
+ * Existing vs. Proposed comparison — the heart of the live validation meeting.
+ *
+ * "Existing" is what the client has today (their survey counts × the sizes they
+ * gave us). "Proposed" is what industry ratios suggest for their *future*
+ * planning headcount (the Fast-Track engine). These are independent; the
+ * comparison shows them side by side, biggest differences first, so the meeting
+ * starts with the decisions that matter.
+ */
+import type { SurveyResult } from "./types"
+import { seedToolFromSurvey } from "./seedToolFromSurvey"
+import {
+  computeAllSeatDemandBlocks, computeSpaceProgram, type SummaryInputs,
+} from "../fast-track-calculations"
+import { COLLAB_CATALOG, SUPPORT_CATALOG } from "./catalog"
+
+export type CompCategory = "Workstations" | "Offices" | "Collaboration" | "Support"
+
+export interface ComparisonLine {
+  key: string
+  label: string
+  category: CompCategory
+  /** SF per unit — used to recompute area when a count is adjusted in the review. */
+  unitSF: number
+  existingCount: number
+  proposedCount: number
+}
+
+export interface Comparison {
+  clientName: string
+  current: number
+  future: number
+  daysInOffice: number
+  fullyRemote: number
+  planningHeadcount: number
+  lines: ComparisonLine[]
+}
+
+const sfById = (id: string, cat: typeof COLLAB_CATALOG | typeof SUPPORT_CATALOG) =>
+  cat.find((c) => c.id === id)?.sfEach ?? 0
+
+export function buildComparison(result: SurveyResult): Comparison {
+  const seeded = seedToolFromSurvey(result)
+  const inputs: SummaryInputs = {
+    clientName: result.meta.clientName || "Your organization",
+    programmedBy: result.meta.completedBy || "",
+    totalHeadcount: seeded.inputs.totalHeadcount,
+    fullyRemote: seeded.inputs.fullyRemote,
+    percentOffices: seeded.inputs.percentOffices,
+    grossRent: 50,
+    daysInOffice: seeded.inputs.daysInOffice,
+    rentableFactor: 0.22,
+  }
+  const blocks = computeAllSeatDemandBlocks(inputs.totalHeadcount, inputs.fullyRemote)
+  const program = computeSpaceProgram(inputs, blocks, inputs.daysInOffice)
+
+  const ex = result.existing ?? {}
+  const lines: ComparisonLine[] = []
+
+  // Workstations (all individual desk types) ----------------------------------
+  const wsItems = program.individual.filter((i) => /workstation|touch|workpoint/i.test(i.name))
+  const wsProposed = wsItems.reduce((s, i) => s + i.quantity, 0)
+  const wsUnitSF = ex.workstationSF ?? (wsItems[0]?.areaSf || 48)
+  lines.push({
+    key: "workstations", label: "Workstations", category: "Workstations", unitSF: wsUnitSF,
+    existingCount: ex.existingWorkstations ?? 0, proposedCount: wsProposed,
+  })
+
+  // Private offices -----------------------------------------------------------
+  const offItems = program.individual.filter((i) => /office/i.test(i.name))
+  const offProposed = offItems.reduce((s, i) => s + i.quantity, 0)
+  lines.push({
+    key: "offices", label: "Private offices", category: "Offices",
+    unitSF: ex.officeSF ?? (offItems[0]?.areaSf || 120),
+    existingCount: ex.existingOffices ?? 0, proposedCount: offProposed,
+  })
+
+  // Collaboration — one line per engine type ----------------------------------
+  for (const item of program.collaborative) {
+    lines.push({
+      key: `collab:${item.name}`, label: item.name, category: "Collaboration", unitSF: item.areaSf,
+      existingCount: ex.existingCollab?.[item.name] ?? 0, proposedCount: item.quantity,
+    })
+  }
+  // Existing collab types the engine didn't propose
+  for (const [name, count] of Object.entries(ex.existingCollab ?? {})) {
+    if (!program.collaborative.some((i) => i.name === name)) {
+      lines.push({ key: `collab:${name}`, label: name, category: "Collaboration", unitSF: sfById(name, COLLAB_CATALOG), existingCount: count, proposedCount: 0 })
+    }
+  }
+
+  // Support — proposed (qty>0) + any existing ---------------------------------
+  for (const item of program.support) {
+    const existing = ex.existingSupport?.[item.name] ?? 0
+    if (item.quantity <= 0 && existing <= 0) continue
+    lines.push({
+      key: `support:${item.name}`, label: item.name, category: "Support", unitSF: item.areaSf,
+      existingCount: existing, proposedCount: item.quantity,
+    })
+  }
+  for (const [name, count] of Object.entries(ex.existingSupport ?? {})) {
+    if (!program.support.some((i) => i.name === name)) {
+      lines.push({ key: `support:${name}`, label: name, category: "Support", unitSF: sfById(name, SUPPORT_CATALOG), existingCount: count, proposedCount: 0 })
+    }
+  }
+
+  return {
+    clientName: inputs.clientName,
+    current: result.people.totalHeadcount,
+    future: seeded.planningHeadcount,
+    daysInOffice: inputs.daysInOffice,
+    fullyRemote: inputs.fullyRemote,
+    planningHeadcount: seeded.planningHeadcount,
+    lines,
+  }
+}
+
+/** SF for a line at a given count. */
+export const lineSF = (l: ComparisonLine, count: number) => count * l.unitSF

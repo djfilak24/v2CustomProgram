@@ -214,14 +214,14 @@ export function Summary({
           <button
             type="button"
             onClick={() => {
-              // Hand the structured answers to the tool, then open it. The tool
-              // reads this seed on load and pre-populates a starting program.
+              // Hand the structured answers forward and open the validation review
+              // (existing vs. proposed) before the deep canvas.
               saveSurveySeed(buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" }))
-              window.location.href = "/"
+              window.location.href = "/review"
             }}
             className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
           >
-            See your starting program <ArrowRight className="h-4 w-4" />
+            See your program comparison <ArrowRight className="h-4 w-4" />
           </button>
         </div>
         <p className="mt-4 text-center text-xs text-white/40">

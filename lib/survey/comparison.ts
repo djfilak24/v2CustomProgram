@@ -36,19 +36,42 @@ export interface Comparison {
   lines: ComparisonLine[]
 }
 
+/** The live, adjustable inputs behind the proposed program (the engine's dials). */
+export interface CompInputs {
+  clientName: string
+  current: number
+  /** Planning headcount — the engine designs the proposed program for this. */
+  future: number
+  daysInOffice: number
+  fullyRemote: number
+  percentOffices: number
+}
+
+export function defaultCompInputs(result: SurveyResult): CompInputs {
+  const seeded = seedToolFromSurvey(result)
+  return {
+    clientName: result.meta.clientName || "Your organization",
+    current: result.people.totalHeadcount,
+    future: seeded.planningHeadcount,
+    daysInOffice: seeded.inputs.daysInOffice,
+    fullyRemote: seeded.inputs.fullyRemote,
+    percentOffices: seeded.inputs.percentOffices,
+  }
+}
+
 const sfById = (id: string, cat: typeof COLLAB_CATALOG | typeof SUPPORT_CATALOG) =>
   cat.find((c) => c.id === id)?.sfEach ?? 0
 
-export function buildComparison(result: SurveyResult): Comparison {
-  const seeded = seedToolFromSurvey(result)
+export function buildComparison(result: SurveyResult, ci?: CompInputs): Comparison {
+  const c = ci ?? defaultCompInputs(result)
   const inputs: SummaryInputs = {
-    clientName: result.meta.clientName || "Your organization",
+    clientName: c.clientName,
     programmedBy: result.meta.completedBy || "",
-    totalHeadcount: seeded.inputs.totalHeadcount,
-    fullyRemote: seeded.inputs.fullyRemote,
-    percentOffices: seeded.inputs.percentOffices,
+    totalHeadcount: c.future, // proposed program designs for the planning headcount
+    fullyRemote: c.fullyRemote,
+    percentOffices: c.percentOffices,
     grossRent: 50,
-    daysInOffice: seeded.inputs.daysInOffice,
+    daysInOffice: c.daysInOffice,
     rentableFactor: 0.22,
   }
   const blocks = computeAllSeatDemandBlocks(inputs.totalHeadcount, inputs.fullyRemote)
@@ -105,12 +128,12 @@ export function buildComparison(result: SurveyResult): Comparison {
   }
 
   return {
-    clientName: inputs.clientName,
-    current: result.people.totalHeadcount,
-    future: seeded.planningHeadcount,
-    daysInOffice: inputs.daysInOffice,
-    fullyRemote: inputs.fullyRemote,
-    planningHeadcount: seeded.planningHeadcount,
+    clientName: c.clientName,
+    current: c.current,
+    future: c.future,
+    daysInOffice: c.daysInOffice,
+    fullyRemote: c.fullyRemote,
+    planningHeadcount: c.future,
     lines,
   }
 }

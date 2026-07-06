@@ -31,6 +31,7 @@ import type React from "react"
   Presentation,
   Wrench,
   Focus,
+  Crown,
 } from "lucide-react"
 import Image from "next/image"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
@@ -1003,7 +1004,7 @@ const WorkplaceProgrammingTool = () => {
     futureHeadcount?: number
     // Named roster (leaders or full team) captured in the survey — preserved so
     // the Department Manager can show/edit real people, not just counts.
-    employees?: { id: string; name: string }[]
+    employees?: { id: string; name: string; isLeader?: boolean }[]
   }
 
   interface Space {
@@ -5751,8 +5752,17 @@ const WorkplaceProgrammingTool = () => {
                                 </div>
                                 {rosterOpen && roster.length > 0 && (
                                   <div className="flex flex-wrap gap-1 px-4 pb-2.5 -mt-0.5">
-                                    {roster.map((p) => (
-                                      <span key={p.id} className="rounded-full bg-slate-50 border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600">
+                                    {[...roster].sort((a, b) => Number(!!b.isLeader) - Number(!!a.isLeader)).map((p) => (
+                                      <span
+                                        key={p.id}
+                                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+                                          p.isLeader
+                                            ? "border-amber-300 bg-amber-50 text-amber-700 font-medium"
+                                            : "border-slate-200 bg-slate-50 text-slate-600"
+                                        }`}
+                                        title={p.isLeader ? "Leader" : undefined}
+                                      >
+                                        {p.isLeader && <Crown className="w-2.5 h-2.5" />}
                                         {p.name}
                                       </span>
                                     ))}

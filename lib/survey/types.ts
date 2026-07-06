@@ -23,7 +23,7 @@ export interface SurveyDepartment {
    */
   futureHeadcount?: number
   /** Named roster (leaders or full team) — survives into the canvas Dept Manager. */
-  employees?: { id: string; name: string }[]
+  employees?: { id: string; name: string; isLeader?: boolean }[]
 }
 
 export interface SurveyResult {
@@ -32,6 +32,17 @@ export interface SurveyResult {
     completedBy: string
     /** ISO timestamp. */
     completedAt: string
+  }
+
+  /**
+   * Your Goals — the motivators behind the project. Frames the "how much space"
+   * conversation and steers gap strategy; narrative-only, never a calculation input.
+   */
+  goals?: {
+    /** Selected drivers (growth, optimize, flexibility, density, amenity, focus). */
+    motivators: string[]
+    /** Where they sit on the square-footage tension. */
+    posture?: "expand" | "balance" | "optimize"
   }
 
   /** Section 1 — Your People (+ growth, §4.5 of the spec). */
@@ -73,6 +84,8 @@ export interface SurveyResult {
   spaces: {
     /** Private offices per department (the ± steppers). Keyed by department id. */
     privateOfficesByDept: Record<string, number>
+    /** Where private offices sit relative to the window line. */
+    officePlacement?: "exterior" | "interior" | "mixed" | "unsure"
     /** Collaboration spaces: per-type counts, optionally split by department. */
     collaboration: SurveyCollaborationItem[]
     /** Per-type room configuration (setup, monitor, custom notes). */

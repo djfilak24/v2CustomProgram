@@ -76,5 +76,15 @@ describe("demos seed real hierarchy", () => {
     expect(office.length).toBe(4)
     expect(desk.length).toBe(22)
     expect(office.some((e) => s.deskByEmployee[e.id])).toBe(false)
+    // The office-holders are flagged as leaders; desk-holders are not.
+    expect(office.every((e) => e.isLeader)).toBe(true)
+    expect(desk.some((e) => e.isLeader)).toBe(false)
+  })
+
+  it("law demo (leaders mode) flags every named person as a leader", () => {
+    const s = demoState("law")!
+    const named = s.departments.flatMap((d) => d.employees ?? [])
+    expect(named.length).toBeGreaterThan(0)
+    expect(named.every((e) => e.isLeader)).toBe(true)
   })
 })

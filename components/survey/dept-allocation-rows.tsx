@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, ChevronRight } from "lucide-react"
+import { Check, ChevronRight, Crown } from "lucide-react"
 import { Stepper } from "./stepper"
 import type { SpineDept } from "@/lib/survey/sections"
 
@@ -174,6 +174,7 @@ export function DeptAllocationRows({
                 {roster.map((emp) => {
                   const on = !!employeeSelections![emp.id]
                   const locked = !on && !!excludedEmployees?.[emp.id]
+                  const leader = !!emp.isLeader
                   return (
                     <button
                       key={emp.id}
@@ -186,7 +187,9 @@ export function DeptAllocationRows({
                           ? "cursor-not-allowed border-white/[0.06] bg-white/[0.01] text-white/30"
                           : on
                             ? "border-[#00badc]/50 bg-[#00badc]/[0.08] text-white"
-                            : "border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20"
+                            : leader
+                              ? "border-amber-400/40 bg-amber-400/[0.06] text-white hover:border-amber-400/60"
+                              : "border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20"
                       }`}
                     >
                       <span
@@ -197,6 +200,7 @@ export function DeptAllocationRows({
                         {on && <Check className="h-3 w-3" strokeWidth={3} />}
                         {locked && <span className="h-2 w-2 rounded-[1px] bg-white/25" />}
                       </span>
+                      {leader && <Crown className={`h-3.5 w-3.5 shrink-0 ${locked ? "text-amber-400/40" : "text-amber-300"}`} />}
                       <span className="truncate">{emp.name || "Unnamed"}</span>
                       {locked && excludedNoun && (
                         <span className="ml-auto shrink-0 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/40">

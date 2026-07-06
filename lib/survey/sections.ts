@@ -44,6 +44,8 @@ export type Lane = "quick" | "detailed"
 export interface Employee {
   id: string
   name: string
+  /** Marked as a leader (org hierarchy). Leaders are considered for offices first. */
+  isLeader?: boolean
 }
 
 export interface SpineDept {
@@ -58,8 +60,8 @@ export interface SpineDept {
   employees?: Employee[]
 }
 
-export function makeEmployee(name = ""): Employee {
-  return { id: newDeptId() + "e", name }
+export function makeEmployee(name = "", isLeader = false): Employee {
+  return { id: newDeptId() + "e", name, ...(isLeader ? { isLeader: true } : {}) }
 }
 
 /**
@@ -137,6 +139,40 @@ export const OFFICE_POSTURES: CardOption[] = [
   { id: "leaders", label: "Leadership only", description: "Execs / directors", icon: "briefcase" },
   { id: "some", label: "Some roles", description: "Plus select roles", icon: "building" },
   { id: "none", label: "Open plan", description: "No private offices", icon: "users" },
+]
+
+/**
+ * Section 3a — where private offices sit relative to the window line. This
+ * drives daylight strategy and how offices port to the proposed program:
+ * exterior offices consume perimeter/glass; interior offices free the window
+ * line for open plan (the more optimized posture).
+ */
+export const OFFICE_PLACEMENT_OPTIONS: CardOption[] = [
+  { id: "exterior", label: "On the window line", description: "Offices ring the perimeter" },
+  { id: "interior", label: "Interior / core", description: "Glass stays open to the floor" },
+  { id: "mixed", label: "A mix of both", description: "Some perimeter, some interior" },
+  { id: "unsure", label: "Not sure yet", description: "We'll decide live" },
+]
+
+/**
+ * Your Goals — the motivators behind the project. Multi-select drivers plus a
+ * single expand↔optimize posture. These frame the "how much space do you really
+ * need" conversation and steer which strategies we propose against the gaps.
+ */
+export const GOAL_MOTIVATORS: CardOption[] = [
+  { id: "growth", label: "Room to grow", description: "Headcount is climbing — plan for it", icon: "trending-up" },
+  { id: "optimize", label: "Optimize real estate", description: "Make the most of every square foot", icon: "ruler" },
+  { id: "flexibility", label: "Flexibility", description: "Adaptable, hybrid-ready space", icon: "shuffle" },
+  { id: "density", label: "Higher density", description: "Fit more people comfortably", icon: "users" },
+  { id: "amenity", label: "Amenities & experience", description: "Attract and retain people", icon: "coffee" },
+  { id: "focus", label: "Focus & wellbeing", description: "Quiet, heads-down, healthier", icon: "shield" },
+]
+
+/** The core square-footage tension: expand for more, or right-size what you have. */
+export const SPACE_POSTURES: CardOption[] = [
+  { id: "expand", label: "Expand", description: "More space — more room, comfort, amenities" },
+  { id: "balance", label: "Balanced", description: "Right space for the need, no more" },
+  { id: "optimize", label: "Optimize", description: "Less space — make the most of what we have" },
 ]
 
 /** Section 3b — collaboration space types (these names resolve to SPACE_PRESETS on import). */
@@ -242,6 +278,7 @@ export function emptyExisting(): ExistingConditions {
 
 export type StepId =
   | "people"
+  | "goals"
   | "existing"
   | "work"
   | "seating"
@@ -276,6 +313,15 @@ export const SURVEY_STEPS: SurveyStep[] = [
     canDefer: false,
   },
   {
+    id: "goals",
+    section: "Your Goals",
+    title: "What are you trying to get out of this move?",
+    subtitle: "Your motivators frame the whole 'how much space do you really need' conversation — and which strategies we reach for.",
+    detailedHint: "Pick what's driving the project and where you sit on the expand ↔ optimize spectrum.",
+    hasDetailed: false,
+    canDefer: false,
+  },
+  {
     id: "existing",
     section: "Existing Conditions",
     title: "What's in place today?",
@@ -294,10 +340,19 @@ export const SURVEY_STEPS: SurveyStep[] = [
     canDefer: true,
   },
   {
+    id: "offices",
+    section: "How Teams Work",
+    title: "Who needs private offices?",
+    subtitle: "Start with leadership — enclosed, assigned offices go to them first. Anyone here won't also need a dedicated desk.",
+    detailedHint: "Assign a private-office count per department, or name the leaders who get one.",
+    hasDetailed: true,
+    canDefer: true,
+  },
+  {
     id: "seating",
     section: "How Teams Work",
-    title: "Who needs a dedicated desk, who can share?",
-    subtitle: "Dedicated seats vs. flexible, shared space — the core hybrid trade-off.",
+    title: "Who else needs a dedicated desk?",
+    subtitle: "Of the people without a private office, who keeps an assigned seat vs. shares flexible space — the core hybrid trade-off.",
     detailedHint: "Set how many people keep a dedicated seat per department.",
     hasDetailed: true,
     canDefer: true,
@@ -309,15 +364,6 @@ export const SURVEY_STEPS: SurveyStep[] = [
     subtitle: "Cross-functional collaboration tells us who to seat near whom.",
     detailedHint: "Captured as adjacency notes for the live session — the tool plans the rest.",
     hasDetailed: false,
-    canDefer: true,
-  },
-  {
-    id: "offices",
-    section: "Your Space",
-    title: "Who needs private offices?",
-    subtitle: "Enclosed, assigned space — for leadership or roles that require it.",
-    detailedHint: "Assign a private-office count per department with ± steppers.",
-    hasDetailed: true,
     canDefer: true,
   },
   {
@@ -380,6 +426,9 @@ export interface SurveyState {
   totalHeadcount: number | null
   growthChoice: string | null
   departments: SpineDept[]
+  // Your Goals — motivators + the expand↔optimize posture
+  goalMotivators: string[]
+  spacePosture: string | null
   /** People-detail decision tree (simple headcount / named leaders / full roster). */
   peopleMode: PeopleMode
   // Existing conditions — current furniture + sizes (baseline)
@@ -399,6 +448,8 @@ export interface SurveyState {
   // Section 3a — offices
   officeChoice: string | null
   officesByDept: Record<string, number>
+  /** Where private offices sit: exterior (window) / interior / mixed / unsure. */
+  officePlacement: string | null
   // Section 3b — collaboration
   collabTypes: string[]
   /** type id -> dept id -> count (detailed lane). */
@@ -424,6 +475,8 @@ export function emptyState(): SurveyState {
     totalHeadcount: null,
     growthChoice: null,
     departments: starterDepartments(),
+    goalMotivators: [],
+    spacePosture: null,
     peopleMode: "simple",
     existing: emptyExisting(),
     workChoice: null,
@@ -435,6 +488,7 @@ export function emptyState(): SurveyState {
     adjacencyPairs: [],
     officeChoice: null,
     officesByDept: {},
+    officePlacement: null,
     collabTypes: [],
     collabByDept: {},
     collabConfig: {},
@@ -502,7 +556,7 @@ export function assignSeatHierarchy(s: SurveyState): void {
     const nOffice = Math.min(s.officesByDept[d.id] ?? 0, roster.length)
     const nDesk = Math.min(s.dedicatedByDept[d.id] ?? 0, Math.max(0, roster.length - nOffice))
     roster.forEach((e, i) => {
-      if (i < nOffice) officeByEmployee[e.id] = true
+      if (i < nOffice) { officeByEmployee[e.id] = true; e.isLeader = true }
       else if (i < nOffice + nDesk) deskByEmployee[e.id] = true
     })
   }
@@ -525,6 +579,9 @@ export function surveyStateFromResult(r: import("./types").SurveyResult): Survey
   const pct = r.people.companyGrowthPct ?? 0
   s.growthChoice = pct >= 25 ? "rapid" : pct >= 10 ? "growing" : pct > 0 ? "stable" : null
 
+  s.goalMotivators = [...(r.goals?.motivators ?? [])]
+  s.spacePosture = r.goals?.posture ?? null
+
   const days = r.work.daysInOffice
   s.workChoice = days >= 5 ? "office" : days <= 1 ? "remote" : "hybrid"
   if (r.work.perDeptDaysRange) {
@@ -533,6 +590,7 @@ export function surveyStateFromResult(r: import("./types").SurveyResult): Survey
   s.dedicatedByDept = { ...(r.work.dedicatedByDept ?? {}) }
 
   s.officesByDept = { ...(r.spaces.privateOfficesByDept ?? {}) }
+  s.officePlacement = r.spaces.officePlacement ?? null
   s.collabConfig = { ...(r.spaces.collabConfig ?? {}) }
   s.collabTypes = r.spaces.collaboration.map((c) => c.type)
   for (const c of r.spaces.collaboration) if (Object.keys(c.byDept).length) s.collabByDept[c.type] = { ...c.byDept }
@@ -655,7 +713,7 @@ export function buildSurveyResult(
         name: d.name.trim(),
         headcount: Math.max(0, Math.round(d.headcount || 0)),
         ...(d.futureHeadcount !== undefined ? { futureHeadcount: Math.max(0, Math.round(d.futureHeadcount)) } : {}),
-        ...(d.employees && d.employees.length ? { employees: d.employees.filter((e) => e.name.trim()).map((e) => ({ id: e.id, name: e.name.trim() })) } : {}),
+        ...(d.employees && d.employees.length ? { employees: d.employees.filter((e) => e.name.trim()).map((e) => ({ id: e.id, name: e.name.trim(), ...(e.isLeader ? { isLeader: true } : {}) })) } : {}),
       }))
     : []
 
@@ -716,6 +774,14 @@ export function buildSurveyResult(
 
   return {
     meta: { clientName: meta.clientName, completedBy: meta.completedBy, completedAt: new Date().toISOString() },
+    ...(s.goalMotivators.length || s.spacePosture
+      ? {
+          goals: {
+            motivators: s.goalMotivators,
+            ...(s.spacePosture ? { posture: s.spacePosture as "expand" | "balance" | "optimize" } : {}),
+          },
+        }
+      : {}),
     people: {
       departments,
       totalHeadcount,
@@ -732,6 +798,9 @@ export function buildSurveyResult(
     },
     spaces: {
       privateOfficesByDept: lanes.offices === "detailed" ? officesByDept : {},
+      ...(s.officePlacement && s.officePlacement !== "unsure"
+        ? { officePlacement: s.officePlacement as "exterior" | "interior" | "mixed" }
+        : {}),
       collaboration,
       ...(Object.keys(s.collabConfig).length ? { collabConfig: s.collabConfig } : {}),
       support: s.support,

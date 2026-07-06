@@ -27,7 +27,7 @@ export interface CanvasDept {
   officeCount: number
   hybridWorkers: number
   workstations: number
-  employees?: { id: string; name: string }[]
+  employees?: { id: string; name: string; isLeader?: boolean }[]
 }
 
 export interface ExistingSeed {
@@ -165,13 +165,32 @@ export function mapSurveyToCanvas(survey: SurveyResult): CanvasSeed {
   }
 }
 
+const MOTIVATOR_LABELS: Record<string, string> = {
+  growth: "room to grow", optimize: "optimize real estate", flexibility: "flexibility",
+  density: "higher density", amenity: "amenities & experience", focus: "focus & wellbeing",
+}
+const POSTURE_LABELS: Record<string, string> = {
+  expand: "expand (more space)", balance: "balanced (right-size)", optimize: "optimize (less space)",
+}
+
 function assembleNotes(survey: SurveyResult): string {
   const out: string[] = []
   const add = (label: string, v?: string) => { if (v?.trim()) out.push(`${label}: ${v.trim()}`) }
+  if (survey.goals?.motivators?.length || survey.goals?.posture) {
+    const drivers = (survey.goals.motivators ?? []).map((m) => MOTIVATOR_LABELS[m] ?? m).join(", ")
+    const posture = survey.goals.posture ? POSTURE_LABELS[survey.goals.posture] ?? survey.goals.posture : ""
+    out.push(`Goals: ${[drivers, posture].filter(Boolean).join(" · ")}`)
+  }
   add("What's working", survey.qualitative.loves)
   add("Pain points", survey.qualitative.painPoints)
   add("Over/under-used", survey.qualitative.imbalances)
   add("Adjacencies", survey.work.adjacencyNotes)
+  if (survey.spaces.officePlacement) {
+    const map: Record<string, string> = {
+      exterior: "on the window line (perimeter)", interior: "interior / core", mixed: "a mix of perimeter + interior",
+    }
+    out.push(`Office placement: ${map[survey.spaces.officePlacement] ?? survey.spaces.officePlacement}`)
+  }
   if (survey.existing?.furniture) out.push(`Furniture: ${survey.existing.furniture}`)
   if (survey.deferred.length) out.push(`Deferred to live session (${survey.deferred.length}): ${survey.deferred.join(", ")}`)
   return out.join("\n")

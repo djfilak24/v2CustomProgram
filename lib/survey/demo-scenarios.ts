@@ -31,11 +31,15 @@ export function demoState(key: string): SurveyState | null {
     let n = 0
     s.departments = s.departments.map((d) => {
       const count = sc.peopleMode === "full" ? d.headcount : Math.min(d.headcount, leadersFor(d.headcount))
-      const employees = Array.from({ length: count }, () => makeEmployee(genName(n++)))
+      // In "leaders" mode the named people ARE the leaders, so flag them as such.
+      const employees = Array.from({ length: count }, () =>
+        makeEmployee(genName(n++), sc.peopleMode === "leaders"),
+      )
       return sc.peopleMode === "full" ? { ...d, employees, headcount: employees.length } : { ...d, employees }
     })
     // Build hierarchy into the roster: leaders (first names) take the private
-    // offices, the next names take dedicated desks — mutually exclusive.
+    // offices, the next names take dedicated desks — mutually exclusive. In full
+    // mode this also flags the office-holders as leaders.
     assignSeatHierarchy(s)
   }
   return s
@@ -45,6 +49,7 @@ const now = "2026-06-25T00:00:00Z"
 
 const tech: SurveyResult = {
   meta: { clientName: "Northwind Labs", completedBy: "Demo", completedAt: now },
+  goals: { motivators: ["growth", "flexibility", "amenity"], posture: "expand" },
   people: {
     departments: [
       { id: "eng", name: "Engineering", headcount: 48, futureHeadcount: 70 },
@@ -60,6 +65,7 @@ const tech: SurveyResult = {
   spaces: {
     // Leaders take offices; senior ICs take dedicated desks (mutually exclusive).
     privateOfficesByDept: { lead: 6, ops: 2, eng: 4, prod: 3 },
+    officePlacement: "interior",
     collaboration: [
       { type: "Huddle Room / Flex", byDept: { eng: 3, prod: 2 } },
       { type: "Phone Room / Focus Booth", byDept: { eng: 4 } },
@@ -83,6 +89,7 @@ const tech: SurveyResult = {
 
 const law: SurveyResult = {
   meta: { clientName: "Hartwell & Cross LLP", completedBy: "Demo", completedAt: now },
+  goals: { motivators: ["optimize", "focus"], posture: "optimize" },
   people: {
     departments: [
       { id: "ptr", name: "Partners", headcount: 14, futureHeadcount: 16 },
@@ -96,6 +103,7 @@ const law: SurveyResult = {
   work: { daysInOffice: 5, fullyRemote: 2, dedicatedByDept: { para: 8, admin: 4 } },
   spaces: {
     privateOfficesByDept: { ptr: 14, assoc: 20 },
+    officePlacement: "exterior",
     collaboration: [
       { type: "Medium Conference", byDept: { ptr: 2 } },
       { type: "Large Conference", byDept: { ptr: 1 } },
@@ -116,6 +124,7 @@ const law: SurveyResult = {
 
 const enterprise: SurveyResult = {
   meta: { clientName: "Meridian Financial", completedBy: "Demo", completedAt: now },
+  goals: { motivators: ["optimize", "density", "growth"], posture: "balance" },
   people: {
     departments: [
       { id: "fin", name: "Finance", headcount: 90, futureHeadcount: 96 },
@@ -132,6 +141,7 @@ const enterprise: SurveyResult = {
   spaces: {
     // Executives/corporate/finance leaders take offices; ICs take dedicated desks.
     privateOfficesByDept: { exec: 10, corp: 8, fin: 6 },
+    officePlacement: "mixed",
     collaboration: [
       { type: "Huddle Room / Flex", byDept: { tech: 6, fin: 4 } },
       { type: "Medium Conference", byDept: { risk: 4 } },

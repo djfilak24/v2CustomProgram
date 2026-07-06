@@ -7,8 +7,8 @@ import {
 } from "lucide-react"
 import {
   SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, deptAllocated,
-  WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES,
-  GROWTH_PRESETS, PEOPLE_MODES,
+  WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES, OFFICE_PLACEMENT_OPTIONS,
+  GROWTH_PRESETS, PEOPLE_MODES, GOAL_MOTIVATORS, SPACE_POSTURES,
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
 } from "@/lib/survey/sections"
 import { DEMO_SCENARIOS, demoState } from "@/lib/survey/demo-scenarios"
@@ -280,6 +280,64 @@ function StepBody({
         </div>
       )
 
+    case "goals": {
+      const toggleMotivator = (id: string) =>
+        patch({
+          goalMotivators: state.goalMotivators.includes(id)
+            ? state.goalMotivators.filter((m) => m !== id)
+            : [...state.goalMotivators, id],
+        })
+      return (
+        <div className="space-y-7">
+          <div>
+            <p className="mb-3 text-sm font-medium text-white/70">What&apos;s driving this project? Pick all that apply.</p>
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              {GOAL_MOTIVATORS.map((o) => {
+                const on = state.goalMotivators.includes(o.id)
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => toggleMotivator(o.id)}
+                    className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-white">{o.label}</div>
+                    {o.description && <div className="mt-0.5 text-xs text-white/45">{o.description}</div>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-medium text-white/70">On space itself, where do you lean?</p>
+            <p className="mb-3 text-xs text-white/40">
+              This anchors the &ldquo;how much space do you really need&rdquo; conversation — and which strategies we bring to the gaps.
+            </p>
+            <div className="grid gap-2.5 sm:grid-cols-3">
+              {SPACE_POSTURES.map((o) => {
+                const on = state.spacePosture === o.id
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => patch({ spacePosture: on ? null : o.id })}
+                    className={`rounded-xl border px-4 py-3.5 text-left transition-colors ${
+                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-white">{o.label}</div>
+                    {o.description && <div className="mt-0.5 text-xs text-white/45">{o.description}</div>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     case "existing":
       return (
         <ExistingConditionsStep
@@ -394,6 +452,31 @@ function StepBody({
               cols={3}
             />
           )}
+
+          {/* Interior vs exterior — daylight strategy + how offices port to proposed */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3.5">
+            <div className="mb-2.5 text-sm font-medium text-white/80">
+              Where do those offices sit — on the glass, or interior?
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {OFFICE_PLACEMENT_OPTIONS.map((o) => {
+                const on = state.officePlacement === o.id
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => patch({ officePlacement: on ? null : o.id })}
+                    className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-white">{o.label}</div>
+                    {o.description && <div className="mt-0.5 text-xs text-white/45">{o.description}</div>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )
 

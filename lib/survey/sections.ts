@@ -148,6 +148,19 @@ export const COLLAB_TYPES: CardOption[] = [
   { id: "Conference Room", label: "Conference rooms", description: "Larger meetings", icon: "presentation" },
 ]
 
+/** Section 3b — how a collaboration room is set up (detailed lane). */
+export const COLLAB_BUILD_OPTIONS: CardOption[] = [
+  { id: "built", label: "Built-in" },
+  { id: "floating", label: "Floating furniture" },
+  { id: "unsure", label: "Not sure — suggest" },
+]
+export const COLLAB_MONITOR_OPTIONS: CardOption[] = [
+  { id: "large", label: "Large monitor" },
+  { id: "small", label: "Small monitor" },
+  { id: "none", label: "No monitor" },
+  { id: "unsure", label: "Not sure" },
+]
+
 /** Section 3c — support spaces checklist (names resolve to SPACE_PRESETS). */
 export const SUPPORT_TYPES: CardOption[] = [
   { id: "Copy/Print", label: "Copy / print", icon: "printer" },
@@ -312,7 +325,7 @@ export const SURVEY_STEPS: SurveyStep[] = [
     section: "Your Space",
     title: "What collaboration spaces matter most?",
     subtitle: "Spaces you have today or expect to use — pick what's relevant; SF and ratios are how we'll size them.",
-    detailedHint: "Set a count per type, per department — the full decision tree.",
+    detailedHint: "Tell us how each room is set up (built-in vs. floating furniture, monitor) — we suggest the rest",
     hasDetailed: true,
     canDefer: true,
   },
@@ -390,6 +403,8 @@ export interface SurveyState {
   collabTypes: string[]
   /** type id -> dept id -> count (detailed lane). */
   collabByDept: Record<string, Record<string, number>>
+  /** Per-type configuration (how the room is set up), detailed lane. */
+  collabConfig: Record<string, { build?: string; monitor?: string }>
   /** Collaboration spaces that exist today (type id -> current count). */
   existingCollab: Record<string, number>
   // Section 3c — support
@@ -422,6 +437,7 @@ export function emptyState(): SurveyState {
     officesByDept: {},
     collabTypes: [],
     collabByDept: {},
+    collabConfig: {},
     existingCollab: {},
     support: [],
     existingSupport: {},

@@ -121,18 +121,21 @@ export default function SurveyPage() {
       >
         <div>
           {/* Global depth control — everything is shown in full by default; the
-              client can Simplify to save time without compromising the program. */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5">
-            <span className="flex items-center gap-2 text-sm text-white/60">
+              client can Simplify to save time without compromising the program.
+              Highlighted, and pulses on the first step to orient the user. */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#00badc]/30 bg-[#00badc]/[0.05] px-4 py-2.5">
+            <span className="flex items-center gap-2 text-sm text-white/75">
               <Wand2 className="h-4 w-4 text-[#00badc]" />
               {anyDetailed
-                ? "You're seeing every question in full — answer what you can."
-                : "Simplified path — a complete program, just quicker."}
+                ? "You're seeing every question in full — answer what you can, or simplify."
+                : "Simplified path — a complete program, just quicker. Same result, less time."}
             </span>
             <button
               type="button"
               onClick={toggleSimplifyAll}
-              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-colors hover:border-[#00badc]/50 hover:text-white"
+              className={`rounded-lg border border-[#00badc]/50 bg-[#00badc]/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#00badc]/20 ${
+                stepIndex === 0 ? "ring-2 ring-[#00badc]/40 ring-offset-2 ring-offset-[#0b1830] motion-safe:animate-pulse" : ""
+              }`}
             >
               {anyDetailed ? "Simplify to save time" : "Show full detail"}
             </button>
@@ -386,9 +389,8 @@ function StepBody({
       return (
         <CollabTree
           lane={lane}
-          departments={state.departments}
           selected={state.collabTypes}
-          byDept={state.collabByDept}
+          config={state.collabConfig}
           onToggleType={(id) =>
             patch({
               collabTypes: state.collabTypes.includes(id)
@@ -396,8 +398,8 @@ function StepBody({
                 : [...state.collabTypes, id],
             })
           }
-          onChangeCounts={(id, counts) =>
-            patch({ collabByDept: { ...state.collabByDept, [id]: counts } })
+          onChangeConfig={(id, p) =>
+            patch({ collabConfig: { ...state.collabConfig, [id]: { ...state.collabConfig[id], ...p } } })
           }
           existing={state.existingCollab}
           onChangeExisting={(id, n) =>

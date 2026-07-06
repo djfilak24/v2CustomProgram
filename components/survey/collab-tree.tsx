@@ -1,43 +1,38 @@
 "use client"
 
-import { PerDeptRows } from "./per-dept-rows"
-import { type Lane, type SpineDept } from "@/lib/survey/sections"
+import { COLLAB_BUILD_OPTIONS, COLLAB_MONITOR_OPTIONS, type Lane } from "@/lib/survey/sections"
 import { COLLAB_CATALOG } from "@/lib/survey/catalog"
 import { SpaceListRow } from "./space-list-row"
 
 /**
- * The collaboration decision tree (SURVEY_SPEC §3b) — the showcase interaction.
- * Quick lane: tap the shared-space types you use. Go deeper: each selected type
- * expands into per-department count rows (departments pre-pulled from the spine),
- * so "Set a count per type, per department" is a real pathway, not a promise.
+ * Collaboration selection. Both lanes use the same chunky rows (icon + SF +
+ * ratio) with a "how many today" count. The detailed lane adds per-type
+ * CONFIGURATION — how the room is set up (built-in vs. floating furniture,
+ * monitor) — rather than per-department counts (the engine derives counts from
+ * ratios; how they're set up is what we actually need from the client).
  */
 export function CollabTree({
   lane,
-  departments,
   selected,
-  byDept,
+  config,
   onToggleType,
-  onChangeCounts,
+  onChangeConfig,
   existing,
   onChangeExisting,
 }: {
   lane: Lane
-  departments: SpineDept[]
   selected: string[]
-  byDept: Record<string, Record<string, number>>
+  config: Record<string, { build?: string; monitor?: string }>
   onToggleType: (typeId: string) => void
-  onChangeCounts: (typeId: string, counts: Record<string, number>) => void
+  onChangeConfig: (typeId: string, patch: { build?: string; monitor?: string }) => void
   existing: Record<string, number>
   onChangeExisting: (typeId: string, n: number) => void
 }) {
-  // Both lanes use the same chunky list rows (icon + SF + ratio). The detailed
-  // lane additionally expands each selected type into per-department counts.
   return (
     <div className={`grid gap-2.5 ${lane === "detailed" ? "" : "lg:grid-cols-2"}`}>
       {COLLAB_CATALOG.map((t) => {
         const isOn = selected.includes(t.id)
-        const counts = byDept[t.id] ?? {}
-        const total = Object.values(counts).reduce((a, b) => a + (b || 0), 0)
+        const cfg = config[t.id] ?? {}
         return (
           <SpaceListRow
             key={t.id}
@@ -52,25 +47,53 @@ export function CollabTree({
             onTodayChange={(n) => onChangeExisting(t.id, n)}
           >
             {lane === "detailed" && (
-              <div className="border-t border-white/10 px-5 py-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs text-white/45">How many for each department?</p>
-                  {total > 0 && (
-                    <span className="rounded-full bg-[#00badc]/15 px-2 py-0.5 text-xs font-medium tabular-nums text-[#00badc]">
-                      {total} total
-                    </span>
-                  )}
-                </div>
-                <PerDeptRows
-                  departments={departments}
-                  values={counts}
-                  onChange={(next) => onChangeCounts(t.id, next)}
+              <div className="space-y-3 border-t border-white/[0.07] px-5 py-3.5">
+                <ChipRow
+                  label="Setup"
+                  options={COLLAB_BUILD_OPTIONS}
+                  value={cfg.build}
+                  onChange={(build) => onChangeConfig(t.id, { build })}
+                />
+                <ChipRow
+                  label="Monitor"
+                  options={COLLAB_MONITOR_OPTIONS}
+                  value={cfg.monitor}
+                  onChange={(monitor) => onChangeConfig(t.id, { monitor })}
                 />
               </div>
             )}
           </SpaceListRow>
         )
       })}
+    </div>
+  )
+}
+
+function ChipRow({
+  label, options, value, onChange,
+}: {
+  label: string
+  options: { id: string; label: string }[]
+  value?: string
+  onChange: (id: string) => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="w-16 shrink-0 text-xs font-medium uppercase tracking-wide text-white/40">{label}</span>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+            value === o.id
+              ? "border-[#00badc] bg-[#00badc]/15 text-white"
+              : "border-white/12 bg-white/[0.03] text-white/60 hover:border-white/25 hover:text-white"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }

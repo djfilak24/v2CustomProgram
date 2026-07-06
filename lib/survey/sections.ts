@@ -472,15 +472,42 @@ export function deptAllocated(
   d: SpineDept,
   values: Record<string, number>,
   byEmployee: Record<string, boolean>,
+  /** Ids assigned to the complementary seat type — never counted here (XOR). */
+  exclude?: Record<string, boolean>,
 ): number {
   const roster = d.employees ?? []
   if (roster.length === 0) return values[d.id] ?? 0
-  const checked = roster.filter((e) => byEmployee[e.id]).length
+  const checked = roster.filter((e) => byEmployee[e.id] && !exclude?.[e.id]).length
   const hc = d.headcount || 0
   // Full roster → exactly the checked people. Partial ("leaders") → the total
   // count (stepper), floored at the explicitly checked named people.
   if (roster.length >= hc) return checked
   return Math.max(values[d.id] ?? 0, checked)
+}
+
+/**
+ * Establish the seating hierarchy across a roster-backed state: a private office
+ * and a dedicated desk are mutually exclusive per person. Offices go to the
+ * most-senior named people first (leaders are listed first in the roster), then
+ * dedicated desks go to the next names — the two sets never overlap. Aggregate
+ * per-department counts (officesByDept / dedicatedByDept) drive how many of each.
+ * Used to pre-fill demos with real hierarchy; safe to call on any state.
+ */
+export function assignSeatHierarchy(s: SurveyState): void {
+  const officeByEmployee: Record<string, boolean> = {}
+  const deskByEmployee: Record<string, boolean> = {}
+  for (const d of s.departments) {
+    const roster = d.employees ?? []
+    if (roster.length === 0) continue
+    const nOffice = Math.min(s.officesByDept[d.id] ?? 0, roster.length)
+    const nDesk = Math.min(s.dedicatedByDept[d.id] ?? 0, Math.max(0, roster.length - nOffice))
+    roster.forEach((e, i) => {
+      if (i < nOffice) officeByEmployee[e.id] = true
+      else if (i < nOffice + nDesk) deskByEmployee[e.id] = true
+    })
+  }
+  s.officeByEmployee = officeByEmployee
+  s.deskByEmployee = deskByEmployee
 }
 
 /**
@@ -675,13 +702,16 @@ export function buildSurveyResult(
 
   // Dedicated desks / private offices — per-person checks when a roster exists,
   // else the per-department numeric value.
+  // A private office and a dedicated desk are mutually exclusive per person.
+  // Offices win (leaders): anyone assigned an office is excluded from the desk
+  // count, so the same named person is never double-counted.
   const dedicatedByDept: Record<string, number> = {}
   const officesByDept: Record<string, number> = {}
   for (const d of namedDepts) {
-    const ded = deptAllocated(d, s.dedicatedByDept, s.deskByEmployee)
-    if (ded > 0) dedicatedByDept[d.id] = ded
     const off = deptAllocated(d, s.officesByDept, s.officeByEmployee)
     if (off > 0) officesByDept[d.id] = off
+    const ded = deptAllocated(d, s.dedicatedByDept, s.deskByEmployee, s.officeByEmployee)
+    if (ded > 0) dedicatedByDept[d.id] = ded
   }
 
   return {

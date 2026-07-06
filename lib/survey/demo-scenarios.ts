@@ -5,7 +5,7 @@
  * the demo button. Add a scenario = add a fixture here; no code changes.
  */
 import type { SurveyResult } from "./types"
-import { surveyStateFromResult, makeEmployee, type SurveyState, type PeopleMode } from "./sections"
+import { surveyStateFromResult, makeEmployee, assignSeatHierarchy, type SurveyState, type PeopleMode } from "./sections"
 
 export interface DemoScenario {
   label: string
@@ -34,6 +34,9 @@ export function demoState(key: string): SurveyState | null {
       const employees = Array.from({ length: count }, () => makeEmployee(genName(n++)))
       return sc.peopleMode === "full" ? { ...d, employees, headcount: employees.length } : { ...d, employees }
     })
+    // Build hierarchy into the roster: leaders (first names) take the private
+    // offices, the next names take dedicated desks — mutually exclusive.
+    assignSeatHierarchy(s)
   }
   return s
 }
@@ -53,9 +56,10 @@ const tech: SurveyResult = {
     totalHeadcount: 120,
     companyGrowthPct: 25,
   },
-  work: { daysInOffice: 3, fullyRemote: 14 },
+  work: { daysInOffice: 3, fullyRemote: 14, dedicatedByDept: { eng: 22, prod: 10 } },
   spaces: {
-    privateOfficesByDept: { lead: 6, ops: 2 },
+    // Leaders take offices; senior ICs take dedicated desks (mutually exclusive).
+    privateOfficesByDept: { lead: 6, ops: 2, eng: 4, prod: 3 },
     collaboration: [
       { type: "Huddle Room / Flex", byDept: { eng: 3, prod: 2 } },
       { type: "Phone Room / Focus Booth", byDept: { eng: 4 } },
@@ -89,7 +93,7 @@ const law: SurveyResult = {
     totalHeadcount: 60,
     companyGrowthPct: 8,
   },
-  work: { daysInOffice: 5, fullyRemote: 2 },
+  work: { daysInOffice: 5, fullyRemote: 2, dedicatedByDept: { para: 8, admin: 4 } },
   spaces: {
     privateOfficesByDept: { ptr: 14, assoc: 20 },
     collaboration: [
@@ -124,8 +128,9 @@ const enterprise: SurveyResult = {
     totalHeadcount: 400,
     companyGrowthPct: 8,
   },
-  work: { daysInOffice: 4, fullyRemote: 24 },
+  work: { daysInOffice: 4, fullyRemote: 24, dedicatedByDept: { tech: 40, ops: 30, fin: 10 } },
   spaces: {
+    // Executives/corporate/finance leaders take offices; ICs take dedicated desks.
     privateOfficesByDept: { exec: 10, corp: 8, fin: 6 },
     collaboration: [
       { type: "Huddle Room / Flex", byDept: { tech: 6, fin: 4 } },

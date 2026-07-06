@@ -326,8 +326,14 @@ function StepBody({
               otherNoun="offices"
               showFlex
               employeeSelections={state.deskByEmployee}
+              excludedEmployees={state.officeByEmployee}
+              excludedNoun="office"
               onToggleEmployee={(id) =>
-                patch({ deskByEmployee: { ...state.deskByEmployee, [id]: !state.deskByEmployee[id] } })
+                patch({
+                  deskByEmployee: { ...state.deskByEmployee, [id]: !state.deskByEmployee[id] },
+                  // XOR: taking a desk releases any office this person held.
+                  officeByEmployee: { ...state.officeByEmployee, [id]: false },
+                })
               }
             />
           ) : (
@@ -366,12 +372,18 @@ function StepBody({
               values={state.officesByDept}
               onChange={(v) => patch({ officesByDept: v })}
               thisNoun="offices"
-              otherByDept={Object.fromEntries(state.departments.map((d) => [d.id, deptAllocated(d, state.dedicatedByDept, state.deskByEmployee)]))}
+              otherByDept={Object.fromEntries(state.departments.map((d) => [d.id, deptAllocated(d, state.dedicatedByDept, state.deskByEmployee, state.officeByEmployee)]))}
               otherNoun="dedicated"
               showFlex
               employeeSelections={state.officeByEmployee}
+              excludedEmployees={state.deskByEmployee}
+              excludedNoun="desk"
               onToggleEmployee={(id) =>
-                patch({ officeByEmployee: { ...state.officeByEmployee, [id]: !state.officeByEmployee[id] } })
+                patch({
+                  officeByEmployee: { ...state.officeByEmployee, [id]: !state.officeByEmployee[id] },
+                  // XOR: taking an office releases any dedicated desk this person held.
+                  deskByEmployee: { ...state.deskByEmployee, [id]: false },
+                })
               }
             />
           ) : (

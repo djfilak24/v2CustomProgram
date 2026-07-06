@@ -22,6 +22,8 @@ export function DeptAllocationRows({
   showFlex = false,
   employeeSelections,
   onToggleEmployee,
+  excludedEmployees,
+  excludedNoun,
 }: {
   departments: SpineDept[]
   values: Record<string, number>
@@ -36,6 +38,13 @@ export function DeptAllocationRows({
   /** Per-person selection (employee id → checked). Enables the nested roster. */
   employeeSelections?: Record<string, boolean>
   onToggleEmployee?: (empId: string) => void
+  /**
+   * People already assigned to the complementary seat type (office ⇄ desk).
+   * They're locked out here — a person holds at most one assigned seat.
+   */
+  excludedEmployees?: Record<string, boolean>
+  /** Short label for the exclusion (e.g. "office", "desk"). */
+  excludedNoun?: string
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set())
 
@@ -164,23 +173,36 @@ export function DeptAllocationRows({
               <div className="mt-3 grid gap-1.5 border-t border-white/[0.07] pt-3 sm:grid-cols-2">
                 {roster.map((emp) => {
                   const on = !!employeeSelections![emp.id]
+                  const locked = !on && !!excludedEmployees?.[emp.id]
                   return (
                     <button
                       key={emp.id}
                       type="button"
-                      onClick={() => onToggleEmployee?.(emp.id)}
+                      disabled={locked}
+                      onClick={() => !locked && onToggleEmployee?.(emp.id)}
+                      title={locked ? `Already has ${excludedNoun ?? "the other seat"} — one assigned seat per person` : undefined}
                       className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                        on ? "border-[#00badc]/50 bg-[#00badc]/[0.08] text-white" : "border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20"
+                        locked
+                          ? "cursor-not-allowed border-white/[0.06] bg-white/[0.01] text-white/30"
+                          : on
+                            ? "border-[#00badc]/50 bg-[#00badc]/[0.08] text-white"
+                            : "border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20"
                       }`}
                     >
                       <span
                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                          on ? "border-[#00badc] bg-[#00badc] text-slate-900" : "border-white/30"
+                          on ? "border-[#00badc] bg-[#00badc] text-slate-900" : locked ? "border-white/15" : "border-white/30"
                         }`}
                       >
                         {on && <Check className="h-3 w-3" strokeWidth={3} />}
+                        {locked && <span className="h-2 w-2 rounded-[1px] bg-white/25" />}
                       </span>
                       <span className="truncate">{emp.name || "Unnamed"}</span>
+                      {locked && excludedNoun && (
+                        <span className="ml-auto shrink-0 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/40">
+                          {excludedNoun}
+                        </span>
+                      )}
                     </button>
                   )
                 })}

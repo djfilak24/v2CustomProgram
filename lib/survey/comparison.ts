@@ -26,6 +26,31 @@ export interface ComparisonLine {
   ratio?: string
   existingCount: number
   proposedCount: number
+  /** Did the client actually give us a count for this today? (vs. assumed 0) */
+  existingCountKnown: boolean
+  /** Do we know the client's real unit size today? (vs. a standard we assumed) */
+  existingSizeKnown: boolean
+}
+
+/** A missing-info gap on a line that matters for porting existing → proposed. */
+export interface LineGap {
+  kind: "no-baseline" | "unknown-size"
+  message: string
+}
+
+/** Gaps on a line — surfaced by the review's "Show gaps" toggle. */
+export function lineGaps(l: ComparisonLine): LineGap[] {
+  const gaps: LineGap[] = []
+  if (l.proposedCount > 0 && !l.existingCountKnown) {
+    gaps.push({ kind: "no-baseline", message: "No existing count captured — can't compare to today." })
+  }
+  if (l.existingCount > 0 && !l.existingSizeKnown) {
+    gaps.push({
+      kind: "unknown-size",
+      message: `Existing size unknown — using a standard ${l.unitSF} SF to port into the proposal.`,
+    })
+  }
+  return gaps
 }
 
 export interface Comparison {
@@ -89,6 +114,7 @@ export function buildComparison(result: SurveyResult, ci?: CompInputs): Comparis
   lines.push({
     key: "workstations", label: "Workstations", category: "Workstations", unitSF: wsUnitSF,
     ratio: "sized by seat demand", existingCount: ex.existingWorkstations ?? 0, proposedCount: wsProposed,
+    existingCountKnown: ex.existingWorkstations !== undefined, existingSizeKnown: ex.workstationSF !== undefined,
   })
 
   // Private offices -----------------------------------------------------------
@@ -98,19 +124,23 @@ export function buildComparison(result: SurveyResult, ci?: CompInputs): Comparis
     key: "offices", label: "Private offices", category: "Offices",
     unitSF: ex.officeSF ?? (offItems[0]?.areaSf || 120),
     ratio: "leadership / by role", existingCount: ex.existingOffices ?? 0, proposedCount: offProposed,
+    existingCountKnown: ex.existingOffices !== undefined, existingSizeKnown: ex.officeSF !== undefined,
   })
 
   // Collaboration — one line per engine type ----------------------------------
+  // Collab/support use standard catalog sizes for "existing", so size is treated
+  // as known (a defensible standard); only the count can be a gap.
   for (const item of program.collaborative) {
     lines.push({
       key: `collab:${item.name}`, label: item.name, category: "Collaboration", unitSF: item.areaSf,
       ratio: item.ratioLabel, existingCount: ex.existingCollab?.[item.name] ?? 0, proposedCount: item.quantity,
+      existingCountKnown: ex.existingCollab?.[item.name] !== undefined, existingSizeKnown: true,
     })
   }
   // Existing collab types the engine didn't propose
   for (const [name, count] of Object.entries(ex.existingCollab ?? {})) {
     if (!program.collaborative.some((i) => i.name === name)) {
-      lines.push({ key: `collab:${name}`, label: name, category: "Collaboration", unitSF: sfById(name, COLLAB_CATALOG), existingCount: count, proposedCount: 0 })
+      lines.push({ key: `collab:${name}`, label: name, category: "Collaboration", unitSF: sfById(name, COLLAB_CATALOG), existingCount: count, proposedCount: 0, existingCountKnown: true, existingSizeKnown: true })
     }
   }
 
@@ -121,11 +151,12 @@ export function buildComparison(result: SurveyResult, ci?: CompInputs): Comparis
     lines.push({
       key: `support:${item.name}`, label: item.name, category: "Support", unitSF: item.areaSf,
       ratio: item.ratioLabel, existingCount: existing, proposedCount: item.quantity,
+      existingCountKnown: ex.existingSupport?.[item.name] !== undefined, existingSizeKnown: true,
     })
   }
   for (const [name, count] of Object.entries(ex.existingSupport ?? {})) {
     if (!program.support.some((i) => i.name === name)) {
-      lines.push({ key: `support:${name}`, label: name, category: "Support", unitSF: sfById(name, SUPPORT_CATALOG), existingCount: count, proposedCount: 0 })
+      lines.push({ key: `support:${name}`, label: name, category: "Support", unitSF: sfById(name, SUPPORT_CATALOG), existingCount: count, proposedCount: 0, existingCountKnown: true, existingSizeKnown: true })
     }
   }
 
@@ -142,3 +173,41 @@ export function buildComparison(result: SurveyResult, ci?: CompInputs): Comparis
 
 /** SF for a line at a given count. */
 export const lineSF = (l: ComparisonLine, count: number) => count * l.unitSF
+
+export interface SpaceStrategy {
+  posture: "expand" | "balance" | "optimize" | "unset"
+  /** proposed vs existing direction. */
+  direction: "grow" | "shrink" | "flat"
+  headline: string
+  note: string
+}
+
+/**
+ * Reconcile the client's stated posture (expand / balanced / optimize) with what
+ * the ratios actually propose vs. what they have today. This is the "how much
+ * space do you really need" read — where goal and math agree, or pull apart.
+ */
+export function spaceStrategy(
+  existingSF: number,
+  proposedSF: number,
+  goals?: SurveyResult["goals"],
+): SpaceStrategy {
+  const posture = goals?.posture ?? "unset"
+  const delta = existingSF > 0 ? (proposedSF - existingSF) / existingSF : proposedSF > 0 ? 1 : 0
+  const direction: SpaceStrategy["direction"] = delta > 0.05 ? "grow" : delta < -0.05 ? "shrink" : "flat"
+
+  if (posture === "optimize") {
+    if (direction === "grow")
+      return { posture, direction, headline: "Goal and math pull apart", note: "You want to optimize, but the ratios point bigger than today — a chance to close the gap with sharing, hoteling, and tighter footprints rather than more floor." }
+    return { posture, direction, headline: "On track to optimize", note: "The proposed program already trims toward your goal of making the most of the space you have." }
+  }
+  if (posture === "expand") {
+    if (direction === "shrink")
+      return { posture, direction, headline: "Room to invest", note: "You're open to more space, yet the ratios come in under today — headroom to reinvest in amenities, collaboration, or comfort." }
+    return { posture, direction, headline: "Aligned on growth", note: "More space supports your growth and experience goals — the proposal leans into that." }
+  }
+  if (posture === "balance")
+    return { posture, direction, headline: "Right-sizing", note: direction === "grow" ? "The ratios suggest growth to meet demand — balanced against efficiency." : "The proposal holds close to today, tuned to the real need." }
+
+  return { posture, direction, headline: direction === "grow" ? "Ratios suggest more space" : direction === "shrink" ? "Ratios suggest less space" : "About the same footprint", note: "Add a goal posture in the survey to frame this as expand vs. optimize." }
+}

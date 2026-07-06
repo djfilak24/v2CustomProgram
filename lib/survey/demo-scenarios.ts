@@ -45,6 +45,31 @@ export function demoState(key: string): SurveyState | null {
   return s
 }
 
+/**
+ * A demo as a SurveyResult with its generated named roster + leaders grafted on
+ * (rosters live in demo state, not the hand-authored fixture). Keeps every
+ * curated fixture value intact and only adds the per-person roster, so the
+ * review shows leaders, rosters, placement, and goals for demos.
+ */
+export function demoResult(key: string): SurveyResult | null {
+  const sc = DEMO_SCENARIOS[key]
+  const st = demoState(key)
+  if (!sc || !st) return null
+  const rosterById = new Map(st.departments.map((d) => [d.id, d.employees]))
+  return {
+    ...sc.result,
+    people: {
+      ...sc.result.people,
+      departments: sc.result.people.departments.map((d) => {
+        const emps = rosterById.get(d.id)
+        return emps && emps.length
+          ? { ...d, employees: emps.map((e) => ({ id: e.id, name: e.name, ...(e.isLeader ? { isLeader: true } : {}) })) }
+          : d
+      }),
+    },
+  }
+}
+
 const now = "2026-06-25T00:00:00Z"
 
 const tech: SurveyResult = {
@@ -153,7 +178,9 @@ const enterprise: SurveyResult = {
   qualitative: {},
   special: {},
   existing: {
-    furniture: "mixed", workstationSF: 42, officeSF: 144,
+    // A big firm that knows its counts but not a single standard office size —
+    // exactly the kind of gap the review's "Show gaps" toggle surfaces.
+    furniture: "mixed", workstationSF: 42,
     existingWorkstations: 360, existingOffices: 30,
     existingCollab: { "Huddle Room / Flex": 8, "Medium Conference": 6, "Large Conference": 2 },
     existingSupport: { Reception: 1, "Work Cafe": 1, "Pantry / Kitchenette": 4, "Mail Room": 1 },

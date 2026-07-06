@@ -2,36 +2,63 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { ArrowRight, TrendingUp, TrendingDown, Minus, Building2, Users, Presentation, Box } from "lucide-react"
+import {
+  ArrowRight, TrendingUp, TrendingDown, Minus, Building2, Users, Presentation, Box,
+  Crown, AlertTriangle, LayoutDashboard, ListChecks, GitCompareArrows, Sun, Moon,
+} from "lucide-react"
 import { loadSurveySeed, saveSurveySeed } from "@/lib/survey/seedStorage"
-import { buildComparison, defaultCompInputs, lineSF, type Comparison, type CompCategory, type CompInputs } from "@/lib/survey/comparison"
-import { DEMO_SCENARIOS } from "@/lib/survey/demo-scenarios"
+import {
+  buildComparison, defaultCompInputs, lineSF, lineGaps, spaceStrategy,
+  type Comparison, type CompCategory, type CompInputs,
+} from "@/lib/survey/comparison"
+import { DEMO_SCENARIOS, demoResult } from "@/lib/survey/demo-scenarios"
+import {
+  surveyStateFromResult, computeProfile,
+  GOAL_MOTIVATORS, SPACE_POSTURES, OFFICE_PLACEMENT_OPTIONS,
+} from "@/lib/survey/sections"
+import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import type { SurveyResult } from "@/lib/survey/types"
 
 const CAT_ICON: Record<CompCategory, typeof Users> = {
   Workstations: Users, Offices: Building2, Collaboration: Presentation, Support: Box,
 }
+const CATS: CompCategory[] = ["Workstations", "Offices", "Collaboration", "Support"]
+
+const labelOf = (list: { id: string; label: string }[], id?: string | null) =>
+  list.find((o) => o.id === id)?.label ?? id ?? ""
+const PLACEMENT_BLURB: Record<string, string> = {
+  exterior: "Offices ring the perimeter (on the glass)", interior: "Offices interior — glass stays open",
+  mixed: "A mix of perimeter and interior",
+}
+
+type Tab = "dashboard" | "responses" | "validation"
 
 export default function ReviewPage() {
   const [result, setResult] = useState<SurveyResult | null>(null)
   const [inputs, setInputs] = useState<CompInputs | null>(null)
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [sizes, setSizes] = useState<Record<string, number>>({})
+  const [tab, setTab] = useState<Tab>("dashboard")
+  const [showGaps, setShowGaps] = useState(true)
 
   const load = (r: SurveyResult) => { setResult(r); setInputs(defaultCompInputs(r)); setCounts({}); setSizes({}) }
 
   useEffect(() => {
     const key = new URLSearchParams(window.location.search).get("demo")
-    if (key && DEMO_SCENARIOS[key]) load(DEMO_SCENARIOS[key].result)
-    else load(loadSurveySeed() ?? DEMO_SCENARIOS.tech.result)
+    if (key && DEMO_SCENARIOS[key]) load(demoResult(key) ?? DEMO_SCENARIOS[key].result)
+    else load(loadSurveySeed() ?? demoResult("tech") ?? DEMO_SCENARIOS.tech.result)
   }, [])
 
   const comp = useMemo<Comparison | null>(
     () => (result && inputs ? buildComparison(result, inputs) : null),
     [result, inputs],
   )
+  const profile = useMemo(
+    () => (result ? computeProfile(surveyStateFromResult(result)) : null),
+    [result],
+  )
 
-  if (!comp || !inputs) {
+  if (!comp || !inputs || !result || !profile) {
     return <div className="flex min-h-screen items-center justify-center bg-[#0b1830] text-white/60">Loading your program…</div>
   }
 
@@ -44,101 +71,85 @@ export default function ReviewPage() {
   )
   const existingTotal = comp.lines.reduce((s, l) => s + lineSF(l, l.existingCount), 0)
   const proposedTotal = comp.lines.reduce((s, l) => s + propCount(l.key, l.proposedCount) * unitSF(l.key, l.unitSF), 0)
+  const strategy = spaceStrategy(existingTotal, proposedTotal, result.goals)
+  const gapCount = comp.lines.reduce((s, l) => s + lineGaps(l).length, 0)
+
+  const catTotals = CATS.map((cat) => {
+    const ls = comp.lines.filter((l) => l.category === cat)
+    return {
+      cat,
+      existing: ls.reduce((s, l) => s + lineSF(l, l.existingCount), 0),
+      proposed: ls.reduce((s, l) => s + propCount(l.key, l.proposedCount) * unitSF(l.key, l.unitSF), 0),
+    }
+  })
 
   const openCanvas = () => { if (result) saveSurveySeed(result); window.location.href = "/" }
+
+  const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "responses", label: "Detailed responses", icon: ListChecks },
+    { id: "validation", label: "Recommended program", icon: GitCompareArrows },
+  ]
 
   return (
     <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1830]/85 px-6 py-4 backdrop-blur-md lg:px-10">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3">
-          <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto brightness-0 invert" priority />
+          <div className="flex items-center gap-4">
+            <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto brightness-0 invert" priority />
+            <span className="hidden text-sm text-white/40 sm:inline">·</span>
+            <span className="hidden text-sm font-medium text-white/70 sm:inline">{comp.clientName}</span>
+          </div>
           <div className="flex items-center gap-2">
             <span className="mr-1 text-[11px] uppercase tracking-wide text-white/35">Demo</span>
             {Object.entries(DEMO_SCENARIOS).map(([key, s]) => (
-              <button key={key} type="button" onClick={() => load(s.result)} title={s.blurb}
+              <button key={key} type="button" onClick={() => load(demoResult(key) ?? s.result)} title={s.blurb}
                 className="rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-xs font-medium text-white/60 transition-colors hover:border-[#00badc]/50 hover:text-white">
                 {s.label}
               </button>
             ))}
           </div>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-[1500px] px-6 py-10 lg:px-10">
-        <p className="text-sm font-semibold uppercase tracking-wide text-[#00badc]">{comp.clientName}</p>
-        <h1 className="mt-2 max-w-4xl text-4xl font-bold tracking-tight">
-          Here&apos;s what you have today, next to what we&apos;d suggest.
-        </h1>
-
-        {/* Live decision points — adjust and the engine re-runs the whole program */}
-        <div className="mt-6 rounded-2xl border border-[#00badc]/25 bg-[#00badc]/[0.05] p-6">
-          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-3 text-lg leading-relaxed text-white/80">
-            You&apos;re planning for
-            <InlineNum value={inputs.future} min={1} max={5000} step={5} onChange={(n) => setInput({ future: n })} />
-            people (from <Strong>{inputs.current}</Strong> today). With a
-            <InlineNum value={inputs.daysInOffice} min={1} max={5} suffix="-day" onChange={(n) => setInput({ daysInOffice: n })} />
-            in-office week and
-            <InlineNum value={inputs.fullyRemote} min={0} max={inputs.future} onChange={(n) => setInput({ fullyRemote: n })} />
-            fully remote, industry ratios suggest the program below. Slide any of these and watch it update.
-          </p>
-        </div>
-
-        {/* Totals */}
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <TotalCard label="Existing today" value={existingTotal} tone="muted" />
-          <TotalCard label="Proposed program" value={proposedTotal} tone="cyan" />
-          <DeltaCard existing={existingTotal} proposed={proposedTotal} />
-        </div>
-
-        {/* Line-by-line */}
-        <div className="mt-8 space-y-2.5">
-          <div className="mb-2 grid grid-cols-[1fr_96px_300px_104px] items-center gap-5 px-5 text-xs font-medium uppercase tracking-wide text-white/35">
-            <span>Space</span>
-            <span className="text-center">Existing</span>
-            <span className="text-center">Proposed (count × size)</span>
-            <span className="text-right">Difference</span>
-          </div>
-          {lines.map((l) => {
-            const Icon = CAT_ICON[l.category]
-            const cnt = propCount(l.key, l.proposedCount)
-            const sf = unitSF(l.key, l.unitSF)
-            const dCount = cnt - l.existingCount
-            const dSF = cnt * sf - l.existingCount * l.unitSF
+        {/* Tab bar */}
+        <div className="mx-auto mt-4 flex max-w-[1500px] items-center gap-1">
+          {TABS.map((t) => {
+            const on = tab === t.id
+            const Icon = t.icon
             return (
-              <div key={l.key} className="grid grid-cols-[1fr_96px_300px_104px] items-center gap-5 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-white/55"><Icon className="h-5 w-5" /></span>
-                  <div className="min-w-0">
-                    <div className="truncate text-[15px] font-semibold text-white">{l.label}</div>
-                    <div className="truncate text-xs text-white/40">
-                      {l.category}{l.ratio ? <span className="text-[#00badc]/70"> · {l.ratio}</span> : ""}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <div className="text-sm font-semibold text-white/70 tabular-nums">{l.existingCount}</div>
-                  <div className="text-[11px] text-white/35 tabular-nums">{lineSF(l, l.existingCount).toLocaleString()} SF</div>
-                </div>
-
-                {/* count × size */}
-                <div className="flex items-center justify-center gap-2">
-                  <MiniStepper value={cnt} onChange={(n) => setCounts((p) => ({ ...p, [l.key]: Math.max(0, n) }))} />
-                  <span className="text-white/30">×</span>
-                  <MiniStepper value={sf} step={5} unit="SF" onChange={(n) => setSizes((p) => ({ ...p, [l.key]: Math.max(0, n) }))} />
-                  <span className="w-20 text-right text-[11px] font-medium tabular-nums text-[#00badc]/85">= {(cnt * sf).toLocaleString()} SF</span>
-                </div>
-
-                <div className="text-right"><DeltaPill dCount={dCount} dSF={dSF} /></div>
-              </div>
+              <button key={t.id} type="button" onClick={() => setTab(t.id)}
+                className={`flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  on ? "border-[#00badc] text-white" : "border-transparent text-white/45 hover:text-white/80"
+                }`}>
+                <Icon className="h-4 w-4" /> {t.label}
+              </button>
             )
           })}
         </div>
+      </header>
+
+      <main className="mx-auto max-w-[1500px] px-6 py-8 lg:px-10">
+        {tab === "dashboard" && (
+          <DashboardTab
+            comp={comp} result={result} profile={profile} strategy={strategy}
+            existingTotal={existingTotal} proposedTotal={proposedTotal} catTotals={catTotals}
+          />
+        )}
+        {tab === "responses" && <ResponsesTab result={result} />}
+        {tab === "validation" && (
+          <ValidationTab
+            comp={comp} inputs={inputs} setInput={setInput} lines={lines}
+            existingTotal={existingTotal} proposedTotal={proposedTotal} strategy={strategy}
+            counts={counts} sizes={sizes} setCounts={setCounts} setSizes={setSizes}
+            propCount={propCount} unitSF={unitSF} showGaps={showGaps} setShowGaps={setShowGaps} gapCount={gapCount}
+          />
+        )}
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
           <p className="max-w-xl text-sm text-white/50">
-            Adjust counts and sizes line by line — the difference column tracks each against what you have today.
-            Open the canvas to go deeper.
+            {tab === "validation"
+              ? "Adjust counts and sizes line by line — the difference column tracks each against today. Toggle gaps to see what's missing."
+              : "Walk the dashboard, then open the detailed responses and the recommended program. Open the canvas to go deeper."}
           </p>
           <button onClick={openCanvas} className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]">
             Open in Advanced Canvas <ArrowRight className="h-4 w-4" />
@@ -147,6 +158,392 @@ export default function ReviewPage() {
       </main>
     </div>
   )
+}
+
+/* ── Dashboard tab ──────────────────────────────────────────────────────────── */
+
+function DashboardTab({
+  comp, result, profile, strategy, existingTotal, proposedTotal, catTotals,
+}: {
+  comp: Comparison; result: SurveyResult; profile: ReturnType<typeof computeProfile>
+  strategy: ReturnType<typeof spaceStrategy>; existingTotal: number; proposedTotal: number
+  catTotals: { cat: CompCategory; existing: number; proposed: number }[]
+}) {
+  const motivators = result.goals?.motivators ?? []
+  const growthPct = result.people.companyGrowthPct
+  return (
+    <div className="space-y-8">
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-wide text-[#00badc]">{comp.clientName}</p>
+        <h1 className="mt-2 max-w-4xl text-4xl font-bold tracking-tight">Here&apos;s what you told us — at a glance.</h1>
+        <p className="mt-2 text-lg text-white/60">
+          Planning for <Strong>{comp.future}</Strong> people (from {comp.current} today){growthPct ? <> · {growthPct}% growth</> : null}.
+        </p>
+      </div>
+
+      {/* Goals */}
+      {(motivators.length > 0 || result.goals?.posture) && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <div className="mb-3 text-xs font-medium uppercase tracking-wide text-white/45">What&apos;s driving this</div>
+          <div className="flex flex-wrap items-center gap-2">
+            {motivators.map((m) => (
+              <span key={m} className="rounded-full border border-[#00badc]/40 bg-[#00badc]/[0.08] px-3 py-1 text-sm font-medium text-white">
+                {labelOf(GOAL_MOTIVATORS, m)}
+              </span>
+            ))}
+            {result.goals?.posture && (
+              <span className="ml-1 rounded-full border border-amber-300/40 bg-amber-300/[0.08] px-3 py-1 text-sm font-medium text-amber-200">
+                Posture: {labelOf(SPACE_POSTURES, result.goals.posture)}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* KPI tiles */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <StatTile label="Today" value={comp.current} suffix="ppl" />
+        <StatTile label="Planning for" value={comp.future} suffix="ppl" accent />
+        <StatTile label="In-office" value={comp.daysInOffice} suffix="days/wk" />
+        <StatTile label="Fully remote" value={comp.fullyRemote} suffix="ppl" />
+        <StatTile label="Existing" value={Math.round(existingTotal).toLocaleString()} suffix="SF" />
+        <StatTile label="Proposed" value={Math.round(proposedTotal).toLocaleString()} suffix="SF" accent />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        {/* Existing vs proposed by category */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-white">Existing vs. proposed, by type</h3>
+            <div className="flex items-center gap-3 text-[11px] text-white/45">
+              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/30" /> Existing</span>
+              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#00badc]" /> Proposed</span>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {catTotals.map(({ cat, existing, proposed }) => {
+              const max = Math.max(1, ...catTotals.flatMap((c) => [c.existing, c.proposed]))
+              const Icon = CAT_ICON[cat]
+              return (
+                <div key={cat}>
+                  <div className="mb-1.5 flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-white/70"><Icon className="h-4 w-4 text-white/45" /> {cat}</span>
+                    <span className="tabular-nums text-white/50">{Math.round(proposed).toLocaleString()} SF</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="h-2.5 rounded-full bg-white/[0.06]"><div className="h-2.5 rounded-full bg-white/30" style={{ width: `${(existing / max) * 100}%` }} /></div>
+                    <div className="h-2.5 rounded-full bg-white/[0.06]"><div className="h-2.5 rounded-full bg-[#00badc]" style={{ width: `${(proposed / max) * 100}%` }} /></div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <StrategyBanner strategy={strategy} className="mt-6" />
+        </div>
+
+        {/* Profile radar */}
+        <WorkplaceProfile scores={profile} />
+      </div>
+    </div>
+  )
+}
+
+/* ── Detailed responses tab ─────────────────────────────────────────────────── */
+
+function ResponsesTab({ result }: { result: SurveyResult }) {
+  const ex = result.existing ?? {}
+  const placement = result.spaces.officePlacement
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold tracking-tight">Everything you told us</h1>
+
+      <Section title="People & growth">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-white/40">
+                <th className="pb-2 pr-4 font-medium">Department</th>
+                <th className="pb-2 pr-4 font-medium">Today</th>
+                <th className="pb-2 pr-4 font-medium">3–5 yr</th>
+                <th className="pb-2 font-medium">Named roster</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.06]">
+              {result.people.departments.map((d) => {
+                const roster = [...(d.employees ?? [])].sort((a, b) => Number(!!b.isLeader) - Number(!!a.isLeader))
+                return (
+                  <tr key={d.id} className="align-top">
+                    <td className="py-2.5 pr-4 font-medium text-white">{d.name}</td>
+                    <td className="py-2.5 pr-4 tabular-nums text-white/70">{d.headcount}</td>
+                    <td className="py-2.5 pr-4 tabular-nums text-white/70">{d.futureHeadcount ?? d.headcount}</td>
+                    <td className="py-2.5">
+                      {roster.length === 0 ? <span className="text-white/30">—</span> : (
+                        <div className="flex flex-wrap gap-1">
+                          {roster.map((p) => (
+                            <span key={p.id} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${p.isLeader ? "border-amber-300/50 bg-amber-300/[0.08] text-amber-200 font-medium" : "border-white/12 bg-white/[0.03] text-white/60"}`}>
+                              {p.isLeader && <Crown className="h-2.5 w-2.5" />}{p.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      {(result.goals?.motivators?.length || result.goals?.posture) && (
+        <Section title="Goals & motivators">
+          <div className="flex flex-wrap gap-2">
+            {(result.goals?.motivators ?? []).map((m) => <Chip key={m}>{labelOf(GOAL_MOTIVATORS, m)}</Chip>)}
+            {result.goals?.posture && <Chip amber>Posture: {labelOf(SPACE_POSTURES, result.goals.posture)}</Chip>}
+          </div>
+        </Section>
+      )}
+
+      <Section title="How teams work">
+        <Facts rows={[
+          ["Typical in-office week", `${result.work.daysInOffice} days`],
+          ["Fully remote", `${result.work.fullyRemote} people`],
+          ...(result.work.daysUnsureDepts?.length ? [["Cadence to confirm live", result.work.daysUnsureDepts.join(", ")] as [string, string]] : []),
+          ...(result.work.dedicatedByDept ? [["Dedicated desks", byDeptText(result, result.work.dedicatedByDept)] as [string, string]] : []),
+        ]} />
+      </Section>
+
+      <Section title="Private offices">
+        <Facts rows={[
+          ["Offices by team", byDeptText(result, result.spaces.privateOfficesByDept)],
+          ...(placement ? [["Placement", PLACEMENT_BLURB[placement] ?? labelOf(OFFICE_PLACEMENT_OPTIONS, placement)] as [string, string]] : []),
+          ["Leaders named", leaderNames(result) || "—"],
+        ]} />
+      </Section>
+
+      {result.work.adjacencyNotes && (
+        <Section title="Adjacencies"><p className="text-sm text-white/70">{result.work.adjacencyNotes}</p></Section>
+      )}
+
+      <Section title="Collaboration spaces">
+        {result.spaces.collaboration.length === 0 ? <Empty /> : (
+          <ul className="space-y-2">
+            {result.spaces.collaboration.map((c) => {
+              const cfg = result.spaces.collabConfig?.[c.type]
+              const bits = [cfg?.build && `setup: ${cfg.build}`, cfg?.monitor && `monitor: ${cfg.monitor}`, cfg?.notes].filter(Boolean)
+              return (
+                <li key={c.type} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-sm">
+                  <span className="font-medium text-white">{c.type}</span>
+                  {bits.length > 0 && <span className="text-xs text-white/45">{bits.join(" · ")}</span>}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Section>
+
+      <Section title="Support spaces">
+        {result.spaces.support.length === 0 ? <Empty /> : (
+          <div className="flex flex-wrap gap-2">{result.spaces.support.map((s) => <Chip key={s}>{s}</Chip>)}</div>
+        )}
+      </Section>
+
+      <Section title="Existing conditions">
+        <Facts rows={[
+          ...(ex.furniture ? [["Furniture posture", ex.furniture] as [string, string]] : []),
+          ["Existing workstations", ex.existingWorkstations !== undefined ? `${ex.existingWorkstations}${ex.workstationSF ? ` · ${ex.workstationSF} SF each` : " · size unknown"}` : "not captured"],
+          ["Existing offices", ex.existingOffices !== undefined ? `${ex.existingOffices}${ex.officeSF ? ` · ${ex.officeSF} SF each` : " · size unknown"}` : "not captured"],
+          ...(ex.existingCollab && Object.keys(ex.existingCollab).length ? [["Existing collaboration", Object.entries(ex.existingCollab).map(([n, c]) => `${c}× ${n}`).join(", ")] as [string, string]] : []),
+          ...(ex.existingSupport && Object.keys(ex.existingSupport).length ? [["Existing support", Object.entries(ex.existingSupport).map(([n, c]) => `${c}× ${n}`).join(", ")] as [string, string]] : []),
+        ]} />
+      </Section>
+
+      {(result.qualitative.loves || result.qualitative.painPoints || result.qualitative.imbalances) && (
+        <Section title="What's working / what isn't">
+          <Facts rows={[
+            ...(result.qualitative.loves ? [["Working", result.qualitative.loves] as [string, string]] : []),
+            ...(result.qualitative.painPoints ? [["Pain points", result.qualitative.painPoints] as [string, string]] : []),
+            ...(result.qualitative.imbalances ? [["Over/under-used", result.qualitative.imbalances] as [string, string]] : []),
+          ]} />
+        </Section>
+      )}
+
+      {result.deferred.length > 0 && (
+        <Section title="Deferred to the live session">
+          <div className="flex flex-wrap gap-2">{result.deferred.map((d) => <Chip key={d}>{d}</Chip>)}</div>
+        </Section>
+      )}
+    </div>
+  )
+}
+
+/* ── Validation / recommended program tab ───────────────────────────────────── */
+
+function ValidationTab({
+  comp, inputs, setInput, lines, existingTotal, proposedTotal, strategy,
+  counts, sizes, setCounts, setSizes, propCount, unitSF, showGaps, setShowGaps, gapCount,
+}: any) {
+  return (
+    <div>
+      <h1 className="max-w-4xl text-3xl font-bold tracking-tight">What you have today, next to what we&apos;d suggest.</h1>
+
+      <div className="mt-5 rounded-2xl border border-[#00badc]/25 bg-[#00badc]/[0.05] p-6">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-3 text-lg leading-relaxed text-white/80">
+          You&apos;re planning for
+          <InlineNum value={inputs.future} min={1} max={5000} step={5} onChange={(n: number) => setInput({ future: n })} />
+          people (from <Strong>{inputs.current}</Strong> today). With a
+          <InlineNum value={inputs.daysInOffice} min={1} max={5} suffix="-day" onChange={(n: number) => setInput({ daysInOffice: n })} />
+          in-office week and
+          <InlineNum value={inputs.fullyRemote} min={0} max={inputs.future} onChange={(n: number) => setInput({ fullyRemote: n })} />
+          fully remote, industry ratios suggest the program below. Slide any of these and watch it update.
+        </p>
+      </div>
+
+      <StrategyBanner strategy={strategy} className="mt-5" />
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <TotalCard label="Existing today" value={existingTotal} tone="muted" />
+        <TotalCard label="Proposed program" value={proposedTotal} tone="cyan" />
+        <DeltaCard existing={existingTotal} proposed={proposedTotal} />
+      </div>
+
+      <div className="mt-8 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-white/50">Every space — existing vs. proposed</h3>
+        <button type="button" onClick={() => setShowGaps((v: boolean) => !v)}
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            showGaps ? "border-amber-300/50 bg-amber-300/[0.1] text-amber-200" : "border-white/12 bg-white/[0.03] text-white/55 hover:text-white"
+          }`}>
+          <AlertTriangle className="h-3.5 w-3.5" />
+          {showGaps ? "Gaps shown" : "Show gaps"}{gapCount > 0 ? ` · ${gapCount}` : ""}
+        </button>
+      </div>
+
+      <div className="mt-3 space-y-2.5">
+        <div className="mb-2 grid grid-cols-[1fr_96px_300px_104px] items-center gap-5 px-5 text-xs font-medium uppercase tracking-wide text-white/35">
+          <span>Space</span>
+          <span className="text-center">Existing</span>
+          <span className="text-center">Proposed (count × size)</span>
+          <span className="text-right">Difference</span>
+        </div>
+        {lines.map((l: any) => {
+          const Icon = CAT_ICON[l.category as CompCategory]
+          const cnt = propCount(l.key, l.proposedCount)
+          const sf = unitSF(l.key, l.unitSF)
+          const dCount = cnt - l.existingCount
+          const dSF = cnt * sf - l.existingCount * l.unitSF
+          const gaps = showGaps ? lineGaps(l) : []
+          return (
+            <div key={l.key} className="rounded-xl border border-white/10 bg-white/[0.03]">
+              <div className="grid grid-cols-[1fr_96px_300px_104px] items-center gap-5 px-5 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-white/55"><Icon className="h-5 w-5" /></span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 truncate text-[15px] font-semibold text-white">
+                      {l.label}
+                      {gaps.length > 0 && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-300" />}
+                    </div>
+                    <div className="truncate text-xs text-white/40">
+                      {l.category}{l.ratio ? <span className="text-[#00badc]/70"> · {l.ratio}</span> : ""}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-semibold text-white/70 tabular-nums">{l.existingCount}</div>
+                  <div className="text-[11px] text-white/35 tabular-nums">{lineSF(l, l.existingCount).toLocaleString()} SF</div>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <MiniStepper value={cnt} onChange={(n: number) => setCounts((p: any) => ({ ...p, [l.key]: Math.max(0, n) }))} />
+                  <span className="text-white/30">×</span>
+                  <MiniStepper value={sf} step={5} unit="SF" onChange={(n: number) => setSizes((p: any) => ({ ...p, [l.key]: Math.max(0, n) }))} />
+                  <span className="w-20 text-right text-[11px] font-medium tabular-nums text-[#00badc]/85">= {(cnt * sf).toLocaleString()} SF</span>
+                </div>
+                <div className="text-right"><DeltaPill dCount={dCount} dSF={dSF} /></div>
+              </div>
+              {gaps.length > 0 && (
+                <div className="border-t border-amber-300/15 bg-amber-300/[0.04] px-5 py-2">
+                  {gaps.map((g: any, i: number) => (
+                    <p key={i} className="flex items-center gap-2 text-xs text-amber-200/90">
+                      <AlertTriangle className="h-3 w-3 shrink-0" /> {g.message}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ── Shared bits ────────────────────────────────────────────────────────────── */
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+      <h3 className="mb-4 text-base font-semibold text-white">{title}</h3>
+      {children}
+    </section>
+  )
+}
+
+function Facts({ rows }: { rows: [string, string][] }) {
+  return (
+    <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+      {rows.map(([k, v], i) => (
+        <div key={i} className="flex flex-col">
+          <dt className="text-xs uppercase tracking-wide text-white/40">{k}</dt>
+          <dd className="mt-0.5 text-sm text-white/80">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+function Chip({ children, amber }: { children: React.ReactNode; amber?: boolean }) {
+  return (
+    <span className={`rounded-full border px-3 py-1 text-sm font-medium ${amber ? "border-amber-300/40 bg-amber-300/[0.08] text-amber-200" : "border-white/12 bg-white/[0.04] text-white/75"}`}>
+      {children}
+    </span>
+  )
+}
+
+function Empty() { return <p className="text-sm text-white/35">None selected.</p> }
+
+function StatTile({ label, value, suffix, accent }: { label: string; value: number | string; suffix?: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-4 ${accent ? "border-[#00badc]/30 bg-[#00badc]/[0.06]" : "border-white/10 bg-white/[0.03]"}`}>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-white/45">{label}</div>
+      <div className="mt-1 text-2xl font-bold tabular-nums text-white">{value}{suffix ? <span className="ml-1 text-xs font-medium text-white/45">{suffix}</span> : null}</div>
+    </div>
+  )
+}
+
+function StrategyBanner({ strategy, className = "" }: { strategy: ReturnType<typeof spaceStrategy>; className?: string }) {
+  const grow = strategy.direction === "grow"
+  const Icon = strategy.posture === "optimize" ? Moon : strategy.posture === "expand" ? Sun : grow ? TrendingUp : TrendingDown
+  return (
+    <div className={`rounded-xl border border-white/10 bg-white/[0.02] p-4 ${className}`}>
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#00badc]/15 text-[#00badc]"><Icon className="h-4 w-4" /></span>
+        <div>
+          <div className="text-sm font-semibold text-white">{strategy.headline}</div>
+          <p className="mt-0.5 text-sm text-white/55">{strategy.note}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function byDeptText(result: SurveyResult, m: Record<string, number>): string {
+  const name = (id: string) => result.people.departments.find((d) => d.id === id)?.name ?? id
+  const parts = Object.entries(m).filter(([, c]) => c > 0).map(([id, c]) => `${c} · ${name(id)}`)
+  return parts.length ? parts.join(", ") : "—"
+}
+
+function leaderNames(result: SurveyResult): string {
+  const names = result.people.departments.flatMap((d) => (d.employees ?? []).filter((e) => e.isLeader).map((e) => e.name))
+  return names.join(", ")
 }
 
 function Strong({ children }: { children: React.ReactNode }) {

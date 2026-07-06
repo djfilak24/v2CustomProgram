@@ -556,12 +556,27 @@ export function assignSeatHierarchy(s: SurveyState): void {
     const nOffice = Math.min(s.officesByDept[d.id] ?? 0, roster.length)
     const nDesk = Math.min(s.dedicatedByDept[d.id] ?? 0, Math.max(0, roster.length - nOffice))
     roster.forEach((e, i) => {
-      if (i < nOffice) { officeByEmployee[e.id] = true; e.isLeader = true }
+      if (i < nOffice) officeByEmployee[e.id] = true
       else if (i < nOffice + nDesk) deskByEmployee[e.id] = true
     })
   }
   s.officeByEmployee = officeByEmployee
   s.deskByEmployee = deskByEmployee
+}
+
+/**
+ * Reconcile each department's roster when the people-detail mode changes:
+ * - leaders → keep only the flagged leaders named (the rest revert to headcount).
+ * - full    → keep everyone named; headcount never drops below who's named.
+ * - simple  → keep the data (just hidden). Pure; safe on any state.
+ */
+export function rosterForMode(departments: SpineDept[], mode: PeopleMode): SpineDept[] {
+  return departments.map((d) => {
+    const roster = d.employees ?? []
+    if (mode === "leaders") return { ...d, employees: roster.filter((e) => e.isLeader) }
+    if (mode === "full") return { ...d, headcount: Math.max(d.headcount || 0, roster.length) }
+    return d
+  })
 }
 
 /**

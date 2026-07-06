@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import {
-  Plus, Trash2, TrendingUp, TrendingDown, Minus as MinusIcon, ChevronRight, X, UserPlus,
+  Plus, Trash2, TrendingUp, TrendingDown, Minus as MinusIcon, ChevronRight, X, UserPlus, Crown,
 } from "lucide-react"
 import { Stepper } from "./stepper"
 import { makeDept, makeEmployee, type SpineDept, type Employee, type PeopleMode } from "@/lib/survey/sections"
@@ -34,7 +34,7 @@ export function DeptSpine({
     setOpen((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const setRoster = (d: SpineDept, employees: Employee[]) =>
-    update(d.id, mode === "full" ? { employees, headcount: employees.length } : { employees })
+    update(d.id, mode === "full" ? { employees, headcount: Math.max(d.headcount || 0, employees.length) } : { employees })
 
   const totalCurrent = departments.reduce((a, d) => a + (d.headcount || 0), 0)
   const totalFuture = departments.reduce((a, d) => a + (d.futureHeadcount ?? (d.headcount || 0)), 0)
@@ -76,13 +76,7 @@ export function DeptSpine({
                   />
                 </div>
 
-                {mode === "full" ? (
-                  <span className="flex w-[120px] items-center justify-center gap-1 text-sm text-white/70" title="Headcount = roster size">
-                    <span className="font-semibold text-white">{roster.length}</span> named
-                  </span>
-                ) : (
-                  <Stepper value={d.headcount} onChange={(n) => update(d.id, { headcount: n })} />
-                )}
+                <Stepper value={d.headcount} onChange={(n) => update(d.id, { headcount: Math.max(n, mode === "full" ? roster.length : 0) })} />
 
                 <div className="flex items-center gap-1.5">
                   <Stepper value={future} onChange={(n) => update(d.id, { futureHeadcount: n })} />
@@ -103,47 +97,74 @@ export function DeptSpine({
                 </button>
               </div>
 
-              {named && isOpen && (
+              {named && isOpen && (() => {
+                const leaderCount = roster.filter((e) => e.isLeader).length
+                return (
                 <div className="border-t border-white/[0.07] px-3 py-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-xs font-medium uppercase tracking-wide text-white/40">
                       {mode === "leaders" ? "Leaders" : "Team roster"}
                     </span>
-                    {mode === "leaders" && roster.length > 0 && (
-                      <span className="text-[11px] text-white/40">
-                        {roster.length} named · {Math.max(0, (d.headcount || 0) - roster.length)} more by headcount
-                      </span>
-                    )}
+                    <span className="text-[11px] text-white/40">
+                      {mode === "leaders"
+                        ? `${roster.length} leader${roster.length === 1 ? "" : "s"} · ${Math.max(0, (d.headcount || 0) - roster.length)} more by headcount`
+                        : `${roster.length} of ${d.headcount || 0} named · ${leaderCount} leader${leaderCount === 1 ? "" : "s"}`}
+                    </span>
                   </div>
+                  {mode === "full" && (
+                    <p className="mb-2.5 text-[11px] text-white/35">
+                      Tap the <Crown className="mx-0.5 inline h-3 w-3 -translate-y-px text-amber-300/70" /> to mark someone a leader — leaders are first in line for private offices.
+                    </p>
+                  )}
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {roster.map((emp, i) => (
-                      <div key={emp.id} className="flex items-center gap-1.5">
-                        <input
-                          value={emp.name}
-                          onChange={(e) => setRoster(d, roster.map((x) => (x.id === emp.id ? { ...x, name: e.target.value } : x)))}
-                          placeholder={`${mode === "leaders" ? "Leader" : "Person"} ${i + 1}`}
-                          className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setRoster(d, roster.filter((x) => x.id !== emp.id))}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/30 hover:bg-white/10 hover:text-white/70"
-                          aria-label="Remove person"
+                    {roster.map((emp, i) => {
+                      const leader = !!emp.isLeader
+                      const toggleLeader = () => setRoster(d, roster.map((x) => (x.id === emp.id ? { ...x, isLeader: !x.isLeader } : x)))
+                      return (
+                        <div
+                          key={emp.id}
+                          className={`flex items-center gap-1.5 rounded-lg ${leader ? "bg-amber-400/[0.06] ring-1 ring-inset ring-amber-400/25" : ""} p-0.5`}
                         >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                          {/* Leader marker: toggle in full mode; static in leaders mode. */}
+                          <button
+                            type="button"
+                            onClick={mode === "full" ? toggleLeader : undefined}
+                            aria-label={leader ? "Leader" : "Mark as leader"}
+                            title={mode === "leaders" ? "Leader" : leader ? "Leader — click to unset" : "Mark as leader"}
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
+                              leader ? "text-amber-300" : "text-white/25"
+                            } ${mode === "full" ? "hover:bg-white/10 hover:text-amber-200" : "cursor-default"}`}
+                          >
+                            <Crown className="h-4 w-4" />
+                          </button>
+                          <input
+                            value={emp.name}
+                            onChange={(e) => setRoster(d, roster.map((x) => (x.id === emp.id ? { ...x, name: e.target.value } : x)))}
+                            placeholder={`${mode === "leaders" ? "Leader" : "Person"} ${i + 1}`}
+                            className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setRoster(d, roster.filter((x) => x.id !== emp.id))}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/30 hover:bg-white/10 hover:text-white/70"
+                            aria-label="Remove person"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )
+                    })}
                   </div>
                   <button
                     type="button"
-                    onClick={() => setRoster(d, [...roster, makeEmployee()])}
+                    onClick={() => setRoster(d, [...roster, makeEmployee("", mode === "leaders")])}
                     className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-[#00badc] transition-colors hover:bg-[#00badc]/10"
                   >
                     <UserPlus className="h-4 w-4" /> Add {mode === "leaders" ? "leader" : "person"}
                   </button>
                 </div>
-              )}
+                )
+              })()}
             </div>
           )
         })}

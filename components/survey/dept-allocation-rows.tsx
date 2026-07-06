@@ -171,7 +171,7 @@ export function DeptAllocationRows({
             {/* Nested per-person assignment */}
             {perPerson && isOpen && (
               <div className="mt-3 grid gap-1.5 border-t border-white/[0.07] pt-3 sm:grid-cols-2">
-                {roster.map((emp) => {
+                {[...roster].sort((a, b) => Number(!!b.isLeader) - Number(!!a.isLeader)).map((emp) => {
                   const on = !!employeeSelections![emp.id]
                   const locked = !on && !!excludedEmployees?.[emp.id]
                   const leader = !!emp.isLeader

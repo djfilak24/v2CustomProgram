@@ -8,7 +8,7 @@ import {
 import {
   SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, deptAllocated,
   WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES, OFFICE_PLACEMENT_OPTIONS,
-  GROWTH_PRESETS, PEOPLE_MODES, GOAL_MOTIVATORS, SPACE_POSTURES,
+  GROWTH_PRESETS, PEOPLE_MODES, GOAL_MOTIVATORS, SPACE_POSTURES, rosterForMode,
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
 } from "@/lib/survey/sections"
 import { DEMO_SCENARIOS, demoState } from "@/lib/survey/demo-scenarios"
@@ -242,7 +242,10 @@ function StepBody({
             <CardGrid
               options={PEOPLE_MODES}
               selected={[state.peopleMode]}
-              onToggle={(id) => patch({ peopleMode: id as PeopleMode })}
+              onToggle={(id) => {
+                const nextMode = id as PeopleMode
+                patch({ peopleMode: nextMode, departments: rosterForMode(state.departments, nextMode) })
+              }}
               cols={3}
             />
             <p className="mt-2 text-xs text-white/40">

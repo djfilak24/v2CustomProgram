@@ -30,16 +30,20 @@ export function demoState(key: string): SurveyState | null {
   if (sc.peopleMode !== "simple") {
     let n = 0
     s.departments = s.departments.map((d) => {
-      const count = sc.peopleMode === "full" ? d.headcount : Math.min(d.headcount, leadersFor(d.headcount))
-      // In "leaders" mode the named people ARE the leaders, so flag them as such.
-      const employees = Array.from({ length: count }, () =>
-        makeEmployee(genName(n++), sc.peopleMode === "leaders"),
-      )
-      return sc.peopleMode === "full" ? { ...d, employees, headcount: employees.length } : { ...d, employees }
+      const isFull = sc.peopleMode === "full"
+      const count = isFull ? d.headcount : Math.min(d.headcount, leadersFor(d.headcount))
+      const employees = Array.from({ length: count }, () => makeEmployee(genName(n++)))
+      // Leaders are an explicit subset, listed first. In "leaders" mode everyone
+      // named is a leader; in "full" mode a handful lead the team (at least as
+      // many as get offices, so offices ⊆ leaders).
+      const nLead = sc.peopleMode === "leaders"
+        ? employees.length
+        : Math.min(employees.length, Math.max(leadersFor(d.headcount), s.officesByDept[d.id] ?? 0))
+      employees.forEach((e, i) => { if (i < nLead) e.isLeader = true })
+      return isFull ? { ...d, employees, headcount: employees.length } : { ...d, employees }
     })
-    // Build hierarchy into the roster: leaders (first names) take the private
-    // offices, the next names take dedicated desks — mutually exclusive. In full
-    // mode this also flags the office-holders as leaders.
+    // Offices go to the leaders first (they lead the roster), dedicated desks to
+    // the next names — mutually exclusive.
     assignSeatHierarchy(s)
   }
   return s

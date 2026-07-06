@@ -22,6 +22,8 @@ export interface SurveyDepartment {
    * shrink — this is the realistic, fit-planning-relevant case.
    */
   futureHeadcount?: number
+  /** Named roster (leaders or full team) — survives into the canvas Dept Manager. */
+  employees?: { id: string; name: string }[]
 }
 
 export interface SurveyResult {
@@ -73,7 +75,9 @@ export interface SurveyResult {
     privateOfficesByDept: Record<string, number>
     /** Collaboration spaces: per-type counts, optionally split by department. */
     collaboration: SurveyCollaborationItem[]
-    /** Support spaces the client flagged as must-have (preset names). */
+    /** Per-type room configuration (setup, monitor, custom notes). */
+    collabConfig?: Record<string, { build?: string; monitor?: string; notes?: string }>
+    /** Support spaces the client flagged as must-have (preset names + custom). */
     support: string[]
   }
 

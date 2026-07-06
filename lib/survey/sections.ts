@@ -493,6 +493,7 @@ export function surveyStateFromResult(r: import("./types").SurveyResult): Survey
   s.departments = r.people.departments.map((d) => ({
     id: d.id, name: d.name, headcount: d.headcount,
     ...(d.futureHeadcount !== undefined ? { futureHeadcount: d.futureHeadcount } : {}),
+    ...(d.employees ? { employees: d.employees } : {}),
   }))
   const pct = r.people.companyGrowthPct ?? 0
   s.growthChoice = pct >= 25 ? "rapid" : pct >= 10 ? "growing" : pct > 0 ? "stable" : null
@@ -505,6 +506,7 @@ export function surveyStateFromResult(r: import("./types").SurveyResult): Survey
   s.dedicatedByDept = { ...(r.work.dedicatedByDept ?? {}) }
 
   s.officesByDept = { ...(r.spaces.privateOfficesByDept ?? {}) }
+  s.collabConfig = { ...(r.spaces.collabConfig ?? {}) }
   s.collabTypes = r.spaces.collaboration.map((c) => c.type)
   for (const c of r.spaces.collaboration) if (Object.keys(c.byDept).length) s.collabByDept[c.type] = { ...c.byDept }
   s.support = [...r.spaces.support]
@@ -626,6 +628,7 @@ export function buildSurveyResult(
         name: d.name.trim(),
         headcount: Math.max(0, Math.round(d.headcount || 0)),
         ...(d.futureHeadcount !== undefined ? { futureHeadcount: Math.max(0, Math.round(d.futureHeadcount)) } : {}),
+        ...(d.employees && d.employees.length ? { employees: d.employees.filter((e) => e.name.trim()).map((e) => ({ id: e.id, name: e.name.trim() })) } : {}),
       }))
     : []
 
@@ -700,6 +703,7 @@ export function buildSurveyResult(
     spaces: {
       privateOfficesByDept: lanes.offices === "detailed" ? officesByDept : {},
       collaboration,
+      ...(Object.keys(s.collabConfig).length ? { collabConfig: s.collabConfig } : {}),
       support: s.support,
     },
     qualitative: {

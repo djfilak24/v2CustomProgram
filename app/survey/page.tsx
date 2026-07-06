@@ -6,12 +6,12 @@ import {
   ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info, Wand2,
 } from "lucide-react"
 import {
-  SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, surveyStateFromResult, deptAllocated,
+  SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, deptAllocated,
   WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES,
   GROWTH_PRESETS, PEOPLE_MODES,
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
 } from "@/lib/survey/sections"
-import { DEMO_SCENARIOS } from "@/lib/survey/demo-scenarios"
+import { DEMO_SCENARIOS, demoState } from "@/lib/survey/demo-scenarios"
 import { ProgressHeader } from "@/components/survey/progress-header"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { LaneToggle } from "@/components/survey/lane-toggle"
@@ -71,9 +71,9 @@ export default function SurveyPage() {
   // Presenter demo: pre-populate every answer from a scenario and open the survey
   // fully expanded, so you click through a filled-in survey and adjust live.
   const startDemo = (key: string) => {
-    const scenario = DEMO_SCENARIOS[key]
-    if (!scenario) return
-    setState(surveyStateFromResult(scenario.result))
+    const st = demoState(key)
+    if (!st) return
+    setState(st)
     setLanes(allLanes("detailed"))
     setDeferred(new Set())
     setStepIndex(0)

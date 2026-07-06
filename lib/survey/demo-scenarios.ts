@@ -5,11 +5,37 @@
  * the demo button. Add a scenario = add a fixture here; no code changes.
  */
 import type { SurveyResult } from "./types"
+import { surveyStateFromResult, makeEmployee, type SurveyState, type PeopleMode } from "./sections"
 
 export interface DemoScenario {
   label: string
   blurb: string
+  /** People-detail mode the demo showcases (fills a named roster to match). */
+  peopleMode: PeopleMode
   result: SurveyResult
+}
+
+// Deterministic name pool so full/leader rosters look real in the demo.
+const FIRST = ["Alex", "Sam", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Jamie", "Avery", "Quinn", "Drew", "Skyler", "Reese", "Cameron", "Devin", "Harper", "Rowan", "Emerson", "Parker", "Sage", "Blake", "Hayden", "Kendall", "Logan", "Marley"]
+const LAST = ["Rivera", "Chen", "Patel", "Nguyen", "Kim", "Garcia", "Okafor", "Silva", "Brooks", "Hayes", "Ford", "Nash", "Reyes", "Cole", "Bennett", "Wu", "Diaz", "Flynn", "Grant", "Shah", "Park", "Lowe", "Reid", "Vance", "Ellis"]
+const genName = (i: number) => `${FIRST[i % FIRST.length]} ${LAST[(i * 7) % LAST.length]}`
+const leadersFor = (hc: number) => (hc <= 6 ? 1 : hc <= 20 ? 2 : 3)
+
+/** Full SurveyState for a demo — answers pre-filled, plus a named roster. */
+export function demoState(key: string): SurveyState | null {
+  const sc = DEMO_SCENARIOS[key]
+  if (!sc) return null
+  const s = surveyStateFromResult(sc.result)
+  s.peopleMode = sc.peopleMode
+  if (sc.peopleMode !== "simple") {
+    let n = 0
+    s.departments = s.departments.map((d) => {
+      const count = sc.peopleMode === "full" ? d.headcount : Math.min(d.headcount, leadersFor(d.headcount))
+      const employees = Array.from({ length: count }, () => makeEmployee(genName(n++)))
+      return sc.peopleMode === "full" ? { ...d, employees, headcount: employees.length } : { ...d, employees }
+    })
+  }
+  return s
 }
 
 const now = "2026-06-25T00:00:00Z"
@@ -121,7 +147,7 @@ const enterprise: SurveyResult = {
 }
 
 export const DEMO_SCENARIOS: Record<string, DemoScenario> = {
-  tech: { label: "Tech Startup · 120", blurb: "High collaboration, hybrid, fast growth", result: tech },
-  law: { label: "Law Firm · 60", blurb: "Office-dense, privacy, stable", result: law },
-  enterprise: { label: "Enterprise · 400", blurb: "Mixed hybrid, large floorplate", result: enterprise },
+  tech: { label: "Tech Startup · 120", blurb: "High collaboration, hybrid, fast growth", peopleMode: "full", result: tech },
+  law: { label: "Law Firm · 60", blurb: "Office-dense, privacy, stable", peopleMode: "leaders", result: law },
+  enterprise: { label: "Enterprise · 400", blurb: "Mixed hybrid, large floorplate", peopleMode: "full", result: enterprise },
 }

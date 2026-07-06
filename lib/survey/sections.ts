@@ -404,7 +404,7 @@ export interface SurveyState {
   /** type id -> dept id -> count (detailed lane). */
   collabByDept: Record<string, Record<string, number>>
   /** Per-type configuration (how the room is set up), detailed lane. */
-  collabConfig: Record<string, { build?: string; monitor?: string }>
+  collabConfig: Record<string, { build?: string; monitor?: string; notes?: string }>
   /** Collaboration spaces that exist today (type id -> current count). */
   existingCollab: Record<string, number>
   // Section 3c — support

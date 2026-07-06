@@ -22,9 +22,9 @@ export function CollabTree({
 }: {
   lane: Lane
   selected: string[]
-  config: Record<string, { build?: string; monitor?: string }>
+  config: Record<string, { build?: string; monitor?: string; notes?: string }>
   onToggleType: (typeId: string) => void
-  onChangeConfig: (typeId: string, patch: { build?: string; monitor?: string }) => void
+  onChangeConfig: (typeId: string, patch: { build?: string; monitor?: string; notes?: string }) => void
   existing: Record<string, number>
   onChangeExisting: (typeId: string, n: number) => void
 }) {
@@ -60,6 +60,15 @@ export function CollabTree({
                   value={cfg.monitor}
                   onChange={(monitor) => onChangeConfig(t.id, { monitor })}
                 />
+                <div className="flex items-start gap-2">
+                  <span className="w-16 shrink-0 pt-1.5 text-xs font-medium uppercase tracking-wide text-white/40">Custom</span>
+                  <input
+                    value={cfg.notes ?? ""}
+                    onChange={(e) => onChangeConfig(t.id, { notes: e.target.value })}
+                    placeholder="Anything specific — AV, layout, furniture, criteria…"
+                    className="w-full rounded-lg border border-white/12 bg-white/[0.03] px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+                  />
+                </div>
               </div>
             )}
           </SpaceListRow>

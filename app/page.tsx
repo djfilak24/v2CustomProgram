@@ -46,7 +46,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { BriefingView } from "@/components/briefing-view"
   import { OnboardingModal, type GeneratedSpaceConfig, type OnboardingInputs } from "@/components/onboarding-modal"
   import { FastTrackExplorer } from "@/components/fast-track-explorer"
-  import { seedToolFromSurvey } from "@/lib/survey/seedToolFromSurvey"
+  import { mapSurveyToCanvas, type ExistingSeed } from "@/lib/survey/mapSurveyToCanvas"
   import { loadSurveySeed, clearSurveySeed } from "@/lib/survey/seedStorage"
   import type { SurveyResult } from "@/lib/survey/types"
   import { convertProgramToSpaces } from "@/lib/convert-program-to-spaces"
@@ -964,6 +964,10 @@ const WorkplaceProgrammingTool = () => {
   const [viewMode, setViewMode] = useState<"dashboard" | "hybrid" | "fullOccupancy" | "comparison" | "seatDemand">("dashboard")
   // Initialize with null - set when onboarding completes
   const [programMetrics, setProgramMetrics] = useState<any>(null)
+  // Existing-conditions baseline + handoff narrative carried in from the survey
+  // (independent of the proposed program; feeds existing-vs-proposed + handoff).
+  const [existingConditions, setExistingConditions] = useState<ExistingSeed | null>(null)
+  const [handoffNotes, setHandoffNotes] = useState<string>("")
   // Track if user chose hybrid mode - shows Fast Track Explorer instead of canvas
   const [showFastTrackExplorer, setShowFastTrackExplorer] = useState(false)
   // Warning dialog for switching back to Fast Track from Advanced Canvas
@@ -997,6 +1001,9 @@ const WorkplaceProgrammingTool = () => {
     // Growth planning: optional future-state headcount per department.
     // When planForGrowth is enabled, this drives computed future KPIs.
     futureHeadcount?: number
+    // Named roster (leaders or full team) captured in the survey — preserved so
+    // the Department Manager can show/edit real people, not just counts.
+    employees?: { id: string; name: string }[]
   }
 
   interface Space {
@@ -1071,6 +1078,8 @@ const WorkplaceProgrammingTool = () => {
     onDelete: () => void
   }) => {
     const [tempName, setTempName] = useState(department.name)
+    const [showRoster, setShowRoster] = useState(false)
+    const roster = department.employees ?? []
 
     if (isEditing) {
       return (
@@ -1098,19 +1107,47 @@ const WorkplaceProgrammingTool = () => {
     }
 
     return (
-      <div className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded group">
-        <div className={`w-2.5 h-2.5 rounded-full ${department.color} shrink-0`}></div>
-        <button onClick={onEdit} className="flex-1 text-sm text-gray-700 text-left hover:text-gray-900 truncate" title="Click to rename">
-          {department.name}
-        </button>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onDuplicate} className="p-1 text-gray-400 hover:text-gray-600 rounded" title="Duplicate">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2"/><path strokeWidth="2" d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <div className="hover:bg-gray-50 rounded group">
+        <div className="flex items-center gap-2 px-2 py-1.5">
+          <div className={`w-2.5 h-2.5 rounded-full ${department.color} shrink-0`}></div>
+          <button onClick={onEdit} className="flex-1 text-sm text-gray-700 text-left hover:text-gray-900 truncate" title="Click to rename">
+            {department.name}
           </button>
-          <button onClick={onDelete} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+          {department.headcount > 0 && (
+            <span className="text-[11px] font-medium text-gray-400 tabular-nums shrink-0" title="Headcount">
+              {department.headcount}
+            </span>
+          )}
+          {roster.length > 0 && (
+            <button
+              onClick={() => setShowRoster((v) => !v)}
+              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 transition-colors ${
+                showRoster ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
+              title={`${roster.length} named ${roster.length === 1 ? "person" : "people"}`}
+            >
+              <Users className="w-2.5 h-2.5" />
+              {roster.length}
+            </button>
+          )}
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={onDuplicate} className="p-1 text-gray-400 hover:text-gray-600 rounded" title="Duplicate">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2"/><path strokeWidth="2" d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <button onClick={onDelete} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
+        {showRoster && roster.length > 0 && (
+          <div className="ml-6 mr-2 mb-1.5 flex flex-wrap gap-1">
+            {roster.map((p) => (
+              <span key={p.id} className="rounded-full bg-white border border-gray-200 px-2 py-0.5 text-[11px] text-gray-600">
+                {p.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
@@ -1258,88 +1295,68 @@ const WorkplaceProgrammingTool = () => {
   // If the Workplace Strategy Discovery survey left a seed in localStorage, build
   // a starting program from it (reusing the same engine path as onboarding) and
   // land the user directly in the canvas. Zero-backend (SURVEY_SPEC Option A).
-  const DEPT_COLOR_CLASSES = [
-    "bg-cyan-500", "bg-blue-500", "bg-violet-500", "bg-pink-500", "bg-orange-500",
-    "bg-emerald-500", "bg-amber-500", "bg-red-500", "bg-teal-500", "bg-purple-500",
-  ]
   const applySurveySeed = (survey: SurveyResult) => {
-    const seeded = seedToolFromSurvey(survey)
-    const summaryInputs: SummaryInputs = {
-      clientName: seeded.inputs.clientName || "",
-      programmedBy: seeded.inputs.programmedBy || "",
-      totalHeadcount: seeded.inputs.totalHeadcount,
-      fullyRemote: seeded.inputs.fullyRemote,
-      percentOffices: seeded.inputs.percentOffices,
-      grossRent: 50,
-      daysInOffice: seeded.inputs.daysInOffice,
-      rentableFactor: 0.22,
-    }
-    try {
-      const blocks = computeAllSeatDemandBlocks(summaryInputs.totalHeadcount, summaryInputs.fullyRemote)
-      const program = computeSpaceProgram(summaryInputs, blocks, undefined, ratioConfig)
-      const result = convertProgramToSpaces(program, summaryInputs)
-      // Baseline workstation/office SF from the survey's existing-conditions sizes,
-      // so the starting program reflects the client's real footprints.
-      const wsSF = survey.existing?.workstationSF
-      const offSF = survey.existing?.officeSF
-      let seededSpaces = result.spaces as Record<string, EditableSpace>
-      if (wsSF || offSF) {
-        seededSpaces = Object.fromEntries(
-          Object.entries(seededSpaces).map(([k, sp]) => {
-            if (wsSF && (sp.workstationType === "employee" || sp.workstationType === "flex")) {
-              return [k, { ...sp, sfEach: wsSF, totalArea: (sp.quantity || 0) * wsSF }]
-            }
-            if (offSF && sp.workstationType === "private") {
-              return [k, { ...sp, sfEach: offSF, totalArea: (sp.quantity || 0) * offSF }]
-            }
-            return [k, sp]
-          }),
-        ) as Record<string, EditableSpace>
-      }
-      setEditableSpaces(seededSpaces)
-      setTargetHeadcount(summaryInputs.totalHeadcount)
-      setTargetOfficeCount(result.targets.officeCount)
-      setTargetWorkstations(result.targets.workstationCount)
-      setTargetHybridWorkers(result.targets.hybridWorkers)
-      setLoadFactor(1 + summaryInputs.rentableFactor)
-      setConfig((prev) => ({
-        ...prev,
-        percentOffices: summaryInputs.percentOffices,
-        daysInOffice: summaryInputs.daysInOffice,
-        fullyRemoteEmployees:
-          summaryInputs.totalHeadcount > 0
-            ? Math.round((summaryInputs.fullyRemote / summaryInputs.totalHeadcount) * 100)
-            : 0,
-      }))
-    } catch {
-      const hc = summaryInputs.totalHeadcount
-      const officeCount = Math.round(hc * (summaryInputs.percentOffices / 100))
-      setTargetHeadcount(hc)
-      setTargetOfficeCount(officeCount)
-      setTargetWorkstations(Math.max(0, hc - officeCount))
-    }
+    // Single source of truth: the comprehensive mapper ports EVERYTHING captured
+    // in the survey into the canvas schema — engine baseline + existing-condition
+    // sizes, dedicated-desk / office allocations, collaboration room config,
+    // custom support spaces, the named roster, an existing-conditions baseline,
+    // and handoff notes. Nothing the client answered is dropped on the floor.
+    const seed = mapSurveyToCanvas(survey)
 
-    if (seeded.departments.length > 0) {
+    setEditableSpaces(seed.spaces)
+
+    // Targets reconcile with the departments (sum of per-dept allocations) so the
+    // sidebar shows no phantom gap between "target" and what's actually allocated.
+    const officeTarget = seed.departments.reduce((s, d) => s + (d.officeCount || 0), 0)
+    const wsTarget = seed.departments.reduce((s, d) => s + (d.workstations || 0), 0)
+    const hybridTarget = seed.departments.reduce((s, d) => s + (d.hybridWorkers || 0), 0)
+    setTargetHeadcount(seed.inputs.totalHeadcount)
+    setTargetOfficeCount(officeTarget)
+    setTargetWorkstations(wsTarget)
+    setTargetHybridWorkers(hybridTarget)
+    setLoadFactor(1.22)
+    setConfig((prev) => ({
+      ...prev,
+      percentOffices: seed.inputs.percentOffices,
+      daysInOffice: seed.inputs.daysInOffice,
+      fullyRemoteEmployees:
+        seed.inputs.totalHeadcount > 0
+          ? Math.round((seed.inputs.fullyRemote / seed.inputs.totalHeadcount) * 100)
+          : 0,
+    }))
+
+    if (seed.departments.length > 0) {
       setDepartments(
-        seeded.departments.map((d, i) => ({
+        seed.departments.map((d) => ({
           id: d.id,
           name: d.name,
-          color: DEPT_COLOR_CLASSES[i % DEPT_COLOR_CLASSES.length],
+          color: d.color,
           headcount: d.headcount,
           officeCount: d.officeCount,
           hybridWorkers: d.hybridWorkers,
           workstations: d.workstations,
           futureHeadcount: d.futureHeadcount ?? d.headcount,
+          ...(d.employees?.length ? { employees: d.employees } : {}),
         })),
       )
     }
-    setPlanForGrowth(seeded.planForGrowth)
+
+    setPlanForGrowth(seed.planForGrowth)
+    setExistingConditions(seed.existing)
+    setHandoffNotes(seed.notes)
+    if (survey.meta.clientName) {
+      setProjectInfo((prev) => ({ ...prev, client: survey.meta.clientName }))
+    }
+
     setOnboardingInputs({
-      totalHeadcount: summaryInputs.totalHeadcount,
-      fullyRemote: summaryInputs.fullyRemote,
-      percentOffices: summaryInputs.percentOffices,
-      daysInOffice: summaryInputs.daysInOffice,
+      totalHeadcount: seed.inputs.totalHeadcount,
+      fullyRemote: seed.inputs.fullyRemote,
+      percentOffices: seed.inputs.percentOffices,
+      daysInOffice: seed.inputs.daysInOffice,
     } as OnboardingInputs)
+    // Mark a program as loaded so the canvas drops the "No program loaded yet"
+    // banner and the Fast-Track explorer / KPI paths treat this as a real program.
+    setProgramMetrics({ generated: true, source: "survey", planningHeadcount: seed.planningHeadcount })
     setShowFastTrackExplorer(false)
     setShowOnboarding(false)
   }
@@ -1397,6 +1414,8 @@ const WorkplaceProgrammingTool = () => {
   const [targetHybridWorkers, setTargetHybridWorkers] = useState(85)
   const [targetWorkstations, setTargetWorkstations] = useState(() => 170 - Math.round(170 * 0.2)) // headcount - offices
   const [deptBreakdownExpanded, setDeptBreakdownExpanded] = useState(false)
+  // Per-department roster expansion in the Department Manager (survey-captured names).
+  const [openRosters, setOpenRosters] = useState<Record<string, boolean>>({})
 
   const saveProject = () => {
     const projectData = {
@@ -3776,7 +3795,7 @@ const WorkplaceProgrammingTool = () => {
                 <>
                   <span className="w-px h-4 bg-slate-200 mx-1.5 shrink-0" />
                   <FeatureToggle active={visibility.allocations} onClick={() => toggleVisibility("allocations")} label="Allocations" title="Department allocation indicators" />
-                  <FeatureToggle active={visibility.departmentManagement} onClick={() => toggleVisibility("departmentManagement")} label="Departments" title="Per-department columns" />
+                  <FeatureToggle active={visibility.departmentManagement} onClick={() => toggleVisibility("departmentManagement")} label="Departments" title="Show the Department manager (roster + per-dept headcount)" />
                   <span className="w-px h-4 bg-slate-200 mx-1.5 shrink-0" />
                   <FeatureToggle active={visibility.growth} onClick={() => toggleVisibility("growth")} label="Growth" title="Growth planning" />
                 </>
@@ -5176,7 +5195,7 @@ const WorkplaceProgrammingTool = () => {
                         <div
                           {...provided.droppableProps}
                           ref={provided.innerRef}
-                          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+                          className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(230px,1fr))]"
                         >
                           {Object.entries(editableSpaces)
                             .filter(([_, space]) => space.zone === "Focus Open")
@@ -5251,7 +5270,7 @@ const WorkplaceProgrammingTool = () => {
                           <div
                             {...provided.droppableProps}
                             ref={provided.innerRef}
-                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"
+                            className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
                           >
                             {focusEnclosedSpaces.map(([spaceKey, space], index) => (
                               <Draggable
@@ -5330,7 +5349,7 @@ const WorkplaceProgrammingTool = () => {
                           <div
                             {...provided.droppableProps}
                             ref={provided.innerRef}
-                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+                            className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(230px,1fr))] mb-8"
                           >
                             {zoneSpaces.map(([spaceKey, space], index) => (
                               <Draggable key={spaceKey} draggableId={spaceKey} index={index}>
@@ -5539,6 +5558,7 @@ const WorkplaceProgrammingTool = () => {
               </Collapsible>
             </div>
 
+            {visibility.departmentManagement && (
             <div className="mx-4 mt-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Departments</h3>
@@ -5579,6 +5599,7 @@ const WorkplaceProgrammingTool = () => {
                 )}
               </Droppable>
             </div>
+            )}
           </div>
           </div>
 
@@ -5684,7 +5705,8 @@ const WorkplaceProgrammingTool = () => {
                         )
                       })()}
 
-                      {/* Department Management collapsible */}
+                      {/* Department Management collapsible — gated by the "Departments" toolbar toggle */}
+                      {visibility.departmentManagement && (
                       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
                         <button
                           onClick={() => setDeptBreakdownExpanded(!deptBreakdownExpanded)}
@@ -5701,17 +5723,44 @@ const WorkplaceProgrammingTool = () => {
                         </button>
                         {deptBreakdownExpanded && (
                           <div className="divide-y divide-slate-100">
-                            {departments.map((dept) => (
-                              <div key={dept.id} className="flex items-center gap-3 px-4 py-2.5">
-                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dept.color}`} />
-                                <span className="flex-1 text-sm text-slate-700 min-w-0 truncate">{dept.name}</span>
-                                <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums shrink-0">
-                                  <span title="Headcount">{dept.headcount ?? 0} HC</span>
-                                  <span className="text-slate-300">·</span>
-                                  <span title="Offices">{dept.officeCount ?? 0} Off</span>
+                            {departments.map((dept) => {
+                              const roster = dept.employees ?? []
+                              const rosterOpen = !!openRosters[dept.id]
+                              return (
+                              <div key={dept.id}>
+                                <div className="flex items-center gap-3 px-4 py-2.5">
+                                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dept.color}`} />
+                                  <span className="flex-1 text-sm text-slate-700 min-w-0 truncate">{dept.name}</span>
+                                  {roster.length > 0 && (
+                                    <button
+                                      onClick={() => setOpenRosters((p) => ({ ...p, [dept.id]: !p[dept.id] }))}
+                                      className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 transition-colors ${
+                                        rosterOpen ? "bg-teal-100 text-teal-700" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                      }`}
+                                      title={`${roster.length} named ${roster.length === 1 ? "person" : "people"}`}
+                                    >
+                                      <Users className="w-2.5 h-2.5" />
+                                      {roster.length}
+                                    </button>
+                                  )}
+                                  <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums shrink-0">
+                                    <span title="Headcount">{dept.headcount ?? 0} HC</span>
+                                    <span className="text-slate-300">·</span>
+                                    <span title="Offices">{dept.officeCount ?? 0} Off</span>
+                                  </div>
                                 </div>
+                                {rosterOpen && roster.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 px-4 pb-2.5 -mt-0.5">
+                                    {roster.map((p) => (
+                                      <span key={p.id} className="rounded-full bg-slate-50 border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600">
+                                        {p.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                            ))}
+                              )
+                            })}
                             <div className="px-4 py-2">
                               <button
                                 onClick={addDepartment}
@@ -5724,6 +5773,7 @@ const WorkplaceProgrammingTool = () => {
                           </div>
                         )}
                       </div>
+                      )}
 
                       {/* Days in Office slider (config) */}
                       <div className="space-y-2">

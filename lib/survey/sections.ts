@@ -423,11 +423,17 @@ export function emptyState(): SurveyState {
 /** Per-question lanes — each step independently Quick or Go-deeper. */
 export type LaneMap = Record<StepId, Lane>
 
+/**
+ * Lanes default to DETAILED — the client sees everything that's being asked, and
+ * can choose to Simplify (which never compromises the output, only the time
+ * spent). Steps without a deeper editor stay effectively simple.
+ */
+export function allLanes(lane: Lane): LaneMap {
+  return SURVEY_STEPS.reduce((acc, s) => { acc[s.id] = lane; return acc }, {} as LaneMap)
+}
+
 export function emptyLanes(): LaneMap {
-  return SURVEY_STEPS.reduce((acc, s) => {
-    acc[s.id] = "quick"
-    return acc
-  }, {} as LaneMap)
+  return allLanes("detailed")
 }
 
 /**
@@ -447,6 +453,50 @@ export function deptAllocated(
   // count (stepper), floored at the explicitly checked named people.
   if (roster.length >= hc) return checked
   return Math.max(values[d.id] ?? 0, checked)
+}
+
+/**
+ * Reverse of buildSurveyResult (approximately) — pre-populate a SurveyState from
+ * a demo SurveyResult so the presenter can click through a fully-filled survey.
+ */
+export function surveyStateFromResult(r: import("./types").SurveyResult): SurveyState {
+  const s = emptyState()
+  s.totalHeadcount = r.people.totalHeadcount
+  s.departments = r.people.departments.map((d) => ({
+    id: d.id, name: d.name, headcount: d.headcount,
+    ...(d.futureHeadcount !== undefined ? { futureHeadcount: d.futureHeadcount } : {}),
+  }))
+  const pct = r.people.companyGrowthPct ?? 0
+  s.growthChoice = pct >= 25 ? "rapid" : pct >= 10 ? "growing" : pct > 0 ? "stable" : null
+
+  const days = r.work.daysInOffice
+  s.workChoice = days >= 5 ? "office" : days <= 1 ? "remote" : "hybrid"
+  if (r.work.perDeptDaysRange) {
+    for (const [id, band] of Object.entries(r.work.perDeptDaysRange)) s.perDeptDays[id] = band
+  }
+  s.dedicatedByDept = { ...(r.work.dedicatedByDept ?? {}) }
+
+  s.officesByDept = { ...(r.spaces.privateOfficesByDept ?? {}) }
+  s.collabTypes = r.spaces.collaboration.map((c) => c.type)
+  for (const c of r.spaces.collaboration) if (Object.keys(c.byDept).length) s.collabByDept[c.type] = { ...c.byDept }
+  s.support = [...r.spaces.support]
+
+  const ex = r.existing ?? {}
+  s.existing = {
+    furniture: ex.furniture ?? null,
+    workstationSize: WORKSTATION_SIZES.find((o) => o.sf === ex.workstationSF)?.id ?? null,
+    officeSize: OFFICE_SIZES.find((o) => o.sf === ex.officeSF)?.id ?? null,
+    reuseConfTables: ex.reuseConfTables ?? null,
+    existingWorkstations: ex.existingWorkstations ?? null,
+    existingOffices: ex.existingOffices ?? null,
+  }
+  s.existingCollab = { ...(ex.existingCollab ?? {}) }
+  s.existingSupport = { ...(ex.existingSupport ?? {}) }
+
+  s.loves = r.qualitative.loves ?? ""
+  s.painPoints = r.qualitative.painPoints ?? ""
+  s.imbalances = r.qualitative.imbalances ?? ""
+  return s
 }
 
 /** Σ of department headcounts, or the quick-lane single number when no depts. */

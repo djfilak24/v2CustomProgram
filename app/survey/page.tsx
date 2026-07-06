@@ -1,16 +1,17 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import {
-  ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info,
+  ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info, Wand2,
 } from "lucide-react"
 import {
-  SURVEY_STEPS, computeProfile, emptyState, emptyLanes,
+  SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, surveyStateFromResult,
   WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES,
   GROWTH_PRESETS, PEOPLE_MODES,
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
 } from "@/lib/survey/sections"
+import { DEMO_SCENARIOS } from "@/lib/survey/demo-scenarios"
 import { ProgressHeader } from "@/components/survey/progress-header"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { LaneToggle } from "@/components/survey/lane-toggle"
@@ -67,7 +68,28 @@ export default function SurveyPage() {
     setShowIntro(true)
   }
 
-  if (phase === "hero") return <Hero onBegin={beginSurvey} />
+  // Presenter demo: pre-populate every answer from a scenario and open the survey
+  // fully expanded, so you click through a filled-in survey and adjust live.
+  const startDemo = (key: string) => {
+    const scenario = DEMO_SCENARIOS[key]
+    if (!scenario) return
+    setState(surveyStateFromResult(scenario.result))
+    setLanes(allLanes("detailed"))
+    setDeferred(new Set())
+    setStepIndex(0)
+    setShowIntro(false)
+    setPhase("survey")
+  }
+  useEffect(() => {
+    const key = new URLSearchParams(window.location.search).get("demo")
+    if (key && DEMO_SCENARIOS[key]) startDemo(key)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const anyDetailed = Object.values(lanes).some((l) => l === "detailed")
+  const toggleSimplifyAll = () => setLanes(allLanes(anyDetailed ? "quick" : "detailed"))
+
+  if (phase === "hero") return <Hero onBegin={beginSurvey} onDemo={startDemo} />
   if (phase === "summary")
     return (
       <Summary
@@ -98,6 +120,24 @@ export default function SurveyPage() {
         }`}
       >
         <div>
+          {/* Global depth control — everything is shown in full by default; the
+              client can Simplify to save time without compromising the program. */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5">
+            <span className="flex items-center gap-2 text-sm text-white/60">
+              <Wand2 className="h-4 w-4 text-[#00badc]" />
+              {anyDetailed
+                ? "You're seeing every question in full — answer what you can."
+                : "Simplified path — a complete program, just quicker."}
+            </span>
+            <button
+              type="button"
+              onClick={toggleSimplifyAll}
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-colors hover:border-[#00badc]/50 hover:text-white"
+            >
+              {anyDetailed ? "Simplify to save time" : "Show full detail"}
+            </button>
+          </div>
+
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">{step.title}</h1>
@@ -111,10 +151,13 @@ export default function SurveyPage() {
             )}
           </div>
 
-          {effectiveLane === "detailed" && step.detailedHint && (
-            <div className="mt-5 flex items-start gap-2 rounded-xl border border-[#00badc]/30 bg-[#00badc]/[0.07] px-4 py-3 text-sm text-white/75">
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#00badc]" />
-              <span><span className="font-semibold text-white">Go deeper:</span> {step.detailedHint}</span>
+          {step.hasDetailed && effectiveLane === "quick" && step.detailedHint && (
+            <div className="mt-5 flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-white/55">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-white/35" />
+              <span>
+                Simplified for speed. The detailed view lets you {step.detailedHint.replace(/\.$/, "")} —
+                it won&apos;t change your final program, only how much you specify now.
+              </span>
             </div>
           )}
 
@@ -468,7 +511,7 @@ function TextField({
 
 // ── Hero + Done ──────────────────────────────────────────────────────────────
 
-function Hero({ onBegin }: { onBegin: () => void }) {
+function Hero({ onBegin, onDemo }: { onBegin: () => void; onDemo: (key: string) => void }) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0b1830] text-white">
       {/* Let the office image speak — a neutral (non-blue) scrim, dark enough to
@@ -510,6 +553,24 @@ function Hero({ onBegin }: { onBegin: () => void }) {
           <p className="mt-6 text-xs text-white/40">
             Don&apos;t know an answer? Defer it — we&apos;ll cover it together live.
           </p>
+
+          {/* Presenter demo — seat a full scenario and click through a filled survey */}
+          <div className="mt-12 flex flex-col items-center gap-3">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-white/35">Presenter demo · seat a full scenario</span>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {Object.entries(DEMO_SCENARIOS).map(([key, s]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onDemo(key)}
+                  title={s.blurb}
+                  className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-medium text-white/70 backdrop-blur-sm transition-colors hover:border-[#00badc]/60 hover:text-white"
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

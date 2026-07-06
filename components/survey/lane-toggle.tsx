@@ -17,11 +17,11 @@ export function LaneToggle({
 }) {
   return (
     <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] p-1">
-      <LaneButton active={lane === "quick"} onClick={() => onChange("quick")} icon={<Zap className="h-3.5 w-3.5" />}>
-        Quick
-      </LaneButton>
       <LaneButton active={lane === "detailed"} onClick={() => onChange("detailed")} icon={<SlidersHorizontal className="h-3.5 w-3.5" />}>
-        Go deeper
+        Detailed
+      </LaneButton>
+      <LaneButton active={lane === "quick"} onClick={() => onChange("quick")} icon={<Zap className="h-3.5 w-3.5" />}>
+        Simple
       </LaneButton>
     </div>
   )

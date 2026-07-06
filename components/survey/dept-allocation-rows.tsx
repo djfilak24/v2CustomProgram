@@ -16,14 +16,23 @@ export function DeptAllocationRows({
   departments,
   values,
   onChange,
-  summarize,
+  thisNoun,
+  otherByDept,
+  otherNoun,
+  showFlex = false,
   employeeSelections,
   onToggleEmployee,
 }: {
   departments: SpineDept[]
   values: Record<string, number>
   onChange: (next: Record<string, number>) => void
-  summarize: (allocated: number, headcount: number) => string
+  /** What this allocation is (e.g. "dedicated desks", "private offices"). */
+  thisNoun: string
+  /** The complementary allocation already made (e.g. offices when setting desks). */
+  otherByDept?: Record<string, number>
+  otherNoun?: string
+  /** Show the remaining flex/shared seats (hc − this − other). */
+  showFlex?: boolean
   /** Per-person selection (employee id → checked). Enables the nested roster. */
   employeeSelections?: Record<string, boolean>
   onToggleEmployee?: (empId: string) => void
@@ -109,14 +118,46 @@ export function DeptAllocationRows({
               </div>
             </div>
 
-            <div className="mt-2.5 flex items-center gap-3">
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-[#00badc] transition-all" style={{ width: `${ratio * 100}%` }} />
-              </div>
-              <span className="w-32 shrink-0 text-right text-[11px] tabular-nums text-white/45">
-                {summarize(val, hc)}
-              </span>
-            </div>
+            {(() => {
+              const other = otherByDept?.[d.id] ?? 0
+              const flex = Math.max(0, hc - val - other)
+              return (
+                <div className="mt-3">
+                  {/* Segmented allocation bar: this · other · flex */}
+                  <div className="flex h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="bg-[#00badc] transition-all" style={{ width: `${(val / Math.max(1, hc)) * 100}%` }} />
+                    {otherByDept && <div className="bg-violet-400 transition-all" style={{ width: `${(other / Math.max(1, hc)) * 100}%` }} />}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-[#00badc]" />
+                      <span className="font-bold tabular-nums text-white">{val}</span>
+                      <span className="text-white/60">{thisNoun}</span>
+                    </span>
+                    {otherByDept && (
+                      <>
+                        <span className="text-white/20">·</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-violet-400" />
+                          <span className="font-bold tabular-nums text-white">{other}</span>
+                          <span className="text-white/60">{otherNoun}</span>
+                        </span>
+                      </>
+                    )}
+                    {showFlex && (
+                      <>
+                        <span className="text-white/20">·</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-white/25" />
+                          <span className="font-bold tabular-nums text-white/80">{flex}</span>
+                          <span className="text-white/50">flex {flex === 1 ? "seat" : "seats"}</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Nested per-person assignment */}
             {perPerson && isOpen && (

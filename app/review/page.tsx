@@ -110,7 +110,9 @@ export default function ReviewPage() {
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-white/55"><Icon className="h-5 w-5" /></span>
                   <div className="min-w-0">
                     <div className="truncate text-[15px] font-semibold text-white">{l.label}</div>
-                    <div className="text-xs text-white/40">{l.category}</div>
+                    <div className="truncate text-xs text-white/40">
+                      {l.category}{l.ratio ? <span className="text-[#00badc]/70"> · {l.ratio}</span> : ""}
+                    </div>
                   </div>
                 </div>
 

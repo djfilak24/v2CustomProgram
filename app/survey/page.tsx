@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info, Wand2,
 } from "lucide-react"
 import {
-  SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, surveyStateFromResult,
+  SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, surveyStateFromResult, deptAllocated,
   WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES,
   GROWTH_PRESETS, PEOPLE_MODES,
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
@@ -318,7 +318,10 @@ function StepBody({
               departments={state.departments}
               values={state.dedicatedByDept}
               onChange={(v) => patch({ dedicatedByDept: v })}
-              summarize={(v, hc) => `${v} dedicated · ${Math.max(0, hc - v)} flex`}
+              thisNoun="dedicated"
+              otherByDept={Object.fromEntries(state.departments.map((d) => [d.id, deptAllocated(d, state.officesByDept, state.officeByEmployee)]))}
+              otherNoun="offices"
+              showFlex
               employeeSelections={state.deskByEmployee}
               onToggleEmployee={(id) =>
                 patch({ deskByEmployee: { ...state.deskByEmployee, [id]: !state.deskByEmployee[id] } })
@@ -359,7 +362,10 @@ function StepBody({
               departments={state.departments}
               values={state.officesByDept}
               onChange={(v) => patch({ officesByDept: v })}
-              summarize={(v, hc) => `${v} ${v === 1 ? "office" : "offices"} of ${hc}`}
+              thisNoun="offices"
+              otherByDept={Object.fromEntries(state.departments.map((d) => [d.id, deptAllocated(d, state.dedicatedByDept, state.deskByEmployee)]))}
+              otherNoun="dedicated"
+              showFlex
               employeeSelections={state.officeByEmployee}
               onToggleEmployee={(id) =>
                 patch({ officeByEmployee: { ...state.officeByEmployee, [id]: !state.officeByEmployee[id] } })
@@ -402,27 +408,39 @@ function StepBody({
 
     case "support":
       return (
-        <div className="grid gap-2.5 lg:grid-cols-2">
-          {SUPPORT_CATALOG.map((sp) => (
-            <SpaceListRow
-              key={sp.id}
-              icon={sp.icon}
-              label={sp.label}
-              sfEach={sp.sfEach}
-              capacity={sp.capacity}
-              ratio={sp.ratio}
-              selected={state.support.includes(sp.id)}
-              onToggle={() =>
-                patch({
-                  support: state.support.includes(sp.id)
-                    ? state.support.filter((x) => x !== sp.id)
-                    : [...state.support, sp.id],
-                })
-              }
-              today={state.existingSupport[sp.id]}
-              onTodayChange={(n) => patch({ existingSupport: { ...state.existingSupport, [sp.id]: n } })}
-            />
-          ))}
+        <div className="space-y-4">
+          <div className="grid gap-2.5 lg:grid-cols-2">
+            {SUPPORT_CATALOG.map((sp) => (
+              <SpaceListRow
+                key={sp.id}
+                icon={sp.icon}
+                label={sp.label}
+                sfEach={sp.sfEach}
+                capacity={sp.capacity}
+                ratio={sp.ratio}
+                selected={state.support.includes(sp.id)}
+                onToggle={() =>
+                  patch({
+                    support: state.support.includes(sp.id)
+                      ? state.support.filter((x) => x !== sp.id)
+                      : [...state.support, sp.id],
+                  })
+                }
+                today={state.existingSupport[sp.id]}
+                onTodayChange={(n) => patch({ existingSupport: { ...state.existingSupport, [sp.id]: n } })}
+              />
+            ))}
+          </div>
+
+          {/* Custom support spaces the client adds themselves */}
+          <CustomSupport
+            items={state.customSupport}
+            onAdd={(name) => patch({ customSupport: [...state.customSupport, name], support: [...state.support, name] })}
+            onRemove={(name) => patch({
+              customSupport: state.customSupport.filter((x) => x !== name),
+              support: state.support.filter((x) => x !== name),
+            })}
+          />
         </div>
       )
 
@@ -453,6 +471,51 @@ function StepBody({
     default:
       return null
   }
+}
+
+function CustomSupport({
+  items, onAdd, onRemove,
+}: {
+  items: string[]
+  onAdd: (name: string) => void
+  onRemove: (name: string) => void
+}) {
+  const [name, setName] = useState("")
+  const add = () => {
+    const n = name.trim()
+    if (n && !items.includes(n)) { onAdd(n); setName("") }
+  }
+  return (
+    <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-4">
+      <p className="mb-2 text-sm font-medium text-white/70">Something unique not listed?</p>
+      {items.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {items.map((n) => (
+            <span key={n} className="inline-flex items-center gap-1.5 rounded-full border border-[#00badc]/40 bg-[#00badc]/10 px-3 py-1 text-sm text-white">
+              {n}
+              <button type="button" onClick={() => onRemove(n)} className="text-white/50 hover:text-white" aria-label={`Remove ${n}`}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
+          placeholder="e.g. Library, Podcast studio, Prayer room…"
+          className="w-full rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={add}
+          className="shrink-0 rounded-lg bg-[#00badc] px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function CardGrid({

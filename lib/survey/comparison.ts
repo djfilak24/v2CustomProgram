@@ -22,6 +22,8 @@ export interface ComparisonLine {
   category: CompCategory
   /** SF per unit — used to recompute area when a count is adjusted in the review. */
   unitSF: number
+  /** The planning ratio the engine used (e.g. "1 per 40 seats"). */
+  ratio?: string
   existingCount: number
   proposedCount: number
 }
@@ -86,7 +88,7 @@ export function buildComparison(result: SurveyResult, ci?: CompInputs): Comparis
   const wsUnitSF = ex.workstationSF ?? (wsItems[0]?.areaSf || 48)
   lines.push({
     key: "workstations", label: "Workstations", category: "Workstations", unitSF: wsUnitSF,
-    existingCount: ex.existingWorkstations ?? 0, proposedCount: wsProposed,
+    ratio: "sized by seat demand", existingCount: ex.existingWorkstations ?? 0, proposedCount: wsProposed,
   })
 
   // Private offices -----------------------------------------------------------
@@ -95,14 +97,14 @@ export function buildComparison(result: SurveyResult, ci?: CompInputs): Comparis
   lines.push({
     key: "offices", label: "Private offices", category: "Offices",
     unitSF: ex.officeSF ?? (offItems[0]?.areaSf || 120),
-    existingCount: ex.existingOffices ?? 0, proposedCount: offProposed,
+    ratio: "leadership / by role", existingCount: ex.existingOffices ?? 0, proposedCount: offProposed,
   })
 
   // Collaboration — one line per engine type ----------------------------------
   for (const item of program.collaborative) {
     lines.push({
       key: `collab:${item.name}`, label: item.name, category: "Collaboration", unitSF: item.areaSf,
-      existingCount: ex.existingCollab?.[item.name] ?? 0, proposedCount: item.quantity,
+      ratio: item.ratioLabel, existingCount: ex.existingCollab?.[item.name] ?? 0, proposedCount: item.quantity,
     })
   }
   // Existing collab types the engine didn't propose
@@ -118,7 +120,7 @@ export function buildComparison(result: SurveyResult, ci?: CompInputs): Comparis
     if (item.quantity <= 0 && existing <= 0) continue
     lines.push({
       key: `support:${item.name}`, label: item.name, category: "Support", unitSF: item.areaSf,
-      existingCount: existing, proposedCount: item.quantity,
+      ratio: item.ratioLabel, existingCount: existing, proposedCount: item.quantity,
     })
   }
   for (const [name, count] of Object.entries(ex.existingSupport ?? {})) {

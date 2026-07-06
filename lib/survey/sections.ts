@@ -69,9 +69,18 @@ export function makeEmployee(name = ""): Employee {
 export type PeopleMode = "simple" | "leaders" | "full"
 
 export const PEOPLE_MODES: CardOption[] = [
-  { id: "simple", label: "Keep it simple", description: "Headcount by department", icon: "users" },
-  { id: "leaders", label: "Name your leaders", description: "Leaders named, rest by headcount", icon: "user-check" },
-  { id: "full", label: "Full team roster", description: "Everyone named, by department", icon: "shuffle" },
+  {
+    id: "simple", label: "Keep it simple", description: "Headcount by department", icon: "users",
+    stats: ["⚡ Fastest — a number per team", "Great for a first pass", "Allocate by department later"],
+  },
+  {
+    id: "leaders", label: "Name your leaders", description: "Leaders named, rest by headcount", icon: "user-check",
+    stats: ["Name the few who need offices", "Balances speed + detail", "Assign leaders by name downstream"],
+  },
+  {
+    id: "full", label: "Full team roster", description: "Everyone named, by department", icon: "shuffle",
+    stats: ["Every person allocated by name", "Most complete program", "More time now — richest output"],
+  },
 ]
 
 let _seq = 0
@@ -387,6 +396,8 @@ export interface SurveyState {
   support: string[]
   /** Support spaces that exist today (type id -> current count). */
   existingSupport: Record<string, number>
+  /** Client-entered support spaces not in the catalog (e.g. a library). */
+  customSupport: string[]
   // Section 4 — qualitative
   loves: string
   painPoints: string
@@ -414,6 +425,7 @@ export function emptyState(): SurveyState {
     existingCollab: {},
     support: [],
     existingSupport: {},
+    customSupport: [],
     loves: "",
     painPoints: "",
     imbalances: "",

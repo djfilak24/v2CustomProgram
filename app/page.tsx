@@ -1417,6 +1417,9 @@ const WorkplaceProgrammingTool = () => {
   const [deptBreakdownExpanded, setDeptBreakdownExpanded] = useState(false)
   // Per-department roster expansion in the Department Manager (survey-captured names).
   const [openRosters, setOpenRosters] = useState<Record<string, boolean>>({})
+  // Sidebar panels for the survey's "today" baseline + narrative handoff.
+  const [existingExpanded, setExistingExpanded] = useState(true)
+  const [notesExpanded, setNotesExpanded] = useState(false)
 
   const saveProject = () => {
     const projectData = {
@@ -5783,6 +5786,93 @@ const WorkplaceProgrammingTool = () => {
                           </div>
                         )}
                       </div>
+                      )}
+
+                      {/* Existing conditions — the survey's "today" baseline, kept
+                          visible so the before/after story survives into the canvas */}
+                      {existingConditions && (() => {
+                        const ex = existingConditions
+                        const programSF = finalEditableTotals.totalUSF
+                        const delta = programSF - ex.totalSF
+                        return (
+                          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                            <button
+                              onClick={() => setExistingExpanded((v) => !v)}
+                              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                {existingExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                                <span className="text-xs font-semibold text-slate-700">Existing Conditions</span>
+                                <span className="text-xs text-slate-400">(from survey)</span>
+                              </div>
+                              <span className="text-[11px] tabular-nums text-slate-500">
+                                {ex.totalSF.toLocaleString()} SF today
+                              </span>
+                            </button>
+                            {existingExpanded && (
+                              <div className="px-4 py-3 space-y-2.5">
+                                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                                  <span className="text-slate-500">Today <span className="font-semibold text-slate-900 tabular-nums">{ex.totalSF.toLocaleString()}</span> SF</span>
+                                  <span className="text-slate-400">→</span>
+                                  <span className="text-slate-500">Program <span className="font-semibold text-slate-900 tabular-nums">{Math.round(programSF).toLocaleString()}</span> SF</span>
+                                  <span className={`font-semibold tabular-nums ${delta > 0 ? "text-emerald-600" : delta < 0 ? "text-amber-600" : "text-slate-500"}`}>
+                                    {delta > 0 ? "+" : ""}{Math.round(delta).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="divide-y divide-slate-100 text-xs">
+                                  {ex.workstations.count > 0 && (
+                                    <div className="flex items-center justify-between py-1.5">
+                                      <span className="text-slate-600">Workstations</span>
+                                      <span className="tabular-nums text-slate-500">{ex.workstations.count} × {ex.workstations.sfEach} SF</span>
+                                    </div>
+                                  )}
+                                  {ex.offices.count > 0 && (
+                                    <div className="flex items-center justify-between py-1.5">
+                                      <span className="text-slate-600">Private offices</span>
+                                      <span className="tabular-nums text-slate-500">{ex.offices.count} × {ex.offices.sfEach} SF</span>
+                                    </div>
+                                  )}
+                                  {ex.collab.map((c) => (
+                                    <div key={c.name} className="flex items-center justify-between py-1.5">
+                                      <span className="text-slate-600 truncate pr-2">{c.name}</span>
+                                      <span className="tabular-nums text-slate-500 shrink-0">{c.count} × {c.sfEach} SF</span>
+                                    </div>
+                                  ))}
+                                  {ex.support.map((c) => (
+                                    <div key={c.name} className="flex items-center justify-between py-1.5">
+                                      <span className="text-slate-600 truncate pr-2">{c.name}</span>
+                                      <span className="tabular-nums text-slate-500 shrink-0">{c.count} × {c.sfEach} SF</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                {ex.furniture && (
+                                  <p className="text-[11px] text-slate-400">Furniture posture: {ex.furniture}</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Survey narrative — goals, what's working, pain points, deferred */}
+                      {handoffNotes && (
+                        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                          <button
+                            onClick={() => setNotesExpanded((v) => !v)}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              {notesExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                              <span className="text-xs font-semibold text-slate-700">Survey Notes</span>
+                              <span className="text-xs text-slate-400">(rides to fit-planning)</span>
+                            </div>
+                          </button>
+                          {notesExpanded && (
+                            <div className="px-4 py-3">
+                              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-slate-600">{handoffNotes}</pre>
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {/* Days in Office slider (config) */}

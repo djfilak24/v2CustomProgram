@@ -7,12 +7,12 @@ import { Users, CalendarDays, Building2, UserX, DollarSign, Percent, ChevronDown
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // InfoTooltip component for input help
-function InfoTooltip({ text }: { text: string }) {
+function InfoTooltip({ text, testId }: { text: string; testId?: string }) {
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+          <Info data-testid={testId} className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-sm">
           {text}

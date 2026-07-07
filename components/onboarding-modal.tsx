@@ -127,8 +127,10 @@ export function OnboardingModal({ isOpen, onClose, onComplete }: OnboardingModal
 
   const handleGenerateProgram = (skipToExplorer = false) => {
     const allBlocks = computeAllSeatDemandBlocks(inputs.totalHeadcount, inputs.fullyRemote)
-    const hybridProgram = computeSpaceProgram(inputs, allBlocks, inputs.daysInOffice)
-    const fullOccProgram = computeSpaceProgram(inputs, allBlocks, 5)
+    // SummaryInputs requires non-optional client/programmer strings.
+    const summaryInputs = { ...inputs, clientName: inputs.clientName ?? "", programmedBy: inputs.programmedBy ?? "" }
+    const hybridProgram = computeSpaceProgram(summaryInputs, allBlocks, inputs.daysInOffice)
+    const fullOccProgram = computeSpaceProgram(summaryInputs, allBlocks, 5)
 
     const allItems = [
       ...hybridProgram.individual,

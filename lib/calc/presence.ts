@@ -15,6 +15,14 @@ export const POPULATION_SHARES: Record<2 | 3 | 4 | 5, PopulationShares> = {
   5: { resident: 1.0, d3: 0, d2: 0, d1: 0 },
 }
 
+/**
+ * Ceil that ignores float noise. Weighted presence factors like
+ * 0.25·1 + 0.3·0.6 + 0.4·0.4 + 0.05·0.2 are exactly 0.60 in decimal but come
+ * out as 0.6000000000000001 in binary — a bare Math.ceil then invents a seat
+ * that doesn't exist (220 × 0.60 → 133 instead of 132). Round to 1e-9 first.
+ */
+const ceilExact = (n: number) => Math.ceil(Math.round(n * 1e9) / 1e9)
+
 export function computeTotalSeats(headcount: number, fullyRemote: number, daysInOffice: 2 | 3 | 4 | 5): number {
   const inOffice = Math.max(headcount - fullyRemote, 0)
 
@@ -29,7 +37,7 @@ export function computeTotalSeats(headcount: number, fullyRemote: number, daysIn
         fallbackShares.d3 * PRESENCE_WEIGHTS.d3 +
         fallbackShares.d2 * PRESENCE_WEIGHTS.d2 +
         fallbackShares.d1 * PRESENCE_WEIGHTS.d1)
-    return Math.ceil(seatsRaw)
+    return ceilExact(seatsRaw)
   }
 
   const seatsRaw =
@@ -39,5 +47,5 @@ export function computeTotalSeats(headcount: number, fullyRemote: number, daysIn
       shares.d2 * PRESENCE_WEIGHTS.d2 +
       shares.d1 * PRESENCE_WEIGHTS.d1)
 
-  return Math.ceil(seatsRaw)
+  return ceilExact(seatsRaw)
 }

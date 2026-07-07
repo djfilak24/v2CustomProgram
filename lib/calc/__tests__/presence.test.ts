@@ -24,9 +24,13 @@ describe("Presence Model", () => {
   })
 
   it("should compute total seats correctly for 2-day policy", () => {
-    // Seed B test case
+    // Seed B test case. From the constants asserted above:
+    // factor = 0.25·1 + 0.3·0.6 + 0.4·0.4 + 0.05·0.2 = 0.60 exactly,
+    // so 220 in-office × 0.60 = 132. (The original seed said 131 — a hand-calc
+    // error inconsistent with those constants; the engine briefly said 133 — a
+    // float-noise ceil bug, fixed by ceilExact in presence.ts.)
     const totalSeats = computeTotalSeats(250, 30, 2)
-    expect(totalSeats).toBe(131)
+    expect(totalSeats).toBe(132)
   })
 
   it("should compute total seats correctly for 4-day policy", () => {

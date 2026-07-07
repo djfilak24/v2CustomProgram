@@ -131,7 +131,7 @@ export function generateCanvasFromFastTrack(
       capacity: 1, // Individual spaces have capacity 1
       sfEach: item.areaSf,
       totalArea: item.totalArea,
-      workspaceType,
+      workstationType: workspaceType,
       notes: "",
       ratio: item.ratioLabel || (item.ratio ? `1:${item.ratio}` : ""),
       departmentAllocations: [],

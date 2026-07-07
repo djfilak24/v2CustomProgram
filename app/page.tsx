@@ -1441,7 +1441,7 @@ const WorkplaceProgrammingTool = () => {
       savedProjects.push(projectData)
     }
 
-    localStorage.setItem("workplaceProjects", JSON.JSON.stringify(savedProjects))
+    localStorage.setItem("workplaceProjects", JSON.stringify(savedProjects))
     setShowSaveSuccess(true)
     setTimeout(() => setShowSaveSuccess(false), 2000)
   }
@@ -1613,12 +1613,11 @@ const WorkplaceProgrammingTool = () => {
       flex: kpis.flex || 0,
       meetingSeats: kpis.meetingSeats || 0,
       phoneBooths: kpis.phoneBooths || 0,
-      totalWorkpoints: kpis.totalWorkpoints || 0, // Added for Workpoints card
+      totalWorkpoints: kpis.assignableWorkpoints || 0, // Workpoints card (kpis has no totalWorkpoints)
       totalDesks: kpis.desks || 0, // Added for Workpoints card
       totalOffices: kpis.offices || 0, // Added for Workpoints card
       totalFlex: kpis.flex || 0, // Added for Workpoints card
       assignableSeats,
-      peakInOffice, // Use the newly calculated peakInOffice
       vsPeakSeats,
       recommendedRSF: targetHeadcount * rsfPerPerson,
       rsfDifference: calculatedRSF - targetHeadcount * rsfPerPerson,
@@ -2149,7 +2148,7 @@ const WorkplaceProgrammingTool = () => {
     const isDepartmentExpanded = departmentExpansionState[spaceKey] || false
 
     const zone = space.zone || "Focus Open"
-    const zoneColor = zoneColors[zone]
+    const zoneColor = zoneColors[zone as keyof typeof zoneColors] ?? zoneColors["Focus Open"]
     const [editingName, setEditingName] = useState(false)
     const [tempName, setTempName] = useState(space.customName || space.name)
 
@@ -5318,9 +5317,9 @@ const WorkplaceProgrammingTool = () => {
               </div>
               )}
 
-              {["Collaborative", "Support", "Wellness"].map((zoneName) => {
+              {(["Collaborative", "Support", "Wellness"] as const).map((zoneName) => {
                 const zoneSpaces = Object.entries(editableSpaces).filter(([_, space]) => space.zone === zoneName)
-                const zoneUSF = finalEditableTotals[`${zoneName.toLowerCase()}USF`] || 0
+                const zoneUSF = (finalEditableTotals as unknown as Record<string, number>)[`${zoneName.toLowerCase()}USF`] || 0
                 const zoneColor = zoneColors[zoneName]
                 const mode = zoneViewMode[zoneName] || "cards"
 

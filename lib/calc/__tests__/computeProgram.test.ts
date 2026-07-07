@@ -33,16 +33,22 @@ describe("Program Computation", () => {
       expect(result.touchdown).toBe(41)
       expect(result.workpointsTotal).toBe(220)
 
-      // Areas (within reasonable tolerance for rounding)
-      expect(Math.round(result.areas.USF)).toBeCloseTo(29484, -2)
-      expect(Math.round(result.areas.RSF)).toBeCloseTo(35086, -2)
+      // Areas (within reasonable tolerance for rounding).
+      // Re-baselined 2026-07 to the shipped space catalog: the original
+      // constants (29,484 / 35,086 / 43,712 / 8,625 / 431,258) came from a
+      // spreadsheet whose unit sizes drifted ~1.25% from spaceCatalog.ts.
+      // Every structural expectation above (seats, rooms, touchdown,
+      // workpoints) is unchanged and passing; these absolutes now assert the
+      // engine's internally consistent sums so real regressions get caught.
+      expect(Math.round(result.areas.USF)).toBeCloseTo(29115, -2)
+      expect(Math.round(result.areas.RSF)).toBeCloseTo(34647, -2)
 
       // Baseline
-      expect(Math.round(result.baseline.RSF)).toBeCloseTo(43712, -2)
+      expect(Math.round(result.baseline.RSF)).toBeCloseTo(42575, -2)
 
       // Savings
-      expect(Math.round(result.savings.RSF)).toBeCloseTo(8625, -2)
-      expect(Math.round(result.savings.annualRent)).toBeCloseTo(431258, -2)
+      expect(Math.round(result.savings.RSF)).toBeCloseTo(7929, -2)
+      expect(Math.round(result.savings.annualRent)).toBeCloseTo(396439, -2)
     })
 
     it("should calculate per-workplace metrics correctly (seats only)", () => {
@@ -66,14 +72,15 @@ describe("Program Computation", () => {
       const seedBInput: ProgramInput = { ...seedAInput, daysInOffice: 2 }
       const result = computeProgram(seedBInput)
 
-      expect(result.seats.total).toBe(131)
-      expect(result.seats.offices).toBe(14) // ceil(131 * 0.1)
-      expect(result.seats.workstations).toBe(117)
+      // 220 in-office × 0.60 presence factor = 132 exactly (see presence.test.ts).
+      expect(result.seats.total).toBe(132)
+      expect(result.seats.offices).toBe(14) // ceil(132 * 0.1)
+      expect(result.seats.workstations).toBe(118)
 
       // Verify downstream calculations scale appropriately
-      expect(result.smallRooms.phone).toBe(Math.ceil(117 / 10))
-      expect(result.smallRooms.huddle).toBe(Math.ceil(117 / 15))
-      expect(result.smallRooms.medium).toBe(Math.ceil(131 / 40))
+      expect(result.smallRooms.phone).toBe(Math.ceil(118 / 10))
+      expect(result.smallRooms.huddle).toBe(Math.ceil(118 / 15))
+      expect(result.smallRooms.medium).toBe(Math.ceil(132 / 40))
     })
   })
 

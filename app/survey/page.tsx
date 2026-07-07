@@ -12,6 +12,7 @@ import {
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
 } from "@/lib/survey/sections"
 import { DEMO_SCENARIOS, demoState } from "@/lib/survey/demo-scenarios"
+import { saveSurveyDraft, loadSurveyDraft, clearSurveyDraft, draftAge, type SurveyDraft } from "@/lib/survey/draftStorage"
 import { ProgressHeader } from "@/components/survey/progress-header"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { LaneToggle } from "@/components/survey/lane-toggle"
@@ -37,6 +38,8 @@ export default function SurveyPage() {
   const [lanes, setLanes] = useState<LaneMap>(emptyLanes)
   const [state, setState] = useState<SurveyState>(emptyState)
   const [deferred, setDeferred] = useState<Set<StepId>>(new Set())
+  const [draft, setDraft] = useState<SurveyDraft | null>(null)
+  const [savedFlash, setSavedFlash] = useState(false)
 
   const steps = SURVEY_STEPS
   const step = steps[stepIndex]
@@ -83,13 +86,39 @@ export default function SurveyPage() {
   useEffect(() => {
     const key = new URLSearchParams(window.location.search).get("demo")
     if (key && DEMO_SCENARIOS[key]) startDemo(key)
+    else setDraft(loadSurveyDraft()) // offer to resume a saved in-progress survey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Autosave: every answer persists as it's given — closing the tab loses
+  // nothing. Skipped while on the hero so an untouched visit never writes.
+  useEffect(() => {
+    if (phase === "hero") return
+    saveSurveyDraft({ stepIndex, state, lanes, deferred: [...deferred] })
+  }, [phase, stepIndex, state, lanes, deferred])
+
+  const resumeDraft = () => {
+    if (!draft) return
+    setState(draft.state)
+    setLanes(draft.lanes)
+    setDeferred(new Set(draft.deferred))
+    setStepIndex(Math.min(draft.stepIndex, steps.length - 1))
+    setShowIntro(false)
+    setPhase("survey")
+  }
+  const discardDraft = () => { clearSurveyDraft(); setDraft(null) }
+
+  const saveForLater = () => {
+    saveSurveyDraft({ stepIndex, state, lanes, deferred: [...deferred] })
+    setSavedFlash(true)
+    window.setTimeout(() => setSavedFlash(false), 2500)
+  }
 
   const anyDetailed = Object.values(lanes).some((l) => l === "detailed")
   const toggleSimplifyAll = () => setLanes(allLanes(anyDetailed ? "quick" : "detailed"))
 
-  if (phase === "hero") return <Hero onBegin={beginSurvey} onDemo={startDemo} />
+  if (phase === "hero")
+    return <Hero onBegin={beginSurvey} onDemo={startDemo} draft={draft} onResume={resumeDraft} onDiscardDraft={discardDraft} />
   if (phase === "summary")
     return (
       <Summary
@@ -175,14 +204,28 @@ export default function SurveyPage() {
 
           {/* Nav */}
           <div className="mt-9 flex items-center justify-between border-t border-white/10 pt-6">
-            <button
-              type="button"
-              onClick={goBack}
-              disabled={stepIndex === 0}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white/60 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={goBack}
+                disabled={stepIndex === 0}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white/60 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back
+              </button>
+              <button
+                type="button"
+                onClick={saveForLater}
+                className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-white/40 transition-colors hover:text-white/75 sm:inline-flex"
+                title="Everything autosaves on this device — come back any time"
+              >
+                {savedFlash ? (
+                  <span className="text-emerald-400">Saved ✓ — safe to close this tab</span>
+                ) : (
+                  "Autosaves · finish later"
+                )}
+              </button>
+            </div>
 
             <div className="flex items-center gap-3">
               {step.canDefer && (
@@ -674,7 +717,13 @@ function TextField({
 
 // ── Hero + Done ──────────────────────────────────────────────────────────────
 
-function Hero({ onBegin, onDemo }: { onBegin: () => void; onDemo: (key: string) => void }) {
+function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft }: {
+  onBegin: () => void
+  onDemo: (key: string) => void
+  draft: SurveyDraft | null
+  onResume: () => void
+  onDiscardDraft: () => void
+}) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0b1830] text-white">
       {/* Let the office image speak — a neutral (non-blue) scrim, dark enough to
@@ -690,12 +739,47 @@ function Hero({ onBegin, onDemo }: { onBegin: () => void; onDemo: (key: string) 
             <span className="text-white/30">|</span>
             <span className="text-sm font-medium text-white/70">Workplace Strategy Discovery</span>
           </div>
-          <button className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-sm transition-colors hover:bg-white/10">
-            Save &amp; Continue Later
-          </button>
+          {draft ? (
+            <button
+              onClick={onResume}
+              className="rounded-lg border border-[#00badc]/50 bg-[#00badc]/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-[#00badc]/25"
+            >
+              Resume saved survey
+            </button>
+          ) : (
+            <span
+              className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/60 backdrop-blur-sm"
+              title="Your answers save automatically as you go — close the tab and pick up later on this device"
+            >
+              Progress saves automatically
+            </span>
+          )}
         </header>
 
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+          {/* Resume banner — a saved in-progress survey takes priority over starting over */}
+          {draft && (
+            <div className="mb-8 flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-[#00badc]/40 bg-[#0b1830]/80 px-5 py-4 backdrop-blur-md">
+              <span className="text-sm text-white/80">
+                You have a survey in progress — saved {draftAge(draft.savedAt)}, on step{" "}
+                <span className="font-semibold text-white">{Math.min(draft.stepIndex + 1, SURVEY_STEPS.length)} of {SURVEY_STEPS.length}</span>.
+              </span>
+              <span className="flex items-center gap-2">
+                <button
+                  onClick={onResume}
+                  className="rounded-lg bg-[#00badc] px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
+                >
+                  Pick up where you left off
+                </button>
+                <button
+                  onClick={onDiscardDraft}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-white/50 transition-colors hover:text-white"
+                >
+                  Start fresh
+                </button>
+              </span>
+            </div>
+          )}
           <span className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/80 backdrop-blur-sm">
             <Sparkles className="h-4 w-4 text-[#00badc]" /> 3–5 minutes
           </span>

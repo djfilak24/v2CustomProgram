@@ -9,6 +9,7 @@ import {
 } from "@/lib/survey/sections"
 import { COLLAB_CATALOG, SUPPORT_CATALOG } from "@/lib/survey/catalog"
 import { saveSurveySeed } from "@/lib/survey/seedStorage"
+import { clearSurveyDraft } from "@/lib/survey/draftStorage"
 
 const labelFor = (catalog: CardOption[], id: string | null) =>
   id ? catalog.find((c) => c.id === id)?.label ?? id : null
@@ -215,8 +216,10 @@ export function Summary({
             type="button"
             onClick={() => {
               // Hand the structured answers forward and open the validation review
-              // (existing vs. proposed) before the deep canvas.
+              // (existing vs. proposed) before the deep canvas. The in-progress
+              // draft is done its job — clear it so the next visit starts clean.
               saveSurveySeed(buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" }))
+              clearSurveyDraft()
               window.location.href = "/review"
             }}
             className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"

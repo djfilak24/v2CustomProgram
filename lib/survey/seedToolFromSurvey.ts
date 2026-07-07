@@ -83,14 +83,24 @@ export function seedToolFromSurvey(survey: SurveyResult): SeededProgram {
     const days = work.perDeptDays?.[d.id] ?? work.daysInOffice
     const future = deptFutureHeadcount(d.headcount, d.futureHeadcount, people.companyGrowthPct)
     const hasGrowth = future !== d.headcount
+    // When the survey captured WHO keeps a dedicated desk (per-person checks or
+    // per-dept counts), the department card honors that answer exactly:
+    // workstations = dedicated seats, and everyone else (minus office holders)
+    // shares flex seats. Only without that answer do we fall back to formulas.
+    const dedicated = work.dedicatedByDept?.[d.id]
+    const seatCap = Math.max(0, d.headcount - officeCount)
+    const workstations = dedicated !== undefined ? Math.min(Math.max(0, dedicated), seatCap) : seatCap
+    const hybrid = dedicated !== undefined
+      ? Math.max(0, d.headcount - officeCount - workstations)
+      : hybridWorkers(d.headcount, days)
     return {
       id: d.id,
       name: d.name,
       color: DEPT_COLORS[i % DEPT_COLORS.length],
       headcount: d.headcount,
       officeCount,
-      hybridWorkers: hybridWorkers(d.headcount, days),
-      workstations: Math.max(0, d.headcount - officeCount),
+      hybridWorkers: hybrid,
+      workstations,
       ...(hasGrowth ? { futureHeadcount: future } : {}),
     }
   })

@@ -13,7 +13,7 @@ import {
 } from "@/lib/survey/comparison"
 import { DEMO_SCENARIOS, demoResult } from "@/lib/survey/demo-scenarios"
 import {
-  surveyStateFromResult, computeProfile,
+  surveyStateFromResult, computeProfile, SURVEY_STEPS,
   GOAL_MOTIVATORS, SPACE_POSTURES, OFFICE_PLACEMENT_OPTIONS,
 } from "@/lib/survey/sections"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
@@ -133,6 +133,7 @@ export default function ReviewPage() {
           <DashboardTab
             comp={comp} result={result} profile={profile} strategy={strategy}
             existingTotal={existingTotal} proposedTotal={proposedTotal} catTotals={catTotals}
+            gapCount={gapCount} onOpenValidation={() => { setShowGaps(true); setTab("validation") }}
           />
         )}
         {tab === "responses" && <ResponsesTab result={result} />}
@@ -163,14 +164,25 @@ export default function ReviewPage() {
 /* ── Dashboard tab ──────────────────────────────────────────────────────────── */
 
 function DashboardTab({
-  comp, result, profile, strategy, existingTotal, proposedTotal, catTotals,
+  comp, result, profile, strategy, existingTotal, proposedTotal, catTotals, gapCount, onOpenValidation,
 }: {
   comp: Comparison; result: SurveyResult; profile: ReturnType<typeof computeProfile>
   strategy: ReturnType<typeof spaceStrategy>; existingTotal: number; proposedTotal: number
   catTotals: { cat: CompCategory; existing: number; proposed: number }[]
+  gapCount: number; onOpenValidation: () => void
 }) {
   const motivators = result.goals?.motivators ?? []
   const growthPct = result.people.companyGrowthPct
+  // Everything the client chose to leave for the meeting — skipping a question
+  // isn't a dead end, it's an agenda item. Deferred steps + unsure cadences +
+  // data gaps all land here so the live session starts with a ready list.
+  const stepTitle = (id: string) => SURVEY_STEPS.find((s) => s.id === id)?.title ?? id
+  const confirmLive: string[] = [
+    ...result.deferred.map(stepTitle),
+    ...(result.work.daysUnsureDepts?.length
+      ? [`In-office cadence: ${result.work.daysUnsureDepts.join(", ")}`]
+      : []),
+  ]
   return (
     <div className="space-y-8">
       <div>
@@ -197,6 +209,39 @@ function DashboardTab({
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* The live-session agenda — everything skipped, deferred, or unknown.
+          Skipping a question was never a dead end; it lands here. */}
+      {(confirmLive.length > 0 || gapCount > 0) && (
+        <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.04] p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-300" />
+              <span className="text-xs font-medium uppercase tracking-wide text-amber-200/90">For the live session</span>
+            </div>
+            {gapCount > 0 && (
+              <button
+                type="button"
+                onClick={onOpenValidation}
+                className="rounded-full border border-amber-300/40 bg-amber-300/[0.08] px-3 py-1 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-300/[0.15]"
+              >
+                {gapCount} data gap{gapCount === 1 ? "" : "s"} in the program →
+              </button>
+            )}
+          </div>
+          {confirmLive.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {confirmLive.map((t) => (
+                <span key={t} className="rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-sm text-white/75">
+                  {t}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/50">Nothing was deferred — the gaps above are the working agenda.</p>
+          )}
         </div>
       )}
 

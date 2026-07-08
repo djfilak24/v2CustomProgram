@@ -23,7 +23,7 @@ export function DaysRows({
 }) {
   if (departments.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-6 text-center text-sm text-white/45">
+      <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
         Add departments in the first step to set per-department cadence here.
       </p>
     )
@@ -37,7 +37,7 @@ export function DaysRows({
 
   return (
     <div className="space-y-2">
-      <p className="px-1 text-xs text-white/40">
+      <p className="px-1 text-xs text-slate-400">
         Standard is 4 days a week — adjust any team, add a range if it varies, or defer.
       </p>
       {departments.map((d) => {
@@ -47,16 +47,16 @@ export function DaysRows({
         return (
           <div
             key={d.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5"
           >
             <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-white">{d.name || "Untitled department"}</div>
-              <div className="text-xs text-white/40">{d.headcount} people</div>
+              <div className="truncate text-sm font-medium text-slate-900">{d.name || "Untitled department"}</div>
+              <div className="text-xs text-slate-400">{d.headcount} people</div>
             </div>
 
             <div className="flex items-center gap-3">
               {unsure ? (
-                <span className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-300">
+                <span className="rounded-lg border border-amber-500/70 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-500">
                   We&apos;ll confirm this live
                 </span>
               ) : (
@@ -70,7 +70,7 @@ export function DaysRows({
                   />
                   {isRange && (
                     <>
-                      <span className="text-xs text-white/40">to</span>
+                      <span className="text-xs text-slate-400">to</span>
                       <Stepper
                         value={max}
                         min={0}
@@ -83,7 +83,7 @@ export function DaysRows({
                   <button
                     type="button"
                     onClick={() => set(d.id, isRange ? { min, max: min } : { min, max: Math.min(5, min + 1) })}
-                    className="inline-flex items-center gap-1 rounded-lg border border-white/12 px-2 py-1.5 text-xs font-medium text-white/45 transition-colors hover:border-white/25 hover:text-white/80"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
                     title={isRange ? "Use a single number" : "Varies? Add a range"}
                   >
                     {isRange ? <><X className="h-3 w-3" /> Range</> : <><Plus className="h-3 w-3" /> Range</>}
@@ -96,8 +96,8 @@ export function DaysRows({
                 onClick={() => set(d.id, unsure ? { min: defaultDay, max: defaultDay } : "unsure")}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                   unsure
-                    ? "border-amber-400/40 bg-amber-400/15 text-amber-300"
-                    : "border-white/12 text-white/45 hover:border-white/25 hover:text-white/80"
+                    ? "border-amber-400/70 bg-amber-100 text-amber-500"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
                 }`}
                 title="Not sure yet? We'll cover it together in the live session."
               >

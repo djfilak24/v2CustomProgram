@@ -50,7 +50,7 @@ export function DeptAllocationRows({
 
   if (departments.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-6 text-center text-sm text-white/45">
+      <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
         Add departments in the first step to set per-department values here.
       </p>
     )
@@ -84,7 +84,7 @@ export function DeptAllocationRows({
         return (
           <div
             key={d.id}
-            className={`rounded-xl border border-white/10 bg-white/[0.03] ${big ? "px-5 py-4" : med ? "px-5 py-3.5" : "px-5 py-3"}`}
+            className={`rounded-xl border border-slate-200 bg-white ${big ? "px-5 py-4" : med ? "px-5 py-3.5" : "px-5 py-3"}`}
           >
             <div className="flex items-center justify-between gap-4">
               <button
@@ -93,13 +93,13 @@ export function DeptAllocationRows({
                 className={`flex min-w-0 items-center gap-2 text-left ${perPerson ? "cursor-pointer" : "cursor-default"}`}
               >
                 {perPerson && (
-                  <ChevronRight className={`h-4 w-4 shrink-0 text-white/40 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                  <ChevronRight className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
                 )}
                 <span className="min-w-0">
-                  <span className={`block truncate font-semibold text-white ${big ? "text-lg" : med ? "text-base" : "text-sm"}`}>
+                  <span className={`block truncate font-semibold text-slate-900 ${big ? "text-lg" : med ? "text-base" : "text-sm"}`}>
                     {d.name || "Untitled department"}
                   </span>
-                  <span className="block text-xs text-white/40">
+                  <span className="block text-xs text-slate-400">
                     {hc} {hc === 1 ? "person" : "people"}{perPerson ? " · tap to assign by name" : ""}
                   </span>
                 </span>
@@ -114,14 +114,14 @@ export function DeptAllocationRows({
                       min={perPerson ? checked : 0}
                       max={hc}
                     />
-                    <span className="whitespace-nowrap text-sm text-white/50">
-                      of <span className="font-semibold text-white/80">{hc}</span>
+                    <span className="whitespace-nowrap text-sm text-slate-500">
+                      of <span className="font-semibold text-slate-700">{hc}</span>
                     </span>
                   </>
                 ) : (
-                  <span className="text-sm text-white/80">
-                    <span className="font-semibold text-white">{val}</span>
-                    <span className="text-white/50"> of {hc}</span>
+                  <span className="text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">{val}</span>
+                    <span className="text-slate-500"> of {hc}</span>
                   </span>
                 )}
               </div>
@@ -133,33 +133,33 @@ export function DeptAllocationRows({
               return (
                 <div className="mt-3">
                   {/* Segmented allocation bar: this · other · flex */}
-                  <div className="flex h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
                     <div className="bg-[#00badc] transition-all" style={{ width: `${(val / Math.max(1, hc)) * 100}%` }} />
                     {otherByDept && <div className="bg-violet-400 transition-all" style={{ width: `${(other / Math.max(1, hc)) * 100}%` }} />}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-[#00badc]" />
-                      <span className="font-bold tabular-nums text-white">{val}</span>
-                      <span className="text-white/60">{thisNoun}</span>
+                      <span className="font-bold tabular-nums text-slate-900">{val}</span>
+                      <span className="text-slate-600">{thisNoun}</span>
                     </span>
                     {otherByDept && (
                       <>
-                        <span className="text-white/20">·</span>
+                        <span className="text-slate-300">·</span>
                         <span className="inline-flex items-center gap-1.5">
                           <span className="h-2 w-2 rounded-full bg-violet-400" />
-                          <span className="font-bold tabular-nums text-white">{other}</span>
-                          <span className="text-white/60">{otherNoun}</span>
+                          <span className="font-bold tabular-nums text-slate-900">{other}</span>
+                          <span className="text-slate-600">{otherNoun}</span>
                         </span>
                       </>
                     )}
                     {showFlex && (
                       <>
-                        <span className="text-white/20">·</span>
+                        <span className="text-slate-300">·</span>
                         <span className="inline-flex items-center gap-1.5">
                           <span className="h-2 w-2 rounded-full bg-white/25" />
-                          <span className="font-bold tabular-nums text-white/80">{flex}</span>
-                          <span className="text-white/50">flex {flex === 1 ? "seat" : "seats"}</span>
+                          <span className="font-bold tabular-nums text-slate-700">{flex}</span>
+                          <span className="text-slate-500">flex {flex === 1 ? "seat" : "seats"}</span>
                         </span>
                       </>
                     )}
@@ -170,7 +170,7 @@ export function DeptAllocationRows({
 
             {/* Nested per-person assignment */}
             {perPerson && isOpen && (
-              <div className="mt-3 grid gap-1.5 border-t border-white/[0.07] pt-3 sm:grid-cols-2">
+              <div className="mt-3 grid gap-1.5 border-t border-slate-100 pt-3 sm:grid-cols-2">
                 {[...roster].sort((a, b) => Number(!!b.isLeader) - Number(!!a.isLeader)).map((emp) => {
                   const on = !!employeeSelections![emp.id]
                   const locked = !on && !!excludedEmployees?.[emp.id]
@@ -184,26 +184,26 @@ export function DeptAllocationRows({
                       title={locked ? `Already has ${excludedNoun ?? "the other seat"} — one assigned seat per person` : undefined}
                       className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                         locked
-                          ? "cursor-not-allowed border-white/[0.06] bg-white/[0.01] text-white/30"
+                          ? "cursor-not-allowed border-slate-100 bg-slate-50/60 text-slate-400"
                           : on
-                            ? "border-[#00badc]/50 bg-[#00badc]/[0.08] text-white"
+                            ? "border-[#00badc]/50 bg-[#00badc]/[0.08] text-slate-900"
                             : leader
-                              ? "border-amber-400/40 bg-amber-400/[0.06] text-white hover:border-amber-400/60"
-                              : "border-white/10 bg-white/[0.02] text-white/70 hover:border-white/20"
+                              ? "border-amber-400/70 bg-amber-50 text-slate-900 hover:border-amber-500/70"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                       }`}
                     >
                       <span
                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                          on ? "border-[#00badc] bg-[#00badc] text-slate-900" : locked ? "border-white/15" : "border-white/30"
+                          on ? "border-[#00badc] bg-[#00badc] text-slate-900" : locked ? "border-slate-300" : "border-slate-300"
                         }`}
                       >
                         {on && <Check className="h-3 w-3" strokeWidth={3} />}
                         {locked && <span className="h-2 w-2 rounded-[1px] bg-white/25" />}
                       </span>
-                      {leader && <Crown className={`h-3.5 w-3.5 shrink-0 ${locked ? "text-amber-400/40" : "text-amber-300"}`} />}
+                      {leader && <Crown className={`h-3.5 w-3.5 shrink-0 ${locked ? "text-amber-600/40" : "text-amber-500"}`} />}
                       <span className="truncate">{emp.name || "Unnamed"}</span>
                       {locked && excludedNoun && (
-                        <span className="ml-auto shrink-0 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/40">
+                        <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
                           {excludedNoun}
                         </span>
                       )}

@@ -47,7 +47,7 @@ export function CollabTree({
             onTodayChange={(n) => onChangeExisting(t.id, n)}
           >
             {lane === "detailed" && (
-              <div className="space-y-3 border-t border-white/[0.07] px-5 py-3.5">
+              <div className="space-y-3 border-t border-slate-100 px-5 py-3.5">
                 <ChipRow
                   label="Setup"
                   options={COLLAB_BUILD_OPTIONS}
@@ -61,12 +61,12 @@ export function CollabTree({
                   onChange={(monitor) => onChangeConfig(t.id, { monitor })}
                 />
                 <div className="flex items-start gap-2">
-                  <span className="w-16 shrink-0 pt-1.5 text-xs font-medium uppercase tracking-wide text-white/40">Custom</span>
+                  <span className="w-16 shrink-0 pt-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">Custom</span>
                   <input
                     value={cfg.notes ?? ""}
                     onChange={(e) => onChangeConfig(t.id, { notes: e.target.value })}
                     placeholder="Anything specific — AV, layout, furniture, criteria…"
-                    className="w-full rounded-lg border border-white/12 bg-white/[0.03] px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
                   />
                 </div>
               </div>
@@ -88,7 +88,7 @@ function ChipRow({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="w-16 shrink-0 text-xs font-medium uppercase tracking-wide text-white/40">{label}</span>
+      <span className="w-16 shrink-0 text-xs font-medium uppercase tracking-wide text-slate-400">{label}</span>
       {options.map((o) => (
         <button
           key={o.id}
@@ -96,8 +96,8 @@ function ChipRow({
           onClick={() => onChange(o.id)}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
             value === o.id
-              ? "border-[#00badc] bg-[#00badc]/15 text-white"
-              : "border-white/12 bg-white/[0.03] text-white/60 hover:border-white/25 hover:text-white"
+              ? "border-[#00badc] bg-[#00badc]/15 text-slate-900"
+              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
           }`}
         >
           {o.label}

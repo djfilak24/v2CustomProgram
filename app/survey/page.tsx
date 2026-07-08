@@ -138,7 +138,7 @@ export default function SurveyPage() {
   const wide = step.id === "adjacency"
 
   return (
-    <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
+    <div className="min-h-screen bg-[#f3f7fa] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-slate-900">
       {showIntro && <IntroDemo onDismiss={() => setShowIntro(false)} />}
 
       <ProgressHeader stepIndex={stepIndex} onJump={(i) => setStepIndex(i)} />
@@ -153,8 +153,8 @@ export default function SurveyPage() {
               client can Simplify to save time without compromising the program.
               Highlighted, and pulses on the first step to orient the user. */}
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#00badc]/30 bg-[#00badc]/[0.05] px-4 py-2.5">
-            <span className="flex items-center gap-2 text-sm text-white/75">
-              <Wand2 className="h-4 w-4 text-[#00badc]" />
+            <span className="flex items-center gap-2 text-sm text-slate-700">
+              <Wand2 className="h-4 w-4 text-[#0089a3]" />
               {anyDetailed
                 ? "You're seeing every question in full — answer what you can, or simplify."
                 : "Simplified path — a complete program, just quicker. Same result, less time."}
@@ -162,8 +162,8 @@ export default function SurveyPage() {
             <button
               type="button"
               onClick={toggleSimplifyAll}
-              className={`rounded-lg border border-[#00badc]/50 bg-[#00badc]/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#00badc]/20 ${
-                stepIndex === 0 ? "ring-2 ring-[#00badc]/40 ring-offset-2 ring-offset-[#0b1830] motion-safe:animate-pulse" : ""
+              className={`rounded-lg border border-[#00badc]/50 bg-[#00badc]/10 px-3 py-1.5 text-xs font-semibold text-slate-900 transition-colors hover:bg-[#00badc]/20 ${
+                stepIndex === 0 ? "ring-2 ring-[#00badc]/40 ring-offset-2 ring-offset-[#f3f7fa] motion-safe:animate-pulse" : ""
               }`}
             >
               {anyDetailed ? "Simplify to save time" : "Show full detail"}
@@ -173,7 +173,7 @@ export default function SurveyPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">{step.title}</h1>
-              <p className="mt-2 text-white/55">{step.subtitle}</p>
+              <p className="mt-2 text-slate-500">{step.subtitle}</p>
             </div>
             {step.hasDetailed && (
               <LaneToggle
@@ -184,8 +184,8 @@ export default function SurveyPage() {
           </div>
 
           {step.hasDetailed && effectiveLane === "quick" && step.detailedHint && (
-            <div className="mt-5 flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-white/55">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-white/35" />
+            <div className="mt-5 flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
               <span>
                 Simplified for speed. The detailed view lets you {step.detailedHint.replace(/\.$/, "")} —
                 it won&apos;t change your final program, only how much you specify now.
@@ -203,24 +203,24 @@ export default function SurveyPage() {
           </div>
 
           {/* Nav */}
-          <div className="mt-9 flex items-center justify-between border-t border-white/10 pt-6">
+          <div className="mt-9 flex items-center justify-between border-t border-slate-200 pt-6">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={goBack}
                 disabled={stepIndex === 0}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white/60 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </button>
               <button
                 type="button"
                 onClick={saveForLater}
-                className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-white/40 transition-colors hover:text-white/75 sm:inline-flex"
+                className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition-colors hover:text-slate-700 sm:inline-flex"
                 title="Everything autosaves on this device — come back any time"
               >
                 {savedFlash ? (
-                  <span className="text-emerald-400">Saved ✓ — safe to close this tab</span>
+                  <span className="text-emerald-600">Saved ✓ — safe to close this tab</span>
                 ) : (
                   "Autosaves · finish later"
                 )}
@@ -232,7 +232,7 @@ export default function SurveyPage() {
                 <button
                   type="button"
                   onClick={deferStep}
-                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white/50 transition-colors hover:text-white/80"
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-700"
                   title="We'll cover this together in the live session"
                 >
                   <MessageCircle className="h-4 w-4" /> We&apos;ll talk live
@@ -281,7 +281,7 @@ function StepBody({
       return lane === "detailed" ? (
         <div className="space-y-6">
           <div>
-            <p className="mb-3 text-sm font-medium text-white/70">How much detail do you want on your people?</p>
+            <p className="mb-3 text-sm font-medium text-slate-600">How much detail do you want on your people?</p>
             <CardGrid
               options={PEOPLE_MODES}
               selected={[state.peopleMode]}
@@ -291,7 +291,7 @@ function StepBody({
               }}
               cols={3}
             />
-            <p className="mt-2 text-xs text-white/40">
+            <p className="mt-2 text-xs text-slate-400">
               Naming people once here lets later steps assign desks, offices, and in-office days down to the person.
             </p>
           </div>
@@ -304,18 +304,18 @@ function StepBody({
       ) : (
         <div className="space-y-7">
           <div className="max-w-sm">
-            <label className="text-sm font-medium text-white/70">Roughly how many people, total?</label>
+            <label className="text-sm font-medium text-slate-600">Roughly how many people, total?</label>
             <input
               type="number"
               min={0}
               value={state.totalHeadcount ?? ""}
               onChange={(e) => patch({ totalHeadcount: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
               placeholder="e.g. 120"
-              className="mt-2 w-full rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2.5 text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
             />
           </div>
           <div>
-            <p className="mb-3 text-sm font-medium text-white/70">Expected growth over the next 3–5 years?</p>
+            <p className="mb-3 text-sm font-medium text-slate-600">Expected growth over the next 3–5 years?</p>
             <CardGrid
               options={GROWTH_PRESETS}
               selected={state.growthChoice ? [state.growthChoice] : []}
@@ -336,7 +336,7 @@ function StepBody({
       return (
         <div className="space-y-7">
           <div>
-            <p className="mb-3 text-sm font-medium text-white/70">What&apos;s driving this project? Pick all that apply.</p>
+            <p className="mb-3 text-sm font-medium text-slate-600">What&apos;s driving this project? Pick all that apply.</p>
             <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
               {GOAL_MOTIVATORS.map((o) => {
                 const on = state.goalMotivators.includes(o.id)
@@ -346,19 +346,19 @@ function StepBody({
                     type="button"
                     onClick={() => toggleMotivator(o.id)}
                     className={`rounded-xl border px-4 py-3 text-left transition-colors ${
-                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
-                    <div className="text-sm font-semibold text-white">{o.label}</div>
-                    {o.description && <div className="mt-0.5 text-xs text-white/45">{o.description}</div>}
+                    <div className="text-sm font-semibold text-slate-900">{o.label}</div>
+                    {o.description && <div className="mt-0.5 text-xs text-slate-500">{o.description}</div>}
                   </button>
                 )
               })}
             </div>
           </div>
           <div>
-            <p className="mb-1 text-sm font-medium text-white/70">On space itself, where do you lean?</p>
-            <p className="mb-3 text-xs text-white/40">
+            <p className="mb-1 text-sm font-medium text-slate-600">On space itself, where do you lean?</p>
+            <p className="mb-3 text-xs text-slate-400">
               This anchors the &ldquo;how much space do you really need&rdquo; conversation — and which strategies we bring to the gaps.
             </p>
             <div className="grid gap-2.5 sm:grid-cols-3">
@@ -370,11 +370,11 @@ function StepBody({
                     type="button"
                     onClick={() => patch({ spacePosture: on ? null : o.id })}
                     className={`rounded-xl border px-4 py-3.5 text-left transition-colors ${
-                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
-                    <div className="text-sm font-semibold text-white">{o.label}</div>
-                    {o.description && <div className="mt-0.5 text-xs text-white/45">{o.description}</div>}
+                    <div className="text-sm font-semibold text-slate-900">{o.label}</div>
+                    {o.description && <div className="mt-0.5 text-xs text-slate-500">{o.description}</div>}
                   </button>
                 )
               })}
@@ -412,11 +412,11 @@ function StepBody({
     case "seating":
       return (
         <div className="space-y-5">
-          <div className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/[0.07] px-4 py-3 text-sm text-white/80">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <div className="flex items-start gap-3 rounded-xl border border-amber-500/70 bg-amber-50 px-4 py-3 text-sm text-slate-700">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
             <span>
-              <span className="font-semibold text-white">This isn&apos;t about offices.</span> A dedicated
-              desk is an <span className="font-medium text-white">assigned workstation</span> in the open plan —
+              <span className="font-semibold text-slate-900">This isn&apos;t about offices.</span> A dedicated
+              desk is an <span className="font-medium text-slate-900">assigned workstation</span> in the open plan —
               not an enclosed room. Private offices are a separate question on the next screen.
             </span>
           </div>
@@ -463,10 +463,10 @@ function StepBody({
     case "offices":
       return (
         <div className="space-y-5">
-          <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/65">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+          <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <span>
-              Enclosed, assigned <span className="font-medium text-white">private offices</span> — typically for
+              Enclosed, assigned <span className="font-medium text-slate-900">private offices</span> — typically for
               leadership or roles that need them. How many per team?
             </span>
           </div>
@@ -500,8 +500,8 @@ function StepBody({
           )}
 
           {/* Interior vs exterior — daylight strategy + how offices port to proposed */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3.5">
-            <div className="mb-2.5 text-sm font-medium text-white/80">
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3.5">
+            <div className="mb-2.5 text-sm font-medium text-slate-700">
               Where do those offices sit — on the glass, or interior?
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -513,11 +513,11 @@ function StepBody({
                     type="button"
                     onClick={() => patch({ officePlacement: on ? null : o.id })}
                     className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1]" : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
-                    <div className="text-sm font-medium text-white">{o.label}</div>
-                    {o.description && <div className="mt-0.5 text-xs text-white/45">{o.description}</div>}
+                    <div className="text-sm font-medium text-slate-900">{o.label}</div>
+                    {o.description && <div className="mt-0.5 text-xs text-slate-500">{o.description}</div>}
                   </button>
                 )
               })}
@@ -629,14 +629,14 @@ function CustomSupport({
     if (n && !items.includes(n)) { onAdd(n); setName("") }
   }
   return (
-    <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-4">
-      <p className="mb-2 text-sm font-medium text-white/70">Something unique not listed?</p>
+    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4">
+      <p className="mb-2 text-sm font-medium text-slate-600">Something unique not listed?</p>
       {items.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
           {items.map((n) => (
-            <span key={n} className="inline-flex items-center gap-1.5 rounded-full border border-[#00badc]/40 bg-[#00badc]/10 px-3 py-1 text-sm text-white">
+            <span key={n} className="inline-flex items-center gap-1.5 rounded-full border border-[#00badc]/40 bg-[#00badc]/10 px-3 py-1 text-sm text-slate-900">
               {n}
-              <button type="button" onClick={() => onRemove(n)} className="text-white/50 hover:text-white" aria-label={`Remove ${n}`}>×</button>
+              <button type="button" onClick={() => onRemove(n)} className="text-slate-500 hover:text-slate-900" aria-label={`Remove ${n}`}>×</button>
             </span>
           ))}
         </div>
@@ -647,7 +647,7 @@ function CustomSupport({
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
           placeholder="e.g. Library, Podcast studio, Prayer room…"
-          className="w-full rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
         />
         <button
           type="button"
@@ -703,13 +703,13 @@ function TextField({
 }) {
   return (
     <div>
-      <label className="text-sm font-medium text-white/70">{label}</label>
+      <label className="text-sm font-medium text-slate-600">{label}</label>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={3}
         placeholder={placeholder}
-        className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+        className="mt-2 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
       />
     </div>
   )

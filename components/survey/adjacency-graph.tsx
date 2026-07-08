@@ -25,7 +25,7 @@ export function AdjacencyGraph({
 
   if (named.length < 2) {
     return (
-      <p className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-6 text-center text-sm text-white/45">
+      <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
         Add at least two departments in the first step to map how they work together.
       </p>
     )
@@ -63,7 +63,7 @@ export function AdjacencyGraph({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[480px_minmax(0,1fr)]">
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3">
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto h-auto w-full max-w-[460px]">
           {/* connections, drawn low-priority first so the top ones sit on top */}
           {[...pairs].map((k, rank) => ({ k, rank })).reverse().map(({ k, rank }) => {
@@ -98,7 +98,7 @@ export function AdjacencyGraph({
                 <circle
                   cx={p.x} cy={p.y} r={isSel ? 13 : 10}
                   fill={isSel ? "#00badc" : "#0e1f3a"}
-                  stroke={isSel ? "#00badc" : "rgba(255,255,255,0.4)"}
+                  stroke={isSel ? "#00badc" : "rgba(15,23,42,0.4)"}
                   strokeWidth={2}
                   className="transition-all"
                 />
@@ -113,7 +113,7 @@ export function AdjacencyGraph({
             )
           })}
         </svg>
-        <p className="mt-1 text-center text-xs text-white/45">
+        <p className="mt-1 text-center text-xs text-slate-500">
           {selected
             ? `Tap another team to connect it to ${nameOf(selected)}`
             : "Tap two teams to connect the ones that work closely together."}
@@ -122,21 +122,21 @@ export function AdjacencyGraph({
 
       <div>
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-white">Priority</h4>
+          <h4 className="text-sm font-semibold text-slate-900">Priority</h4>
           {pairs.length > 0 && (
             <button
               type="button"
               onClick={() => { onChange([]); setSelected(null) }}
-              className="text-xs text-white/40 transition-colors hover:text-white/70"
+              className="text-xs text-slate-400 transition-colors hover:text-slate-600"
             >
               Clear all
             </button>
           )}
         </div>
-        <p className="mt-0.5 text-xs text-white/40">Most → least important. Reorder with the arrows.</p>
+        <p className="mt-0.5 text-xs text-slate-400">Most → least important. Reorder with the arrows.</p>
 
         {pairs.length === 0 ? (
-          <p className="mt-3 text-sm text-white/40">No connections yet.</p>
+          <p className="mt-3 text-sm text-slate-400">No connections yet.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {pairs.map((k, i) => {
@@ -145,7 +145,7 @@ export function AdjacencyGraph({
               return (
                 <li
                   key={k}
-                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] py-2 pl-2 pr-2 text-sm"
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white py-2 pl-2 pr-2 text-sm"
                 >
                   <span
                     className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold text-slate-900"
@@ -153,27 +153,27 @@ export function AdjacencyGraph({
                   >
                     {i + 1}
                   </span>
-                  <span className="min-w-0 flex-1 text-white/85">
+                  <span className="min-w-0 flex-1 text-slate-800">
                     {nameOf(a)} <span style={{ color }}>↔</span> {nameOf(b)}
                   </span>
                   <div className="flex shrink-0 items-center">
                     <button
                       type="button" onClick={() => move(i, -1)} disabled={i === 0}
-                      className="flex h-6 w-6 items-center justify-center rounded text-white/40 transition-colors hover:text-white disabled:opacity-20"
+                      className="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition-colors hover:text-slate-900 disabled:opacity-20"
                       aria-label="Move up"
                     >
                       <ChevronUp className="h-4 w-4" />
                     </button>
                     <button
                       type="button" onClick={() => move(i, 1)} disabled={i === pairs.length - 1}
-                      className="flex h-6 w-6 items-center justify-center rounded text-white/40 transition-colors hover:text-white disabled:opacity-20"
+                      className="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition-colors hover:text-slate-900 disabled:opacity-20"
                       aria-label="Move down"
                     >
                       <ChevronDown className="h-4 w-4" />
                     </button>
                     <button
                       type="button" onClick={() => onChange(pairs.filter((p) => p !== k))}
-                      className="flex h-6 w-6 items-center justify-center rounded text-white/35 transition-colors hover:text-white/80"
+                      className="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition-colors hover:text-slate-700"
                       aria-label="Remove connection"
                     >
                       <X className="h-3.5 w-3.5" />

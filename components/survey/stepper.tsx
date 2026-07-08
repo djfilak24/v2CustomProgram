@@ -26,11 +26,11 @@ export function Stepper({
   }
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-white/12 bg-white/[0.04]">
+    <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white">
       <button
         type="button"
         onClick={(e) => step(-1, e)}
-        className="flex h-8 w-8 items-center justify-center rounded-l-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+        className="flex h-8 w-8 items-center justify-center rounded-l-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
         aria-label="Decrease"
       >
         <Minus className="h-3.5 w-3.5" />
@@ -39,13 +39,13 @@ export function Stepper({
         type="number"
         value={Number.isFinite(value) ? value : ""}
         onChange={(e) => onChange(clamp(e.target.value === "" ? min : Number(e.target.value)))}
-        className="w-12 bg-transparent text-center text-sm font-medium tabular-nums text-white focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        className="w-12 bg-transparent text-center text-sm font-medium tabular-nums text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
       />
-      {suffix && <span className="pr-1 text-xs text-white/40">{suffix}</span>}
+      {suffix && <span className="pr-1 text-xs text-slate-400">{suffix}</span>}
       <button
         type="button"
         onClick={(e) => step(1, e)}
-        className="flex h-8 w-8 items-center justify-center rounded-r-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+        className="flex h-8 w-8 items-center justify-center rounded-r-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
         aria-label="Increase"
       >
         <Plus className="h-3.5 w-3.5" />

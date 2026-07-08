@@ -66,15 +66,15 @@ export function Summary({
   })()
 
   return (
-    <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
+    <div className="min-h-screen bg-[#f3f7fa] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-slate-900">
       <div className="mx-auto w-full max-w-[1700px] px-6 py-7 lg:px-10">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3 py-1 text-xs font-medium text-[#00badc]">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3 py-1 text-xs font-medium text-[#0089a3]">
               Your workplace snapshot
             </span>
             <h1 className="mt-2 text-3xl font-bold tracking-tight">Here&apos;s what you told us</h1>
-            <p className="mt-1 max-w-2xl text-sm text-white/60">
+            <p className="mt-1 max-w-2xl text-sm text-slate-600">
               A quick review before we open your starting program. Everything here pre-populates the tool — nothing is locked in.
             </p>
           </div>
@@ -92,23 +92,23 @@ export function Summary({
                       const delta = future - (d.headcount || 0)
                       return (
                         <div key={d.id} className="flex items-center justify-between text-sm">
-                          <span className="text-white/80">{d.name}</span>
-                          <span className="flex items-center gap-2 tabular-nums text-white/60">
+                          <span className="text-slate-700">{d.name}</span>
+                          <span className="flex items-center gap-2 tabular-nums text-slate-600">
                             {d.headcount}
-                            <span className="text-white/30">→</span>
-                            <span className="text-white">{future}</span>
-                            {delta > 0 && <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />}
-                            {delta < 0 && <TrendingDown className="h-3.5 w-3.5 text-amber-400" />}
+                            <span className="text-slate-400">→</span>
+                            <span className="text-slate-900">{future}</span>
+                            {delta > 0 && <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />}
+                            {delta < 0 && <TrendingDown className="h-3.5 w-3.5 text-amber-600" />}
                           </span>
                         </div>
                       )
                     })}
                   </div>
-                  <div className="mt-3 flex justify-between border-t border-white/10 pt-3 text-sm font-medium">
-                    <span className="text-white/60">Total headcount</span>
+                  <div className="mt-3 flex justify-between border-t border-slate-200 pt-3 text-sm font-medium">
+                    <span className="text-slate-600">Total headcount</span>
                     <span className="tabular-nums">
-                      {totalCurrent} <span className="text-white/30">→</span>{" "}
-                      <span className="text-[#00badc]">{totalFuture}</span>
+                      {totalCurrent} <span className="text-slate-400">→</span>{" "}
+                      <span className="text-[#0089a3]">{totalFuture}</span>
                     </span>
                   </div>
                 </>
@@ -137,12 +137,12 @@ export function Summary({
               <Row label="Seats" value={labelFor(SEATING_POSTURES, state.seatingChoice) ?? "—"} />
               {adjacencies.length > 0 && (
                 <div className="pt-1">
-                  <div className="mb-1.5 text-sm text-white/50">
-                    Teams that work closely <span className="text-white/30">· ranked by priority</span>
+                  <div className="mb-1.5 text-sm text-slate-500">
+                    Teams that work closely <span className="text-slate-400">· ranked by priority</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {adjacencies.map((a) => (
-                      <span key={a.label} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-xs text-white/80">
+                      <span key={a.label} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
                         <span
                           className="flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold text-slate-900"
                           style={{ backgroundColor: a.color }}
@@ -162,10 +162,10 @@ export function Summary({
               <Row label="Private offices" value={labelFor(OFFICE_POSTURES, state.officeChoice) ?? "—"} />
               {collab.length > 0 && (
                 <div className="pt-1">
-                  <div className="mb-1.5 text-sm text-white/50">Collaboration spaces</div>
+                  <div className="mb-1.5 text-sm text-slate-500">Collaboration spaces</div>
                   <div className="flex flex-wrap gap-2">
                     {collab.map((c) => (
-                      <span key={c.label} className="rounded-full bg-[#00badc]/10 px-3 py-1 text-xs text-[#00badc]">
+                      <span key={c.label} className="rounded-full bg-[#00badc]/10 px-3 py-1 text-xs text-[#0089a3]">
                         {c.label}{c.total > 0 ? ` · ${c.total}` : ""}
                       </span>
                     ))}
@@ -174,10 +174,10 @@ export function Summary({
               )}
               {state.support.length > 0 && (
                 <div className="pt-1">
-                  <div className="mb-1.5 text-sm text-white/50">Support spaces</div>
+                  <div className="mb-1.5 text-sm text-slate-500">Support spaces</div>
                   <div className="flex flex-wrap gap-2">
                     {state.support.map((id) => (
-                      <span key={id} className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-white/75">
+                      <span key={id} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
                         {SUPPORT_CATALOG.find((s) => s.id === id)?.label ?? id}
                       </span>
                     ))}
@@ -191,11 +191,11 @@ export function Summary({
           <aside className="space-y-5">
             <WorkplaceProfile scores={scores} />
             {deferredTitles.length > 0 && (
-              <div className="rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-5">
-                <div className="flex items-center gap-2 text-sm font-semibold text-amber-300">
+              <div className="rounded-2xl border border-amber-400/25 bg-amber-50 p-5">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-500">
                   <MessageCircle className="h-4 w-4" /> To cover live ({deferredTitles.length})
                 </div>
-                <ul className="mt-2 space-y-1 text-sm text-white/65">
+                <ul className="mt-2 space-y-1 text-sm text-slate-600">
                   {deferredTitles.map((t) => <li key={t}>· {t}</li>)}
                 </ul>
               </div>
@@ -208,7 +208,7 @@ export function Summary({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-5 py-3 text-sm font-medium text-white/75 transition-colors hover:bg-white/5"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100/80"
           >
             <ArrowLeft className="h-4 w-4" /> Back to edit
           </button>
@@ -227,7 +227,7 @@ export function Summary({
             See your program comparison <ArrowRight className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-4 text-center text-xs text-white/40">
+        <p className="mt-4 text-center text-xs text-slate-400">
           Everything you entered pre-populates the tool — nothing is locked in.
         </p>
       </div>
@@ -237,8 +237,8 @@ export function Summary({
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-      <h3 className="mb-3 text-base font-semibold text-white">{title}</h3>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <h3 className="mb-3 text-base font-semibold text-slate-900">{title}</h3>
       <div className="space-y-2">{children}</div>
     </div>
   )
@@ -247,8 +247,8 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 text-sm">
-      <span className="text-white/50">{label}</span>
-      <span className="text-right font-medium text-white">{value}</span>
+      <span className="text-slate-500">{label}</span>
+      <span className="text-right font-medium text-slate-900">{value}</span>
     </div>
   )
 }
@@ -256,8 +256,8 @@ function Row({ label, value }: { label: string; value: string }) {
 function Note({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-sm text-white/50">{label}</div>
-      <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-white/80">{value}</p>
+      <div className="text-sm text-slate-500">{label}</div>
+      <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{value}</p>
     </div>
   )
 }

@@ -29,12 +29,12 @@ export function ProgressHeader({
   })
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1830]/85 backdrop-blur-md">
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-[1760px] items-center justify-between gap-6 px-6 py-3.5 lg:px-10">
-        <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto brightness-0 invert" priority />
+        <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto" priority />
         <div className="text-right">
-          <div className="text-sm font-semibold text-white">Workplace Strategy Discovery</div>
-          <div className="text-xs text-white/50">Step {stepIndex + 1} of {total} · {pct}%</div>
+          <div className="text-sm font-semibold text-slate-900">Workplace Strategy Discovery</div>
+          <div className="text-xs text-slate-500">Step {stepIndex + 1} of {total} · {pct}%</div>
         </div>
       </div>
 
@@ -49,7 +49,7 @@ export function ProgressHeader({
                 <div className="flex items-center gap-2">
                   <span
                     className={`whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide transition-colors ${
-                      groupActive ? "text-[#00badc]" : groupDone ? "text-white/55" : "text-white/30"
+                      groupActive ? "text-[#0089a3]" : groupDone ? "text-slate-500" : "text-slate-400"
                     }`}
                   >
                     {g.section}
@@ -72,7 +72,7 @@ export function ProgressHeader({
                               ? "bg-[#00badc] text-slate-900 ring-4 ring-[#00badc]/20"
                               : done
                                 ? "bg-[#00badc]/80 text-slate-900 hover:bg-[#00badc]"
-                                : "bg-white/10 text-white/40"
+                                : "bg-slate-100 text-slate-400"
                           } ${clickable ? "cursor-pointer" : "cursor-default"}`}
                         >
                           {done ? <Check className="h-3 w-3" strokeWidth={3} /> : index + 1}
@@ -82,7 +82,7 @@ export function ProgressHeader({
                   </div>
                 </div>
                 {gi < groups.length - 1 && (
-                  <span className={`h-px w-5 shrink-0 ${groupDone ? "bg-[#00badc]/50" : "bg-white/10"}`} />
+                  <span className={`h-px w-5 shrink-0 ${groupDone ? "bg-[#00badc]/50" : "bg-slate-100"}`} />
                 )}
               </div>
             )

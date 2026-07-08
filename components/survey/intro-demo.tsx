@@ -11,24 +11,24 @@ import { Zap, SlidersHorizontal, MessageCircle, ArrowRight, X } from "lucide-rea
 export function IntroDemo({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#060e1d]/80 px-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/12 bg-[#0e1f3a] shadow-2xl">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-[#0e1f3a] shadow-2xl">
         <button
           type="button"
           onClick={onDismiss}
-          className="absolute right-4 top-4 text-white/40 transition-colors hover:text-white"
+          className="absolute right-4 top-4 text-slate-400 transition-colors hover:text-slate-900"
           aria-label="Close"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <div className="border-b border-white/10 px-7 pb-5 pt-7">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3 py-1 text-xs font-medium text-[#00badc]">
+        <div className="border-b border-slate-200 px-7 pb-5 pt-7">
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3 py-1 text-xs font-medium text-[#0089a3]">
             How this works
           </span>
-          <h2 className="mt-3 text-2xl font-bold tracking-tight text-white">
+          <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
             Answer at the depth that suits you
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-white/60">
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
             Every question gives you three ways to answer. The more you share now,
             the more accurate your starting program — and the faster the live session.
           </p>
@@ -56,8 +56,8 @@ export function IntroDemo({ onDismiss }: { onDismiss: () => void }) {
           />
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-white/10 px-7 py-5">
-          <p className="text-xs text-white/40">
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-7 py-5">
+          <p className="text-xs text-slate-400">
             You can switch lanes on any question.
           </p>
           <button
@@ -89,24 +89,24 @@ function LaneRow({
   return (
     <div
       className={`flex gap-3 rounded-xl border p-3.5 ${
-        accent ? "border-[#00badc]/35 bg-[#00badc]/[0.06]" : "border-white/10 bg-white/[0.03]"
+        accent ? "border-[#00badc]/35 bg-[#00badc]/[0.06]" : "border-slate-200 bg-white"
       }`}
     >
       <span
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-          accent ? "bg-[#00badc]/20 text-[#00badc]" : "bg-white/[0.06] text-white/70"
+          accent ? "bg-[#00badc]/20 text-[#0089a3]" : "bg-slate-100 text-slate-600"
         }`}
       >
         {icon}
       </span>
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-white">{title}</span>
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/50">
+          <span className="text-sm font-semibold text-slate-900">{title}</span>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
             {time}
           </span>
         </div>
-        <p className="mt-1 text-sm leading-relaxed text-white/60">{body}</p>
+        <p className="mt-1 text-sm leading-relaxed text-slate-600">{body}</p>
       </div>
     </div>
   )

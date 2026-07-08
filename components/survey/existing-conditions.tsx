@@ -27,7 +27,7 @@ export function ExistingConditionsStep({
     <div className="space-y-8">
       {/* Furniture posture */}
       <div>
-        <p className="mb-3 text-sm font-medium text-white/70">Are you reusing existing furniture, or starting fresh?</p>
+        <p className="mb-3 text-sm font-medium text-slate-600">Are you reusing existing furniture, or starting fresh?</p>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {REUSE_POSTURES.map((o) => (
             <ChoiceCard
@@ -62,7 +62,7 @@ export function ExistingConditionsStep({
 
       {/* Conference tables reuse */}
       <div>
-        <p className="mb-3 text-sm font-medium text-white/70">Re-using existing conference tables?</p>
+        <p className="mb-3 text-sm font-medium text-slate-600">Re-using existing conference tables?</p>
         <div className="flex gap-3">
           {[
             { id: true, label: "Yes, re-use" },
@@ -74,8 +74,8 @@ export function ExistingConditionsStep({
               onClick={() => set({ reuseConfTables: o.id })}
               className={`rounded-xl border px-5 py-2.5 text-sm font-medium transition-colors ${
                 value.reuseConfTables === o.id
-                  ? "border-[#00badc] bg-[#00badc]/10 text-white"
-                  : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25"
+                  ? "border-[#00badc] bg-[#00badc]/10 text-slate-900"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
               {o.label}
@@ -97,7 +97,7 @@ export function ExistingConditionsStep({
             value={value.existingOffices}
             onChange={(n) => set({ existingOffices: n })}
           />
-          <p className="text-xs text-white/45 sm:col-span-2">
+          <p className="text-xs text-slate-500 sm:col-span-2">
             We&apos;ll carry these current counts forward so later steps start from what you actually have.
           </p>
         </div>
@@ -117,8 +117,8 @@ function SizePicker({
 }) {
   return (
     <div>
-      <p className="text-sm font-medium text-white/70">{label}</p>
-      <p className="mb-3 text-xs text-white/40">{help}</p>
+      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <p className="mb-3 text-xs text-slate-400">{help}</p>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => {
           const on = value === o.id
@@ -128,11 +128,11 @@ function SizePicker({
               type="button"
               onClick={() => onChange(o.id)}
               className={`rounded-lg border px-3.5 py-2 text-left transition-colors ${
-                on ? "border-[#00badc] bg-[#00badc]/10" : "border-white/10 bg-white/[0.03] hover:border-white/25"
+                on ? "border-[#00badc] bg-[#00badc]/10" : "border-slate-200 bg-white hover:border-slate-300"
               }`}
             >
-              <span className="block text-sm font-semibold text-white">{o.label}</span>
-              <span className="block text-[11px] tabular-nums text-white/45">{o.sf} SF</span>
+              <span className="block text-sm font-semibold text-slate-900">{o.label}</span>
+              <span className="block text-[11px] tabular-nums text-slate-500">{o.sf} SF</span>
             </button>
           )
         })}
@@ -150,14 +150,14 @@ function CountField({
 }) {
   return (
     <div>
-      <label className="text-sm font-medium text-white/70">{label}</label>
+      <label className="text-sm font-medium text-slate-600">{label}</label>
       <input
         type="number"
         min={0}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
         placeholder="e.g. 80"
-        className="mt-2 w-full rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2.5 text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
       />
     </div>
   )

@@ -35,7 +35,7 @@ export function PerDeptRows({
 
   if (departments.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-6 text-center text-sm text-white/45">
+      <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
         Add departments in the first step to set per-department values here.
       </p>
     )
@@ -46,12 +46,12 @@ export function PerDeptRows({
       {departments.map((d) => (
         <div
           key={d.id}
-          className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5"
+          className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5"
         >
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-white">{d.name || "Untitled department"}</div>
+            <div className="truncate text-sm font-medium text-slate-900">{d.name || "Untitled department"}</div>
             {showHeadcount && (
-              <div className="text-xs text-white/40">{d.headcount} people</div>
+              <div className="text-xs text-slate-400">{d.headcount} people</div>
             )}
           </div>
           <Stepper

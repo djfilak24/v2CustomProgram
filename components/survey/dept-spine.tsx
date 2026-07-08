@@ -40,8 +40,8 @@ export function DeptSpine({
   const totalFuture = departments.reduce((a, d) => a + (d.futureHeadcount ?? (d.headcount || 0)), 0)
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-2 grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-1 text-xs font-medium uppercase tracking-wide text-white/40">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="mb-2 grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-1 text-xs font-medium uppercase tracking-wide text-slate-400">
         <span>Department</span>
         <span className="w-[120px] text-center">Current</span>
         <span className="w-[120px] text-center">3–5 yr</span>
@@ -55,14 +55,14 @@ export function DeptSpine({
           const roster = d.employees ?? []
           const isOpen = open.has(d.id)
           return (
-            <div key={d.id} className="rounded-xl border border-white/[0.07] bg-white/[0.02]">
+            <div key={d.id} className="rounded-xl border border-slate-100 bg-white">
               <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 p-1.5">
                 <div className="flex items-center gap-1.5">
                   {named && (
                     <button
                       type="button"
                       onClick={() => toggle(d.id)}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/80"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                       aria-label="Toggle roster"
                     >
                       <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
@@ -72,7 +72,7 @@ export function DeptSpine({
                     value={d.name}
                     onChange={(e) => update(d.id, { name: e.target.value })}
                     placeholder="Department name"
-                    className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
                   />
                 </div>
 
@@ -81,16 +81,16 @@ export function DeptSpine({
                 <div className="flex items-center gap-1.5">
                   <Stepper value={future} onChange={(n) => update(d.id, { futureHeadcount: n })} />
                   <span className="flex w-7 justify-center" title={`${delta >= 0 ? "+" : ""}${delta} vs today`}>
-                    {delta > 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
-                      : delta < 0 ? <TrendingDown className="h-3.5 w-3.5 text-amber-400" />
-                      : <MinusIcon className="h-3.5 w-3.5 text-white/25" />}
+                    {delta > 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                      : delta < 0 ? <TrendingDown className="h-3.5 w-3.5 text-amber-600" />
+                      : <MinusIcon className="h-3.5 w-3.5 text-slate-300" />}
                   </span>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => remove(d.id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-white/35 transition-colors hover:bg-white/10 hover:text-white/80"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                   aria-label="Remove department"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -100,20 +100,20 @@ export function DeptSpine({
               {named && isOpen && (() => {
                 const leaderCount = roster.filter((e) => e.isLeader).length
                 return (
-                <div className="border-t border-white/[0.07] px-3 py-3">
+                <div className="border-t border-slate-100 px-3 py-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium uppercase tracking-wide text-white/40">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
                       {mode === "leaders" ? "Leaders" : "Team roster"}
                     </span>
-                    <span className="text-[11px] text-white/40">
+                    <span className="text-[11px] text-slate-400">
                       {mode === "leaders"
                         ? `${roster.length} leader${roster.length === 1 ? "" : "s"} · ${Math.max(0, (d.headcount || 0) - roster.length)} more by headcount`
                         : `${roster.length} of ${d.headcount || 0} named · ${leaderCount} leader${leaderCount === 1 ? "" : "s"}`}
                     </span>
                   </div>
                   {mode === "full" && (
-                    <p className="mb-2.5 text-[11px] text-white/35">
-                      Tap the <Crown className="mx-0.5 inline h-3 w-3 -translate-y-px text-amber-300/70" /> to mark someone a leader — leaders are first in line for private offices.
+                    <p className="mb-2.5 text-[11px] text-slate-400">
+                      Tap the <Crown className="mx-0.5 inline h-3 w-3 -translate-y-px text-amber-500/80" /> to mark someone a leader — leaders are first in line for private offices.
                     </p>
                   )}
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -123,7 +123,7 @@ export function DeptSpine({
                       return (
                         <div
                           key={emp.id}
-                          className={`flex items-center gap-1.5 rounded-lg ${leader ? "bg-amber-400/[0.06] ring-1 ring-inset ring-amber-400/25" : ""} p-0.5`}
+                          className={`flex items-center gap-1.5 rounded-lg ${leader ? "bg-amber-50 ring-1 ring-inset ring-amber-400/50" : ""} p-0.5`}
                         >
                           {/* Leader marker: toggle in full mode; static in leaders mode. */}
                           <button
@@ -132,8 +132,8 @@ export function DeptSpine({
                             aria-label={leader ? "Leader" : "Mark as leader"}
                             title={mode === "leaders" ? "Leader" : leader ? "Leader — click to unset" : "Mark as leader"}
                             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
-                              leader ? "text-amber-300" : "text-white/25"
-                            } ${mode === "full" ? "hover:bg-white/10 hover:text-amber-200" : "cursor-default"}`}
+                              leader ? "text-amber-500" : "text-slate-300"
+                            } ${mode === "full" ? "hover:bg-slate-100 hover:text-amber-700" : "cursor-default"}`}
                           >
                             <Crown className="h-4 w-4" />
                           </button>
@@ -141,12 +141,12 @@ export function DeptSpine({
                             value={emp.name}
                             onChange={(e) => setRoster(d, roster.map((x) => (x.id === emp.id ? { ...x, name: e.target.value } : x)))}
                             placeholder={`${mode === "leaders" ? "Leader" : "Person"} ${i + 1}`}
-                            className="w-full rounded-lg border border-white/12 bg-white/[0.04] px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:border-[#00badc] focus:outline-none"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
                           />
                           <button
                             type="button"
                             onClick={() => setRoster(d, roster.filter((x) => x.id !== emp.id))}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/30 hover:bg-white/10 hover:text-white/70"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                             aria-label="Remove person"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -158,7 +158,7 @@ export function DeptSpine({
                   <button
                     type="button"
                     onClick={() => setRoster(d, [...roster, makeEmployee("", mode === "leaders")])}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-[#00badc] transition-colors hover:bg-[#00badc]/10"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-[#0089a3] transition-colors hover:bg-[#00badc]/10"
                   >
                     <UserPlus className="h-4 w-4" /> Add {mode === "leaders" ? "leader" : "person"}
                   </button>
@@ -170,17 +170,17 @@ export function DeptSpine({
         })}
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
+      <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
         <button
           type="button"
           onClick={add}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-[#00badc] transition-colors hover:bg-[#00badc]/10"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-[#0089a3] transition-colors hover:bg-[#00badc]/10"
         >
           <Plus className="h-4 w-4" /> Add department
         </button>
         <div className="flex items-center gap-5 px-1 text-sm tabular-nums">
-          <span className="text-white/60">Today <span className="font-semibold text-white">{totalCurrent}</span></span>
-          <span className="text-white/60">Future <span className="font-semibold text-[#00badc]">{totalFuture}</span></span>
+          <span className="text-slate-600">Today <span className="font-semibold text-slate-900">{totalCurrent}</span></span>
+          <span className="text-slate-600">Future <span className="font-semibold text-[#0089a3]">{totalFuture}</span></span>
         </div>
       </div>
     </div>

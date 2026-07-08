@@ -16,7 +16,7 @@ export function LaneToggle({
   onChange: (lane: Lane) => void
 }) {
   return (
-    <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] p-1">
+    <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1">
       <LaneButton active={lane === "detailed"} onClick={() => onChange("detailed")} icon={<SlidersHorizontal className="h-3.5 w-3.5" />}>
         Detailed
       </LaneButton>
@@ -43,7 +43,7 @@ function LaneButton({
       type="button"
       onClick={onClick}
       className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-        active ? "bg-[#00badc] text-slate-900" : "text-white/60 hover:text-white"
+        active ? "bg-[#00badc] text-slate-900" : "text-slate-600 hover:text-slate-900"
       }`}
     >
       {icon}

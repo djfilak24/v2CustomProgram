@@ -20,6 +20,7 @@ import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { buildProgramMap, MAP_DEPT_COLORS } from "@/lib/survey/programMap"
 import { ProgramMapView } from "@/components/survey/program-map"
 import { PrintReport } from "@/components/survey/print-report"
+import { exportProgramXlsx, exportIntakeWorkbook } from "@/lib/survey/excelExport"
 import type { SurveyResult } from "@/lib/survey/types"
 
 const CAT_ICON: Record<CompCategory, typeof Users> = {
@@ -121,13 +122,29 @@ export default function ReviewPage() {
                 {s.label}
               </button>
             ))}
-            {/* The leave-behind — a branded, light print report of the whole review */}
+            {/* The leave-behinds — branded print report + the two workbooks */}
             <button
               type="button"
               onClick={() => window.print()}
               className="ml-2 inline-flex items-center gap-1.5 rounded-lg border border-[#00badc]/45 bg-[#00badc]/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#00badc]/20"
             >
-              <FileDown className="h-3.5 w-3.5 text-[#00badc]" /> Export PDF
+              <FileDown className="h-3.5 w-3.5 text-[#00badc]" /> PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => exportProgramXlsx(result, comp, lines, { existing: existingTotal, proposed: proposedTotal })}
+              title="The program as a spreadsheet — every space, existing vs proposed"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#00badc]/45 bg-[#00badc]/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#00badc]/20"
+            >
+              <FileDown className="h-3.5 w-3.5 text-[#00badc]" /> Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => exportIntakeWorkbook(result)}
+              title="The intake workbook — every question pre-filled, ready to circulate and return"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/70 transition-colors hover:border-white/30 hover:text-white"
+            >
+              <FileDown className="h-3.5 w-3.5" /> Workbook
             </button>
             {/* NELSON-only: the Advanced Canvas is our tool, never a client affordance.
                 Deliberately quiet — a presenter knows to look for it. */}

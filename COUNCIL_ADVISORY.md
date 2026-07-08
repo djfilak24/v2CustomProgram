@@ -323,3 +323,31 @@ the backend ("it demos; databases don't"). The council kept the backend first
 because the access model makes distributed intake the blocker for real client
 work — but agreed the Map is small enough to build in parallel if capacity
 allows, and it requires zero backend.
+
+---
+
+# Advisory #3 — Dashboard Audit (implemented same-day)
+
+The founder pushed the council to audit the review Dashboard. Findings, all
+addressed in the same commit:
+
+1. **No verdict.** The page said "what you told us" but never "what it means" —
+   the money number (proposed SF + delta) was tile 6 of 6. → Now a verdict hero:
+   the SF huge, the delta pill beside it, the goal-vs-math strategy line as the
+   why, inputs as a quiet context rail.
+2. **Flat hierarchy, duplicated numbers.** Six identical tiles, two repeating
+   the subtitle. → Tiles folded into the hero context rail (People 400→440,
+   Rhythm, Today).
+3. **Strategy banner buried** below the fold. → Merged into the hero.
+4. **Copy bug + mixed message** in "For the live session" ("the gaps above"
+   pointed at nothing; alarming "16 data gaps" beside "Nothing was deferred").
+   → Moved to the right rail, positive copy ("Everything answered — 16 program
+   details to confirm together →").
+5. **Bars labeled only one value.** → Both values labeled per row + per-type
+   delta chips; the trade (e.g., −SF individual, +SF collaboration) is now the
+   visible story.
+6. **No seat story, no departments.** → "Where your N people sit" stacked bar
+   (offices / dedicated / flex / remote, as declared) and a "Your teams" grid
+   (today → future with growth arrows, dept colors matching the Program Map,
+   link to the map).
+7. **Radar outranked the money chart.** → Radar moved to the right rail.

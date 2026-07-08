@@ -17,7 +17,7 @@ import {
   GOAL_MOTIVATORS, SPACE_POSTURES, OFFICE_PLACEMENT_OPTIONS,
 } from "@/lib/survey/sections"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
-import { buildProgramMap } from "@/lib/survey/programMap"
+import { buildProgramMap, MAP_DEPT_COLORS } from "@/lib/survey/programMap"
 import { ProgramMapView } from "@/components/survey/program-map"
 import type { SurveyResult } from "@/lib/survey/types"
 
@@ -151,6 +151,7 @@ export default function ReviewPage() {
             comp={comp} result={result} profile={profile} strategy={strategy}
             existingTotal={existingTotal} proposedTotal={proposedTotal} catTotals={catTotals}
             gapCount={gapCount} onOpenValidation={() => { setShowGaps(true); setTab("validation") }}
+            onOpenMap={() => setTab("map")}
           />
         )}
         {tab === "map" && programMap && (
@@ -192,18 +193,15 @@ export default function ReviewPage() {
 /* ── Dashboard tab ──────────────────────────────────────────────────────────── */
 
 function DashboardTab({
-  comp, result, profile, strategy, existingTotal, proposedTotal, catTotals, gapCount, onOpenValidation,
+  comp, result, profile, strategy, existingTotal, proposedTotal, catTotals, gapCount, onOpenValidation, onOpenMap,
 }: {
   comp: Comparison; result: SurveyResult; profile: ReturnType<typeof computeProfile>
   strategy: ReturnType<typeof spaceStrategy>; existingTotal: number; proposedTotal: number
   catTotals: { cat: CompCategory; existing: number; proposed: number }[]
-  gapCount: number; onOpenValidation: () => void
+  gapCount: number; onOpenValidation: () => void; onOpenMap: () => void
 }) {
   const motivators = result.goals?.motivators ?? []
   const growthPct = result.people.companyGrowthPct
-  // Everything the client chose to leave for the meeting — skipping a question
-  // isn't a dead end, it's an agenda item. Deferred steps + unsure cadences +
-  // data gaps all land here so the live session starts with a ready list.
   const stepTitle = (id: string) => SURVEY_STEPS.find((s) => s.id === id)?.title ?? id
   const confirmLive: string[] = [
     ...result.deferred.map(stepTitle),
@@ -211,112 +209,212 @@ function DashboardTab({
       ? [`In-office cadence: ${result.work.daysUnsureDepts.join(", ")}`]
       : []),
   ]
-  return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-wide text-[#00badc]">{comp.clientName}</p>
-        <h1 className="mt-2 max-w-4xl text-4xl font-bold tracking-tight">Here&apos;s what you told us — at a glance.</h1>
-        <p className="mt-2 text-lg text-white/60">
-          Planning for <Strong>{comp.future}</Strong> people (from {comp.current} today){growthPct ? <> · {growthPct}% growth</> : null}.
-        </p>
-      </div>
 
-      {/* Goals */}
-      {(motivators.length > 0 || result.goals?.posture) && (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <div className="mb-3 text-xs font-medium uppercase tracking-wide text-white/45">What&apos;s driving this</div>
-          <div className="flex flex-wrap items-center gap-2">
-            {motivators.map((m) => (
-              <span key={m} className="rounded-full border border-[#00badc]/40 bg-[#00badc]/[0.08] px-3 py-1 text-sm font-medium text-white">
-                {labelOf(GOAL_MOTIVATORS, m)}
-              </span>
-            ))}
-            {result.goals?.posture && (
-              <span className="ml-1 rounded-full border border-amber-300/40 bg-amber-300/[0.08] px-3 py-1 text-sm font-medium text-amber-200">
-                Posture: {labelOf(SPACE_POSTURES, result.goals.posture)}
-              </span>
-            )}
+  const delta = proposedTotal - existingTotal
+  const deltaPct = existingTotal > 0 ? Math.round((delta / existingTotal) * 100) : 0
+  const up = delta > 0
+
+  // Declared seat posture — where the people they described actually sit today.
+  const depts = result.people.departments
+  const headcount = result.people.totalHeadcount
+  const seatOffices = depts.reduce((s, d) => s + (result.spaces.privateOfficesByDept[d.id] ?? 0), 0)
+  const seatDedicated = depts.reduce((s, d) => s + (result.work.dedicatedByDept?.[d.id] ?? 0), 0)
+  const seatRemote = comp.fullyRemote
+  const seatFlex = Math.max(0, headcount - seatOffices - seatDedicated - seatRemote)
+  const seatSegs = [
+    { label: "Private offices", n: seatOffices, cls: "bg-violet-400" },
+    { label: "Dedicated desks", n: seatDedicated, cls: "bg-[#00badc]" },
+    { label: "Flexible / shared", n: seatFlex, cls: "bg-white/30" },
+    { label: "Fully remote", n: seatRemote, cls: "bg-white/[0.12]" },
+  ].filter((s) => s.n > 0)
+
+  return (
+    <div className="space-y-6">
+      {/* ── The verdict — the number, the delta, and the why, first ─────────── */}
+      <div className="grid gap-6 rounded-2xl border border-[#00badc]/25 bg-[#00badc]/[0.04] p-7 lg:grid-cols-[1.5fr_1fr]">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-[#00badc]">{comp.clientName} · your program</p>
+          <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-2">
+            <span className="text-6xl font-bold tabular-nums leading-none tracking-tight">
+              {Math.round(proposedTotal).toLocaleString()}
+              <span className="ml-2 text-2xl font-medium text-white/45">SF</span>
+            </span>
+            <span className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold tabular-nums ${
+              up ? "bg-emerald-400/15 text-emerald-300" : delta < 0 ? "bg-amber-400/15 text-amber-300" : "bg-white/10 text-white/60"
+            }`}>
+              {up ? <TrendingUp className="h-4 w-4" /> : delta < 0 ? <TrendingDown className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+              {up ? "+" : ""}{Math.round(delta).toLocaleString()} SF vs today{existingTotal > 0 ? ` · ${deltaPct > 0 ? "+" : ""}${deltaPct}%` : ""}
+            </span>
+          </div>
+          <div className="mt-4 max-w-2xl">
+            <p className="text-base font-semibold text-white">{strategy.headline}</p>
+            <p className="mt-1 text-sm leading-relaxed text-white/60">{strategy.note}</p>
           </div>
         </div>
-      )}
 
-      {/* The live-session agenda — everything skipped, deferred, or unknown.
-          Skipping a question was never a dead end; it lands here. */}
-      {(confirmLive.length > 0 || gapCount > 0) && (
-        <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.04] p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-300" />
-              <span className="text-xs font-medium uppercase tracking-wide text-amber-200/90">For the live session</span>
-            </div>
-            {gapCount > 0 && (
-              <button
-                type="button"
-                onClick={onOpenValidation}
-                className="rounded-full border border-amber-300/40 bg-amber-300/[0.08] px-3 py-1 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-300/[0.15]"
-              >
-                {gapCount} data gap{gapCount === 1 ? "" : "s"} in the program →
-              </button>
-            )}
-          </div>
-          {confirmLive.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {confirmLive.map((t) => (
-                <span key={t} className="rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-sm text-white/75">
-                  {t}
+        {/* Quiet context — the inputs behind the number */}
+        <div className="flex flex-col justify-center gap-3 border-white/10 text-sm lg:border-l lg:pl-7">
+          <ContextRow label="People" value={<><Strong>{comp.current}</Strong> → <Strong>{comp.future}</Strong>{growthPct ? <span className="text-white/45"> · {growthPct}% growth</span> : null}</>} />
+          <ContextRow label="Rhythm" value={<><Strong>{comp.daysInOffice}</Strong> days/wk in office · <Strong>{comp.fullyRemote}</Strong> fully remote</>} />
+          <ContextRow label="Today" value={<><Strong>{Math.round(existingTotal).toLocaleString()}</Strong> SF existing</>} />
+          {(motivators.length > 0 || result.goals?.posture) && (
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {motivators.map((m) => (
+                <span key={m} className="rounded-full border border-[#00badc]/35 bg-[#00badc]/[0.08] px-2.5 py-0.5 text-xs font-medium text-white/85">
+                  {labelOf(GOAL_MOTIVATORS, m)}
                 </span>
               ))}
+              {result.goals?.posture && (
+                <span className="rounded-full border border-amber-300/40 bg-amber-300/[0.08] px-2.5 py-0.5 text-xs font-medium text-amber-200">
+                  {labelOf(SPACE_POSTURES, result.goals.posture)}
+                </span>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-white/50">Nothing was deferred — the gaps above are the working agenda.</p>
           )}
+        </div>
+      </div>
+
+      {/* ── Where your people sit — the declared seat posture ───────────────── */}
+      {seatSegs.length > 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h3 className="text-sm font-semibold text-white">Where your {headcount} people sit</h3>
+            <span className="text-[11px] text-white/40">as you described it</span>
+          </div>
+          <div className="flex h-3.5 overflow-hidden rounded-full bg-white/[0.05]">
+            {seatSegs.map((s) => (
+              <div key={s.label} className={`${s.cls} transition-all`} style={{ width: `${(s.n / Math.max(1, headcount)) * 100}%` }} title={`${s.n} ${s.label.toLowerCase()}`} />
+            ))}
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+            {seatSegs.map((s) => (
+              <span key={s.label} className="inline-flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${s.cls}`} />
+                <span className="font-bold tabular-nums text-white">{s.n}</span>
+                <span className="text-white/55">{s.label.toLowerCase()}</span>
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* KPI tiles */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatTile label="Today" value={comp.current} suffix="ppl" />
-        <StatTile label="Planning for" value={comp.future} suffix="ppl" accent />
-        <StatTile label="In-office" value={comp.daysInOffice} suffix="days/wk" />
-        <StatTile label="Fully remote" value={comp.fullyRemote} suffix="ppl" />
-        <StatTile label="Existing" value={Math.round(existingTotal).toLocaleString()} suffix="SF" />
-        <StatTile label="Proposed" value={Math.round(proposedTotal).toLocaleString()} suffix="SF" accent />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        {/* Existing vs proposed by category */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-base font-semibold text-white">Existing vs. proposed, by type</h3>
-            <div className="flex items-center gap-3 text-[11px] text-white/45">
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/30" /> Existing</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#00badc]" /> Proposed</span>
+      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+        <div className="space-y-6">
+          {/* Existing vs proposed by type — both values labeled, delta per row */}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-white">Existing vs. proposed, by type</h3>
+              <div className="flex items-center gap-3 text-[11px] text-white/45">
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/30" /> Existing</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#00badc]" /> Proposed</span>
+              </div>
+            </div>
+            <div className="space-y-5">
+              {catTotals.map(({ cat, existing, proposed }) => {
+                const max = Math.max(1, ...catTotals.flatMap((c) => [c.existing, c.proposed]))
+                const d = proposed - existing
+                const Icon = CAT_ICON[cat]
+                return (
+                  <div key={cat}>
+                    <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                      <span className="flex items-center gap-2 text-white/75"><Icon className="h-4 w-4 text-white/45" /> {cat}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
+                        d > 0 ? "bg-emerald-400/10 text-emerald-300" : d < 0 ? "bg-amber-400/10 text-amber-300" : "bg-white/[0.06] text-white/40"
+                      }`}>
+                        {d === 0 ? "no change" : `${d > 0 ? "+" : ""}${Math.round(d).toLocaleString()} SF`}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2.5 flex-1 rounded-full bg-white/[0.05]"><div className="h-2.5 rounded-full bg-white/30" style={{ width: `${(existing / max) * 100}%` }} /></div>
+                        <span className="w-16 text-right text-[11px] tabular-nums text-white/40">{Math.round(existing).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-2.5 flex-1 rounded-full bg-white/[0.05]"><div className="h-2.5 rounded-full bg-[#00badc]" style={{ width: `${(proposed / max) * 100}%` }} /></div>
+                        <span className="w-16 text-right text-[11px] font-medium tabular-nums text-[#00badc]/90">{Math.round(proposed).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
-          <div className="space-y-4">
-            {catTotals.map(({ cat, existing, proposed }) => {
-              const max = Math.max(1, ...catTotals.flatMap((c) => [c.existing, c.proposed]))
-              const Icon = CAT_ICON[cat]
-              return (
-                <div key={cat}>
-                  <div className="mb-1.5 flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2 text-white/70"><Icon className="h-4 w-4 text-white/45" /> {cat}</span>
-                    <span className="tabular-nums text-white/50">{Math.round(proposed).toLocaleString()} SF</span>
+
+          {/* Departments — the shape of the org, today → future */}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-white">Your teams</h3>
+              <button type="button" onClick={onOpenMap} className="text-xs font-medium text-[#00badc]/85 transition-colors hover:text-[#00badc]">
+                see them on the Program map →
+              </button>
+            </div>
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              {depts.map((d, i) => {
+                const fut = d.futureHeadcount ?? d.headcount
+                const dd = fut - d.headcount
+                return (
+                  <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: MAP_DEPT_COLORS[i % MAP_DEPT_COLORS.length] }} />
+                      <span className="truncate text-sm font-medium text-white">{d.name}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-sm tabular-nums">
+                      <span className="text-white/55">{d.headcount}</span>
+                      <span className="text-white/25">→</span>
+                      <span className="font-semibold text-white">{fut}</span>
+                      {dd !== 0 && (
+                        dd > 0
+                          ? <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                          : <TrendingDown className="h-3.5 w-3.5 text-amber-400" />
+                      )}
+                    </span>
                   </div>
-                  <div className="space-y-1">
-                    <div className="h-2.5 rounded-full bg-white/[0.06]"><div className="h-2.5 rounded-full bg-white/30" style={{ width: `${(existing / max) * 100}%` }} /></div>
-                    <div className="h-2.5 rounded-full bg-white/[0.06]"><div className="h-2.5 rounded-full bg-[#00badc]" style={{ width: `${(proposed / max) * 100}%` }} /></div>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-          <StrategyBanner strategy={strategy} className="mt-6" />
         </div>
 
-        {/* Profile radar */}
-        <WorkplaceProfile scores={profile} />
+        {/* Right rail: the live-session agenda + who they are */}
+        <div className="space-y-6">
+          {(confirmLive.length > 0 || gapCount > 0) && (
+            <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.04] p-5">
+              <div className="mb-2.5 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-300" />
+                <span className="text-xs font-medium uppercase tracking-wide text-amber-200/90">For the live session</span>
+              </div>
+              {confirmLive.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {confirmLive.map((t) => (
+                    <span key={t} className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-0.5 text-xs text-white/75">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {gapCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onOpenValidation}
+                  className="w-full rounded-lg border border-amber-300/40 bg-amber-300/[0.08] px-3 py-2 text-left text-xs font-medium text-amber-200 transition-colors hover:bg-amber-300/[0.15]"
+                >
+                  {confirmLive.length === 0 ? "Everything answered — " : ""}{gapCount} program detail{gapCount === 1 ? "" : "s"} to confirm together →
+                </button>
+              )}
+            </div>
+          )}
+          <WorkplaceProfile scores={profile} />
+        </div>
       </div>
+    </div>
+  )
+}
+
+function ContextRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="w-14 shrink-0 text-[11px] font-medium uppercase tracking-wide text-white/40">{label}</span>
+      <span className="text-white/75">{value}</span>
     </div>
   )
 }
@@ -582,15 +680,6 @@ function Chip({ children, amber }: { children: React.ReactNode; amber?: boolean 
 }
 
 function Empty() { return <p className="text-sm text-white/35">None selected.</p> }
-
-function StatTile({ label, value, suffix, accent }: { label: string; value: number | string; suffix?: string; accent?: boolean }) {
-  return (
-    <div className={`rounded-xl border p-4 ${accent ? "border-[#00badc]/30 bg-[#00badc]/[0.06]" : "border-white/10 bg-white/[0.03]"}`}>
-      <div className="text-[11px] font-medium uppercase tracking-wide text-white/45">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums text-white">{value}{suffix ? <span className="ml-1 text-xs font-medium text-white/45">{suffix}</span> : null}</div>
-    </div>
-  )
-}
 
 function StrategyBanner({ strategy, className = "" }: { strategy: ReturnType<typeof spaceStrategy>; className?: string }) {
   const grow = strategy.direction === "grow"

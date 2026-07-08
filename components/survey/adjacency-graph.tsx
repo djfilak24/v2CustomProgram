@@ -97,15 +97,15 @@ export function AdjacencyGraph({
               <g key={d.id} onClick={() => tap(d.id)} className="cursor-pointer">
                 <circle
                   cx={p.x} cy={p.y} r={isSel ? 13 : 10}
-                  fill={isSel ? "#00badc" : "#0e1f3a"}
-                  stroke={isSel ? "#00badc" : "rgba(15,23,42,0.4)"}
+                  fill={isSel ? "#00badc" : "#ffffff"}
+                  stroke={isSel ? "#0089a3" : "rgba(15,23,42,0.35)"}
                   strokeWidth={2}
                   className="transition-all"
                 />
                 <text
                   x={p.x + (right ? 18 : -18)} y={p.y}
                   dominantBaseline="middle" textAnchor={right ? "start" : "end"}
-                  className="fill-white/80 text-[12px] font-medium"
+                  className={isSel ? "fill-slate-900 text-[12px] font-semibold" : "fill-slate-700 text-[12px] font-medium"}
                 >
                   {d.name.length > 22 ? d.name.slice(0, 21) + "…" : d.name}
                 </text>

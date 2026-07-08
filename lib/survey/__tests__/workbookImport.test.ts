@@ -65,7 +65,8 @@ describe("workbook round-trip (Door 3)", () => {
     const wb = buildIntakeWorkbook(original)
     // Simulate the client editing the returned file.
     const dept = XLSX.utils.sheet_to_json(wb.Sheets["Departments"], { header: 1 }) as any[][]
-    dept[1][1] = 99 // Partners headcount → 99
+    const partners = dept.find((r) => String(r?.[0]) === "Partners")!
+    partners[1] = 99 // Partners headcount → 99
     wb.Sheets["Departments"] = XLSX.utils.aoa_to_sheet(dept)
     const comp = XLSX.utils.sheet_to_json(wb.Sheets["Company & Goals"], { header: 1 }) as any[][]
     const row = comp.find((r) => String(r?.[0]) === "Higher density")!

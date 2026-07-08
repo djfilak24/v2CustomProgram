@@ -146,6 +146,15 @@ export default function ReviewPage() {
             >
               <FileDown className="h-3.5 w-3.5" /> Workbook
             </button>
+            <a
+              href={`/workbook-guide${comp.clientName ? `?client=${encodeURIComponent(comp.clientName)}` : ""}`}
+              target="_blank"
+              rel="noreferrer"
+              title="The send-along guide — what the workbook is, why they got it, what to do. Save as PDF and send both together."
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+            >
+              Guide
+            </a>
             {/* NELSON-only: the Advanced Canvas is our tool, never a client affordance.
                 Deliberately quiet — a presenter knows to look for it. */}
             <button

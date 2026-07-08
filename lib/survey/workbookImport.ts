@@ -36,6 +36,12 @@ function valueOf(rs: Row[], label: string): unknown {
   return r?.[1]
 }
 
+/** Data rows after the header row identified by its first column label. */
+function afterHeader(rs: Row[], firstCol: string): Row[] {
+  const i = rs.findIndex((r) => s(r[0]).toLowerCase() === firstCol.toLowerCase())
+  return i >= 0 ? rs.slice(i + 1) : rs.slice(1)
+}
+
 export function importIntakeWorkbook(data: ArrayBuffer): SurveyResult {
   const wb = XLSX.read(data, { type: "array" })
 
@@ -55,7 +61,7 @@ export function importIntakeWorkbook(data: ArrayBuffer): SurveyResult {
   )?.id as "expand" | "balance" | "optimize" | undefined
 
   // ── Departments ─────────────────────────────────────────────────────────────
-  const deptRows = rows(wb, "Departments").slice(1).filter((r) => s(r[0]))
+  const deptRows = afterHeader(rows(wb, "Departments"), "Department").filter((r) => s(r[0]))
   const idOf = new Map<string, string>()
   const departments = deptRows.map((r, i) => {
     const id = `d${i + 1}`
@@ -78,7 +84,7 @@ export function importIntakeWorkbook(data: ArrayBuffer): SurveyResult {
   })
 
   // ── Roster (names + leader / office / desk marks) ───────────────────────────
-  const rosterRows = rows(wb, "Roster").slice(1).filter((r) => s(r[1]))
+  const rosterRows = afterHeader(rows(wb, "Roster"), "Department").filter((r) => s(r[1]))
   const roster = new Map<string, { id: string; name: string; isLeader?: boolean }[]>()
   const officeMarks: Record<string, number> = {}
   const deskMarks: Record<string, number> = {}

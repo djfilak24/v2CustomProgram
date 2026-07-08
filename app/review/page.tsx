@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import {
   TrendingUp, TrendingDown, Minus, Building2, Users, Presentation, Box,
-  Crown, AlertTriangle, LayoutDashboard, ListChecks, GitCompareArrows, Sun, Moon, Network, Wrench,
+  Crown, AlertTriangle, LayoutDashboard, ListChecks, GitCompareArrows, Sun, Moon, Network, Wrench, FileDown,
 } from "lucide-react"
 import { loadSurveySeed, saveSurveySeed } from "@/lib/survey/seedStorage"
 import {
@@ -19,6 +19,7 @@ import {
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { buildProgramMap, MAP_DEPT_COLORS } from "@/lib/survey/programMap"
 import { ProgramMapView } from "@/components/survey/program-map"
+import { PrintReport } from "@/components/survey/print-report"
 import type { SurveyResult } from "@/lib/survey/types"
 
 const CAT_ICON: Record<CompCategory, typeof Users> = {
@@ -99,7 +100,12 @@ export default function ReviewPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
+    <>
+    <PrintReport
+      result={result} comp={comp} lines={lines}
+      existingTotal={existingTotal} proposedTotal={proposedTotal} catTotals={catTotals}
+    />
+    <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white print:hidden">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1830]/85 px-6 py-4 backdrop-blur-md lg:px-10">
         <div className="mx-auto flex max-w-[2000px] flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-4">
@@ -115,6 +121,14 @@ export default function ReviewPage() {
                 {s.label}
               </button>
             ))}
+            {/* The leave-behind — a branded, light print report of the whole review */}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="ml-2 inline-flex items-center gap-1.5 rounded-lg border border-[#00badc]/45 bg-[#00badc]/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#00badc]/20"
+            >
+              <FileDown className="h-3.5 w-3.5 text-[#00badc]" /> Export PDF
+            </button>
             {/* NELSON-only: the Advanced Canvas is our tool, never a client affordance.
                 Deliberately quiet — a presenter knows to look for it. */}
             <button
@@ -187,6 +201,7 @@ export default function ReviewPage() {
         </div>
       </main>
     </div>
+    </>
   )
 }
 

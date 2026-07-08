@@ -351,3 +351,61 @@ addressed in the same commit:
    (today → future with growth arrows, dept colors matching the Program Map,
    link to the map).
 7. **Radar outranked the money chart.** → Radar moved to the right rail.
+
+---
+
+# Advisory #4 — The Client-Pilot Audit (milestone: claude/client-experience)
+
+> The founder: "Right now, the production app gives anyone with the link full
+> access to everything… I'm starting to think about how I would set this up in
+> a way where I could test it with a client." The committee audited today's
+> build against that goal.
+
+## Verdict: demoable A− · client-pilotable NOT YET — one missing organ
+
+**What a client with the production link sees today:** everything. The survey,
+but also three fictional demo companies one click away, a presenter scenario
+pill on every step, the review with a quiet wrench into the NELSON-only canvas,
+every export, and the canvas itself with its admin panel. Nothing distinguishes
+a client from a NELSON presenter from a stranger.
+
+**The deepest gap isn't cosmetic — it's that the solo link doesn't deliver.**
+All data lives in the visitor's own localStorage. A client who finishes the
+survey on their laptop has sent NELSON *nothing*; their review renders from
+their own browser and we never see it. Today the only working return paths are
+(a) the workbook round-trip and (b) them screen-sharing. The pipe from client
+answers back to NELSON does not exist yet — that is the backend, and it is now
+the single blocking item.
+
+## The minimal client-pilot kit (in order)
+
+1. **Engagement backend** — one table (engagement id, token, SurveyResult JSON,
+   status, updated_at). The survey's finish button writes to it. This converts
+   the survey from a demo into an instrument.
+2. **Client links become scoped:** `/s/<token>` → the survey only, client name
+   pre-seeded, no demo pill, no demo buttons, no canvas-reachable paths.
+   Autosave graduates from localStorage to the engagement record (resume from
+   any device).
+3. **NELSON mode, explicitly:** presenter chrome (demo pill, scenario chips,
+   wrench, exports-as-sender) renders only in NELSON mode — v1 can be a simple
+   gate (passcode/flag), real auth later.
+4. **A review-share decision** (question for the founder below): whether
+   clients ever see the review alone or only in the meeting.
+
+Everything else the pilot needs — survey quality, review, map, exports, the
+workbook loop — already exists and is the strong part of the audit.
+
+## Questions the committee sends back to the founder
+
+1. **Database** (the blocking pick): Vercel Postgres (stays in the Vercel
+   account, zero new vendors) vs. Supabase (free tier, more headroom, its own
+   dashboard). Either works; the council mildly favors Vercel Postgres for
+   fewest moving parts.
+2. **What does the client's link show after they finish the survey?**
+   (a) a thank-you full stop — the review is revealed in our meeting;
+   (b) their dashboard + program map as a teaser, numbers saved for the meeting;
+   (c) the full review. Marta favors (b): payoff without pre-empting the session.
+3. **NELSON gate for the pilot:** shared passcode now (ships this week) vs.
+   proper auth first (slower). Council: passcode now, auth later.
+4. **Which door does the first real client get:** solo link, distributed
+   department mini-links, or the workbook? Determines polish order.

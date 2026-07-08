@@ -196,3 +196,130 @@ leak; into an airtight one, it's the moat.
 *Also fixed in this commit: full-roster/per-dept dedicated-desk counts now land
 on the department cards in the canvas (was: formula `headcount − offices`
 ignored the survey's answer). Covered by 2 new tests; 31 survey tests green.*
+
+---
+---
+
+# Advisory #2 — Program Map, Access Model, Fast-Track Reveal
+*(2026-07-08, following the founder's Phase-1 review)*
+
+> Three founder directions put to the council: (1) an org-chart / whiteboard
+> "bubble" view of the program; (2) the clarified access model — clients never
+> touch the Advanced Canvas, so backend + per-department micro-links jump the
+> queue; (3) Fast Track shows too much at once — inputs first, the full
+> breakdown held back for an intentional reveal.
+
+## 1. The Program Map (whiteboard bubble view) — unanimous, and overdue
+
+The council's strongest endorsement of the session. This isn't a novelty view —
+**it's the bubble diagram, a standard artifact of architectural programming**
+that the tool has been computing but never drawing.
+
+**Marta (strategist):** "This is what I draw on the whiteboard in every meeting
+anyway. Department clusters, spaces sized by square footage, adjacency lines
+between clusters, names on the offices. The tool has every input; give me the
+drawing." It also finally makes adjacency answers *visibly do something* — the
+oldest open row on the traceability matrix.
+
+**Design contract (Felix):**
+- A pan/zoom whiteboard surface, force-directed: each **department is a
+  cluster** (tinted hull in the dept color), each **space is a bubble** sized by
+  `√SF` (workstation blocks, office circles, dept-owned collab).
+- **Named where applicable:** offices/dedicated desks show roster names
+  (leaders crowned); unnamed seats render as count chips ("×22").
+- **Adjacency = gravity + lines:** ranked adjacency pairs pull clusters
+  together and draw weighted links (reusing the survey's priority color ramp).
+- **Shared spaces** (conference, support, wellness) sit in a neutral center
+  band between the clusters they serve.
+- Read-first: v1 is a view (hover for detail, click to highlight a
+  department); dragging/rearranging is v2.
+
+**Placement (council ruling):** a fourth tab on the review — **"Program Map"**
+— because the review is the client-facing meeting surface and already holds
+the full SurveyResult + engine output. The canvas can mount the same component
+later for the NELSON-side deep dive.
+
+**Priya (effort):** M. All data exists (`mapSurveyToCanvas` spaces +
+departmentAllocations, roster, `adjacencyPairs`). A pure layout function
+(d3-force or a small custom simulation) + one SVG component; layout is unit-
+testable. No backend dependency — buildable now.
+
+**Victor:** "This is the screenshot that sells the engagement. It's also the
+page a broker forwards."
+
+## 2. Access model — the council stands corrected, and re-sequences
+
+The founder's clarification changes the map: **the Advanced Canvas is
+NELSON-only.** Clients see the survey and (in the meeting, driven by us) the
+review. Fast Track and the survey are the only solo-exploration paths.
+
+Consequences the council flags:
+
+1. **"Open in Advanced Canvas" must stop being a client affordance.** Today it
+   is the review's primary CTA. Move it behind a presenter affordance (subtle
+   "NELSON" control in the header, not the hero button of the page). The
+   client-facing CTA becomes the artifact ("Get your program summary") or
+   simply the end of the guided meeting.
+2. **The backend jumps from Phase 3 to Phase 2 — now the top of the queue.**
+   With no canvas handoff for clients, the localStorage relay is only a
+   same-device demo trick. Real engagements need: `engagements` (id, token,
+   SurveyResult JSON, updated_at) + `dept_links` (token → engagement, dept id,
+   status). Respondents get tokenized links (no login); the coordinator gets a
+   completion board; NELSON gets the master result. A shared-secret gate on
+   the canvas/review-admin side is acceptable v1 auth; real auth later.
+3. **The artifact matters *more*, not less.** If clients never touch the deep
+   tool, the PDF/Excel leave-behind is the only thing they hold. Exports stay
+   Phase 2, right behind the backend.
+4. **Solo Fast Track earns first-class status** as one of only two
+   self-service doors — which makes direction #3 (below) strategic, not
+   cosmetic.
+
+## 3. Fast Track — stage the reveal (council agrees, with a design contract)
+
+The critique is correct: today's Fast Track answers questions the user hasn't
+asked yet. Anchoring a client with 30 derived numbers while they're still
+choosing inputs is forcing information; it also spends the "wow" moment early
+and cheaply.
+
+**The arc every surface should share** (survey already does this):
+**capture → reveal → drill.**
+
+- **Stage 1 — Capture.** Inputs are the hero: 4–5 large, friendly controls
+  (headcount, remote, days in office, % offices), with at most a whisper of
+  live feedback — a single ticker strip (~total SF · seats) that moves as they
+  dial. Enough to feel alive; not enough to anchor.
+- **Stage 2 — Reveal.** An intentional "Generate my program" → the dashboard
+  moment: staged, animated, the same visual grammar as the review dashboard
+  (KPI tiles, category bars, profile). This is the payoff beat.
+- **Stage 3 — Drill.** "See the full breakdown" opens the detailed tables for
+  those who ask. Held back by default, never forced.
+
+**Priya's sequencing note:** refactor Fast Track *with* the shared token layer
+and reuse the review-dashboard components (StatTile, category bars) — one
+styling pass, one component family, and Fast Track stops being a third visual
+dialect. **Dana:** "Stage 1 is also exactly what the survey hero promises —
+the two solo doors should feel like siblings."
+
+## Re-sequenced roadmap (supersedes Advisory #1 phases 2–4)
+
+**Phase 2 — The platform + the map**
+1. Engagement backend (engagements + dept_links, tokenized) — *promoted per access model*
+2. Distributed per-department micro-links + coordinator completion board
+3. **Program Map** (review tab; force-layout bubbles, roster names, adjacencies)
+4. Gate "Open in Advanced Canvas" behind a presenter affordance
+
+**Phase 3 — The artifact + the reveal**
+5. PDF export of the review (branded leave-behind — the only thing clients keep)
+6. Excel export: program + intake workbook
+7. Shared design tokens → Fast Track staged-reveal refactor (capture/reveal/drill)
+8. Survey/review light re-skin on the token layer
+
+**Phase 4 — Compounding** *(unchanged)*
+9. Quick-entry grid · automated Excel import · goals→engine · analytics ·
+   scenario A/B · monolith decomposition (ongoing)
+
+**Dissent worth recording:** Victor argued the Program Map should ship *before*
+the backend ("it demos; databases don't"). The council kept the backend first
+because the access model makes distributed intake the blocker for real client
+work — but agreed the Map is small enough to build in parallel if capacity
+allows, and it requires zero backend.

@@ -76,8 +76,8 @@ function Guide() {
               agenda items we resolve together in your validation session. There are no wrong answers.
             </Step>
             <Step n={3} title="Send it back.">
-              Reply to your NELSON contact with the finished file — or, if you were given a survey
-              link, use <i>“Import a completed intake workbook”</i> on its first page.
+              Reply to your NELSON contact with the finished file — or return to your NELSON link
+              and use <i>“Upload completed workbook”</i> at the bottom of the page.
             </Step>
           </ol>
         </Section>

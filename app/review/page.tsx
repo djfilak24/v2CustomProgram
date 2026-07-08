@@ -21,6 +21,7 @@ import { buildProgramMap, MAP_DEPT_COLORS } from "@/lib/survey/programMap"
 import { ProgramMapView } from "@/components/survey/program-map"
 import { PrintReport } from "@/components/survey/print-report"
 import { exportProgramXlsx, exportIntakeWorkbook } from "@/lib/survey/excelExport"
+import { isNelsonMode } from "@/lib/nelsonMode"
 import type { SurveyResult } from "@/lib/survey/types"
 
 const CAT_ICON: Record<CompCategory, typeof Users> = {
@@ -44,6 +45,9 @@ export default function ReviewPage() {
   const [sizes, setSizes] = useState<Record<string, number>>({})
   const [tab, setTab] = useState<Tab>("dashboard")
   const [showGaps, setShowGaps] = useState(true)
+  // Presenter chrome (demo chips, canvas wrench) is NELSON-only.
+  const [nelson, setNelson] = useState(false)
+  useEffect(() => { setNelson(isNelsonMode()) }, [])
 
   const load = (r: SurveyResult) => { setResult(r); setInputs(defaultCompInputs(r)); setCounts({}); setSizes({}) }
 
@@ -115,6 +119,7 @@ export default function ReviewPage() {
             <span className="hidden text-sm font-medium text-slate-600 sm:inline">{comp.clientName}</span>
           </div>
           <div className="flex items-center gap-2">
+            {nelson && (<>
             <span className="mr-1 text-[11px] uppercase tracking-wide text-slate-400">Demo</span>
             {Object.entries(DEMO_SCENARIOS).map(([key, s]) => (
               <button key={key} type="button" onClick={() => load(demoResult(key) ?? s.result)} title={s.blurb}
@@ -122,6 +127,7 @@ export default function ReviewPage() {
                 {s.label}
               </button>
             ))}
+            </>)}
             {/* The leave-behinds — branded print report + the two workbooks */}
             <button
               type="button"
@@ -155,8 +161,8 @@ export default function ReviewPage() {
             >
               Guide
             </a>
-            {/* NELSON-only: the Advanced Canvas is our tool, never a client affordance.
-                Deliberately quiet — a presenter knows to look for it. */}
+            {/* NELSON-only: the Advanced Canvas is our tool, never a client affordance. */}
+            {nelson && (
             <button
               type="button"
               onClick={openCanvas}
@@ -165,6 +171,7 @@ export default function ReviewPage() {
             >
               <Wrench className="h-3.5 w-3.5" />
             </button>
+            )}
           </div>
         </div>
 

@@ -15,6 +15,7 @@ import { DEMO_SCENARIOS, demoState } from "@/lib/survey/demo-scenarios"
 import { saveSurveyDraft, loadSurveyDraft, clearSurveyDraft, draftAge, type SurveyDraft } from "@/lib/survey/draftStorage"
 import { saveSurveySeed } from "@/lib/survey/seedStorage"
 import { importIntakeWorkbook } from "@/lib/survey/workbookImport"
+import { isNelsonMode } from "@/lib/nelsonMode"
 import { ProgressHeader } from "@/components/survey/progress-header"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { LaneToggle } from "@/components/survey/lane-toggle"
@@ -45,6 +46,9 @@ export default function SurveyPage() {
   // Presenter mode: which demo scenario is seated. Non-null once a demo starts —
   // unlocks the floating scenario switcher on every step.
   const [demoKey, setDemoKey] = useState<string | null>(null)
+  // Presenter chrome (demo pill, hero demo buttons) is NELSON-only.
+  const [nelson, setNelson] = useState(false)
+  useEffect(() => { setNelson(isNelsonMode()) }, [])
 
   const steps = SURVEY_STEPS
   const step = steps[stepIndex]
@@ -150,14 +154,14 @@ export default function SurveyPage() {
 
   // Always available during the survey — mid-demo (or mid-anything) the
   // presenter can seat a different company on the exact screen being shown.
-  const demoBar = <DemoSwitcher active={demoKey} onSwitch={switchDemo} />
+  const demoBar = nelson ? <DemoSwitcher active={demoKey} onSwitch={switchDemo} /> : null
 
   if (phase === "hero")
     return (
       <Hero
         onBegin={beginSurvey} onDemo={startDemo} draft={draft}
         onResume={resumeDraft} onDiscardDraft={discardDraft}
-        onImport={importWorkbook} importError={importError}
+        onImport={importWorkbook} importError={importError} showDemos={nelson}
       />
     )
   if (phase === "summary")
@@ -791,7 +795,7 @@ function DemoSwitcher({ active, onSwitch }: { active: string | null; onSwitch: (
   )
 }
 
-function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, importError }: {
+function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, importError, showDemos }: {
   onBegin: () => void
   onDemo: (key: string) => void
   draft: SurveyDraft | null
@@ -799,6 +803,7 @@ function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, impo
   onDiscardDraft: () => void
   onImport: (file: File) => void
   importError: string | null
+  showDemos: boolean
 }) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0b1830] text-white">
@@ -894,7 +899,8 @@ function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, impo
             </p>
           )}
 
-          {/* Presenter demo — seat a full scenario and click through a filled survey */}
+          {/* Presenter demo — NELSON-only chrome (unlock at /engagements) */}
+          {showDemos && (
           <div className="mt-12 flex flex-col items-center gap-3">
             <span className="text-[11px] font-medium uppercase tracking-wide text-white/35">Presenter demo · seat a full scenario</span>
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -911,6 +917,7 @@ function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, impo
               ))}
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

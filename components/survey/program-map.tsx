@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
-import { Crown } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Crown, Plus, Minus, Maximize2 } from "lucide-react"
 import type { ProgramMap, MapBubble } from "@/lib/survey/programMap"
 import { adjacencyColor } from "@/lib/survey/sections"
 
@@ -27,23 +27,37 @@ export function ProgramMapView({ map }: { map: ProgramMap }) {
     setSelected(null)
   }
 
-  const toWorld = (clientX: number, clientY: number) => {
-    const rect = svgRef.current!.getBoundingClientRect()
-    return {
-      x: view.x + ((clientX - rect.left) / rect.width) * view.w,
-      y: view.y + ((clientY - rect.top) / rect.height) * view.h,
-    }
-  }
-
-  const onWheel = (e: React.WheelEvent) => {
-    const factor = e.deltaY > 0 ? 1.12 : 1 / 1.12
-    const p = toWorld(e.clientX, e.clientY)
+  // Zoom by a factor, anchored on a screen point (cursor) or the canvas center.
+  const zoomAt = (factor: number, clientX?: number, clientY?: number) => {
+    const rect = svgRef.current?.getBoundingClientRect()
     setView((v) => {
       const w = Math.min(map.width * 3, Math.max(map.width / 8, v.w * factor))
+      if (w === v.w) return v
       const h = (w / v.w) * v.h
-      return { x: p.x - ((p.x - v.x) / v.w) * w, y: p.y - ((p.y - v.y) / v.h) * h, w, h }
+      const ax = rect && clientX !== undefined ? v.x + ((clientX - rect.left) / rect.width) * v.w : v.x + v.w / 2
+      const ay = rect && clientY !== undefined ? v.y + ((clientY - rect.top) / rect.height) * v.h : v.y + v.h / 2
+      return { x: ax - ((ax - v.x) / v.w) * w, y: ay - ((ay - v.y) / v.h) * h, w, h }
     })
   }
+  const fit = () => { setView({ x: 0, y: 0, w: map.width, h: map.height }); setSelected(null) }
+
+  // Wheel zoom only with ⌘/Ctrl held, via a NON-passive native listener so we
+  // can preventDefault — that locks out both page scroll and browser page-zoom
+  // while zooming the canvas. A plain scroll passes through and scrolls the
+  // page like anywhere else. (React's synthetic onWheel is passive: it zoomed
+  // the map while the page also scrolled — the disorienting double-move.)
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const onWheelNative = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      e.preventDefault()
+      zoomAt(e.deltaY > 0 ? 1.12 : 1 / 1.12, e.clientX, e.clientY)
+    }
+    el.addEventListener("wheel", onWheelNative, { passive: false })
+    return () => el.removeEventListener("wheel", onWheelNative)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map])
   const onPointerDown = (e: React.PointerEvent) => {
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
     drag.current = { px: e.clientX, py: e.clientY, vx: view.x, vy: view.y }
@@ -73,11 +87,10 @@ export function ProgramMapView({ map }: { map: ProgramMap }) {
         ref={svgRef}
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
         className="relative block h-[640px] w-full cursor-grab touch-none active:cursor-grabbing"
-        onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onDoubleClick={() => { setView({ x: 0, y: 0, w: map.width, h: map.height }); setSelected(null) }}
+        onDoubleClick={fit}
       >
         {/* Adjacency links — ranked color + weight, behind everything */}
         {map.links.map((l) => {
@@ -124,13 +137,41 @@ export function ProgramMapView({ map }: { map: ProgramMap }) {
         ))}
       </svg>
 
+      {/* Zoom controls — the primary way in and out; wheel zoom is ⌘/Ctrl-gated */}
+      <div className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-200">
+        <button
+          type="button"
+          onClick={() => zoomAt(1 / 1.3)}
+          title="Zoom in"
+          className="flex h-8 w-8 items-center justify-center text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => zoomAt(1.3)}
+          title="Zoom out"
+          className="flex h-8 w-8 items-center justify-center border-t border-slate-100 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={fit}
+          title="Fit to view"
+          className="flex h-8 w-8 items-center justify-center border-t border-slate-100 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
       {/* Legend + hints */}
       <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-white/90 px-3 py-2 text-[11px] text-slate-500 ring-1 ring-slate-200 backdrop-blur-sm">
         <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full border border-slate-500 bg-transparent" /> office (named)</span>
         <span className="flex items-center gap-1.5"><Crown className="h-3 w-3 text-amber-500" /> leader</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-300" /> ×N seats</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 rounded bg-cyan-600" /> adjacency (ranked)</span>
-        <span className="text-slate-400">scroll to zoom · drag to pan · click a team to spotlight · double-click to reset</span>
+        <span className="text-slate-400">⌘/Ctrl + scroll to zoom · drag to pan · click a team to spotlight · double-click to fit</span>
       </div>
     </div>
   )

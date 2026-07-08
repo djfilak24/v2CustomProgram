@@ -40,6 +40,9 @@ export default function SurveyPage() {
   const [deferred, setDeferred] = useState<Set<StepId>>(new Set())
   const [draft, setDraft] = useState<SurveyDraft | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
+  // Presenter mode: which demo scenario is seated. Non-null once a demo starts —
+  // unlocks the floating scenario switcher on every step.
+  const [demoKey, setDemoKey] = useState<string | null>(null)
 
   const steps = SURVEY_STEPS
   const step = steps[stepIndex]
@@ -81,7 +84,20 @@ export default function SurveyPage() {
     setDeferred(new Set())
     setStepIndex(0)
     setShowIntro(false)
+    setDemoKey(key)
     setPhase("survey")
+  }
+
+  // Mid-demo scenario swap: seat a different company but STAY on the current
+  // step — the point is showing how this exact screen reads for different
+  // client configurations.
+  const switchDemo = (key: string) => {
+    const st = demoState(key)
+    if (!st) return
+    setState(st)
+    setLanes(allLanes("detailed"))
+    setDeferred(new Set())
+    setDemoKey(key)
   }
   useEffect(() => {
     const key = new URLSearchParams(window.location.search).get("demo")
@@ -117,17 +133,22 @@ export default function SurveyPage() {
   const anyDetailed = Object.values(lanes).some((l) => l === "detailed")
   const toggleSimplifyAll = () => setLanes(allLanes(anyDetailed ? "quick" : "detailed"))
 
+  const demoBar = demoKey ? <DemoSwitcher active={demoKey} onSwitch={switchDemo} /> : null
+
   if (phase === "hero")
     return <Hero onBegin={beginSurvey} onDemo={startDemo} draft={draft} onResume={resumeDraft} onDiscardDraft={discardDraft} />
   if (phase === "summary")
     return (
-      <Summary
-        state={state}
-        lanes={lanes}
-        deferred={deferred}
-        scores={scores}
-        onBack={() => { setPhase("survey"); setStepIndex(steps.length - 1) }}
-      />
+      <>
+        <Summary
+          state={state}
+          lanes={lanes}
+          deferred={deferred}
+          scores={scores}
+          onBack={() => { setPhase("survey"); setStepIndex(steps.length - 1) }}
+        />
+        {demoBar}
+      </>
     )
 
   // Detailed lane is per-question, and only meaningful where the step defines a
@@ -140,6 +161,7 @@ export default function SurveyPage() {
   return (
     <div className="min-h-screen bg-[#f3f7fa] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-slate-900">
       {showIntro && <IntroDemo onDismiss={() => setShowIntro(false)} />}
+      {demoBar}
 
       <ProgressHeader stepIndex={stepIndex} onJump={(i) => setStepIndex(i)} />
 
@@ -716,6 +738,35 @@ function TextField({
 }
 
 // ── Hero + Done ──────────────────────────────────────────────────────────────
+
+/**
+ * Presenter scenario switcher — locked to every survey step (and the summary)
+ * once a demo is seated. Swapping scenarios keeps you on the SAME screen, so
+ * mid-demo you can show how this exact question reads for a tech startup vs. a
+ * law firm vs. an enterprise. Never shown to real respondents (demo-only).
+ */
+function DemoSwitcher({ active, onSwitch }: { active: string; onSwitch: (key: string) => void }) {
+  return (
+    <div className="fixed bottom-5 left-5 z-40 flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 py-1.5 pl-3.5 pr-1.5 shadow-lg shadow-slate-900/10 backdrop-blur-sm">
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Demo</span>
+      {Object.entries(DEMO_SCENARIOS).map(([key, s]) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onSwitch(key)}
+          title={s.blurb}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            key === active
+              ? "bg-[#00badc] text-slate-900"
+              : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          }`}
+        >
+          {s.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft }: {
   onBegin: () => void

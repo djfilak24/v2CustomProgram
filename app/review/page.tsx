@@ -101,7 +101,7 @@ export default function ReviewPage() {
   return (
     <div className="min-h-screen bg-[#0b1830] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-white">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1830]/85 px-6 py-4 backdrop-blur-md lg:px-10">
-        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-[2000px] flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-4">
             <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto brightness-0 invert" priority />
             <span className="hidden text-sm text-white/40 sm:inline">·</span>
@@ -129,7 +129,7 @@ export default function ReviewPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="mx-auto mt-4 flex max-w-[1500px] items-center gap-1">
+        <div className="mx-auto mt-4 flex max-w-[2000px] items-center gap-1">
           {TABS.map((t) => {
             const on = tab === t.id
             const Icon = t.icon
@@ -145,7 +145,7 @@ export default function ReviewPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] px-6 py-8 lg:px-10">
+      <main className="mx-auto max-w-[2000px] px-6 py-8 lg:px-10">
         {tab === "dashboard" && (
           <DashboardTab
             comp={comp} result={result} profile={profile} strategy={strategy}
@@ -274,29 +274,58 @@ function DashboardTab({
         </div>
       </div>
 
-      {/* ── Where your people sit — the declared seat posture ───────────────── */}
-      {seatSegs.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <div className="mb-3 flex items-baseline justify-between gap-3">
-            <h3 className="text-sm font-semibold text-white">Where your {headcount} people sit</h3>
-            <span className="text-[11px] text-white/40">as you described it</span>
+      {/* ── Seat posture + live-session strip, side by side ─────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+        {seatSegs.length > 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h3 className="text-sm font-semibold text-white">Where your {headcount} people sit</h3>
+              <span className="text-[11px] text-white/40">as you described it</span>
+            </div>
+            <div className="flex h-3.5 overflow-hidden rounded-full bg-white/[0.05]">
+              {seatSegs.map((s) => (
+                <div key={s.label} className={`${s.cls} transition-all`} style={{ width: `${(s.n / Math.max(1, headcount)) * 100}%` }} title={`${s.n} ${s.label.toLowerCase()}`} />
+              ))}
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+              {seatSegs.map((s) => (
+                <span key={s.label} className="inline-flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${s.cls}`} />
+                  <span className="font-bold tabular-nums text-white">{s.n}</span>
+                  <span className="text-white/55">{s.label.toLowerCase()}</span>
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="flex h-3.5 overflow-hidden rounded-full bg-white/[0.05]">
-            {seatSegs.map((s) => (
-              <div key={s.label} className={`${s.cls} transition-all`} style={{ width: `${(s.n / Math.max(1, headcount)) * 100}%` }} title={`${s.n} ${s.label.toLowerCase()}`} />
-            ))}
+        ) : <div />}
+
+        {(confirmLive.length > 0 || gapCount > 0) && (
+          <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.04] p-5">
+            <div className="mb-2.5 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-300" />
+              <span className="text-xs font-medium uppercase tracking-wide text-amber-200/90">For the live session</span>
+            </div>
+            {confirmLive.length > 0 && (
+              <div className="mb-2.5 flex flex-wrap gap-1.5">
+                {confirmLive.map((t) => (
+                  <span key={t} className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-0.5 text-xs text-white/75">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+            {gapCount > 0 && (
+              <button
+                type="button"
+                onClick={onOpenValidation}
+                className="w-full rounded-lg border border-amber-300/40 bg-amber-300/[0.08] px-3 py-2 text-left text-xs font-medium text-amber-200 transition-colors hover:bg-amber-300/[0.15]"
+              >
+                {confirmLive.length === 0 ? "Everything answered — " : ""}{gapCount} program detail{gapCount === 1 ? "" : "s"} to confirm together →
+              </button>
+            )}
           </div>
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
-            {seatSegs.map((s) => (
-              <span key={s.label} className="inline-flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${s.cls}`} />
-                <span className="font-bold tabular-nums text-white">{s.n}</span>
-                <span className="text-white/55">{s.label.toLowerCase()}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
@@ -375,34 +404,8 @@ function DashboardTab({
           </div>
         </div>
 
-        {/* Right rail: the live-session agenda + who they are */}
-        <div className="space-y-6">
-          {(confirmLive.length > 0 || gapCount > 0) && (
-            <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.04] p-5">
-              <div className="mb-2.5 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-300" />
-                <span className="text-xs font-medium uppercase tracking-wide text-amber-200/90">For the live session</span>
-              </div>
-              {confirmLive.length > 0 && (
-                <div className="mb-3 flex flex-wrap gap-1.5">
-                  {confirmLive.map((t) => (
-                    <span key={t} className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-0.5 text-xs text-white/75">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {gapCount > 0 && (
-                <button
-                  type="button"
-                  onClick={onOpenValidation}
-                  className="w-full rounded-lg border border-amber-300/40 bg-amber-300/[0.08] px-3 py-2 text-left text-xs font-medium text-amber-200 transition-colors hover:bg-amber-300/[0.15]"
-                >
-                  {confirmLive.length === 0 ? "Everything answered — " : ""}{gapCount} program detail{gapCount === 1 ? "" : "s"} to confirm together →
-                </button>
-              )}
-            </div>
-          )}
+        {/* Right rail: who they are — starts high, alongside the money chart */}
+        <div>
           <WorkplaceProfile scores={profile} />
         </div>
       </div>

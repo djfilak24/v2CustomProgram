@@ -13,6 +13,8 @@ import {
 } from "@/lib/survey/sections"
 import { DEMO_SCENARIOS, demoState } from "@/lib/survey/demo-scenarios"
 import { saveSurveyDraft, loadSurveyDraft, clearSurveyDraft, draftAge, type SurveyDraft } from "@/lib/survey/draftStorage"
+import { saveSurveySeed } from "@/lib/survey/seedStorage"
+import { importIntakeWorkbook } from "@/lib/survey/workbookImport"
 import { ProgressHeader } from "@/components/survey/progress-header"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { LaneToggle } from "@/components/survey/lane-toggle"
@@ -130,13 +132,34 @@ export default function SurveyPage() {
     window.setTimeout(() => setSavedFlash(false), 2500)
   }
 
+  // Door 3's return half: a completed intake workbook parses straight into a
+  // SurveyResult and lands on the validation review — no retyping.
+  const [importError, setImportError] = useState<string | null>(null)
+  const importWorkbook = async (file: File) => {
+    try {
+      const result = importIntakeWorkbook(await file.arrayBuffer())
+      saveSurveySeed(result)
+      window.location.href = "/review"
+    } catch {
+      setImportError("That file didn't read as our intake workbook — export a fresh one and fill it in, or send it to us.")
+    }
+  }
+
   const anyDetailed = Object.values(lanes).some((l) => l === "detailed")
   const toggleSimplifyAll = () => setLanes(allLanes(anyDetailed ? "quick" : "detailed"))
 
-  const demoBar = demoKey ? <DemoSwitcher active={demoKey} onSwitch={switchDemo} /> : null
+  // Always available during the survey — mid-demo (or mid-anything) the
+  // presenter can seat a different company on the exact screen being shown.
+  const demoBar = <DemoSwitcher active={demoKey} onSwitch={switchDemo} />
 
   if (phase === "hero")
-    return <Hero onBegin={beginSurvey} onDemo={startDemo} draft={draft} onResume={resumeDraft} onDiscardDraft={discardDraft} />
+    return (
+      <Hero
+        onBegin={beginSurvey} onDemo={startDemo} draft={draft}
+        onResume={resumeDraft} onDiscardDraft={discardDraft}
+        onImport={importWorkbook} importError={importError}
+      />
+    )
   if (phase === "summary")
     return (
       <>
@@ -745,7 +768,7 @@ function TextField({
  * mid-demo you can show how this exact question reads for a tech startup vs. a
  * law firm vs. an enterprise. Never shown to real respondents (demo-only).
  */
-function DemoSwitcher({ active, onSwitch }: { active: string; onSwitch: (key: string) => void }) {
+function DemoSwitcher({ active, onSwitch }: { active: string | null; onSwitch: (key: string) => void }) {
   return (
     <div className="fixed bottom-5 left-5 z-40 flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 py-1.5 pl-3.5 pr-1.5 shadow-lg shadow-slate-900/10 backdrop-blur-sm">
       <span className="mr-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Demo</span>
@@ -768,12 +791,14 @@ function DemoSwitcher({ active, onSwitch }: { active: string; onSwitch: (key: st
   )
 }
 
-function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft }: {
+function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, importError }: {
   onBegin: () => void
   onDemo: (key: string) => void
   draft: SurveyDraft | null
   onResume: () => void
   onDiscardDraft: () => void
+  onImport: (file: File) => void
+  importError: string | null
 }) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0b1830] text-white">
@@ -851,6 +876,23 @@ function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft }: {
           <p className="mt-6 text-xs text-white/40">
             Don&apos;t know an answer? Defer it — we&apos;ll cover it together live.
           </p>
+
+          {/* Door 3's return half: a filled-in intake workbook skips the survey
+              entirely and lands on the validation review. */}
+          <label className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white/75 backdrop-blur-sm transition-colors hover:bg-white/10 hover:text-white">
+            <input
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = "" }}
+            />
+            Import a completed intake workbook (.xlsx)
+          </label>
+          {importError && (
+            <p className="mt-2 max-w-md rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">
+              {importError}
+            </p>
+          )}
 
           {/* Presenter demo — seat a full scenario and click through a filled survey */}
           <div className="mt-12 flex flex-col items-center gap-3">

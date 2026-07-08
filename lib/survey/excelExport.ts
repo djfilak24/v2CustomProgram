@@ -67,6 +67,11 @@ export function exportProgramXlsx(
 }
 
 export function exportIntakeWorkbook(result: SurveyResult): void {
+  XLSX.writeFile(buildIntakeWorkbook(result), `${slug(result.meta.clientName || "intake")}-intake-workbook.xlsx`)
+}
+
+/** The intake workbook as a WorkBook — separated so the importer can round-trip it in tests. */
+export function buildIntakeWorkbook(result: SurveyResult): XLSX.WorkBook {
   const wb = XLSX.utils.book_new()
   const ex = result.existing ?? {}
 
@@ -145,7 +150,7 @@ export function exportIntakeWorkbook(result: SurveyResult): void {
     ["Offices on the glass, interior, or a mix?", result.spaces.officePlacement ?? ""],
   ], [38, 60]), "In your words")
 
-  XLSX.writeFile(wb, `${slug(result.meta.clientName || "intake")}-intake-workbook.xlsx`)
+  return wb
 }
 
 const slug = (s: string) => (s || "client").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")

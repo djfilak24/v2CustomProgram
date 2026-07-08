@@ -66,6 +66,8 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 
 export function FastTrackExplorer({ inputs: initialInputs, metrics: initialMetrics, onSwitchToAdvanced }: FastTrackExplorerProps) {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard")
+  // Capture → reveal → drill: the full tab set stays hidden until asked for.
+  const [revealed, setRevealed] = useState(false)
   const [inputs, setInputs] = useState<SummaryInputs>(initialInputs)
   const [showInputPanel, setShowInputPanel] = useState(false)
   const [showSwitchConfirm, setShowSwitchConfirm] = useState(false)
@@ -264,25 +266,43 @@ export function FastTrackExplorer({ inputs: initialInputs, metrics: initialMetri
         </div>
       )}
 
-      {/* Tab Navigation */}
-      <div className="border-b border-slate-200 bg-white px-6">
-        <div className="flex items-center">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`px-4 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${
-                activeTab === id
-                  ? "border-teal-600 text-teal-600"
-                  : "border-transparent text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
+      {/* Tab Navigation — held back until the breakdown is intentionally requested.
+          The reveal arc: land on the dashboard (the payoff), drill only on ask. */}
+      {revealed ? (
+        <div className="border-b border-slate-200 bg-white px-6">
+          <div className="flex items-center">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`px-4 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${
+                  activeTab === id
+                    ? "border-teal-600 text-teal-600"
+                    : "border-transparent text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="border-b border-slate-200 bg-white px-6 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-slate-500">
+              Your program at a glance — the numbers behind it are ready when you are.
+            </span>
+            <Button
+              size="sm"
+              onClick={() => { setRevealed(true); setActiveTab("hybrid") }}
+              className="bg-teal-600 text-white hover:bg-teal-700"
+            >
+              See the full breakdown <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex">

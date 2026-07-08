@@ -11,7 +11,7 @@ import { Zap, SlidersHorizontal, MessageCircle, ArrowRight, X } from "lucide-rea
 export function IntroDemo({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#060e1d]/80 px-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-[#0e1f3a] shadow-2xl">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <button
           type="button"
           onClick={onDismiss}

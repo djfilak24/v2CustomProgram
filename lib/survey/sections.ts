@@ -603,6 +603,7 @@ export function surveyStateFromResult(r: import("./types").SurveyResult): Survey
     for (const [id, band] of Object.entries(r.work.perDeptDaysRange)) s.perDeptDays[id] = band
   }
   s.dedicatedByDept = { ...(r.work.dedicatedByDept ?? {}) }
+  s.adjacencyPairs = (r.work.adjacencyPairs ?? []).map((p) => pairKey(p.a, p.b))
 
   s.officesByDept = { ...(r.spaces.privateOfficesByDept ?? {}) }
   s.officePlacement = r.spaces.officePlacement ?? null
@@ -772,6 +773,10 @@ export function buildSurveyResult(
   const adjacencyNotes = s.adjacencyPairs
     .map((k) => { const [a, b] = k.split("|"); return `${nameOf(a)} ↔ ${nameOf(b)}` })
     .join("; ")
+  // Structured, ranked form of the same pairs (dept ids) — the Program Map input.
+  const adjacencyPairs = s.adjacencyPairs
+    .map((k) => { const [a, b] = k.split("|"); return { a, b } })
+    .filter((p) => valid.has(p.a) && valid.has(p.b))
 
   // Dedicated desks / private offices — per-person checks when a roster exists,
   // else the per-department numeric value.
@@ -810,6 +815,7 @@ export function buildSurveyResult(
       fullyRemote: 0,
       ...(lanes.seating === "detailed" && Object.keys(dedicatedByDept).length ? { dedicatedByDept } : {}),
       ...(adjacencyNotes ? { adjacencyNotes } : {}),
+      ...(adjacencyPairs.length ? { adjacencyPairs } : {}),
     },
     spaces: {
       privateOfficesByDept: lanes.offices === "detailed" ? officesByDept : {},

@@ -78,6 +78,12 @@ export interface SurveyResult {
     dedicatedByDept?: Record<string, number>
     /** Cross-functional adjacency hints → handoff notes. */
     adjacencyNotes?: string
+    /**
+     * Ranked adjacency pairs (department ids), most important first — the
+     * structured form behind adjacencyNotes. Drives the Program Map's cluster
+     * gravity and link weights.
+     */
+    adjacencyPairs?: { a: string; b: string }[]
   }
 
   /** Section 3 — Your Space Types. */

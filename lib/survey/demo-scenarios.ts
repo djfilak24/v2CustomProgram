@@ -90,7 +90,11 @@ const tech: SurveyResult = {
     totalHeadcount: 120,
     companyGrowthPct: 25,
   },
-  work: { daysInOffice: 3, fullyRemote: 14, dedicatedByDept: { eng: 22, prod: 10 } },
+  work: {
+    daysInOffice: 3, fullyRemote: 14, dedicatedByDept: { eng: 22, prod: 10 },
+    adjacencyNotes: "Engineering ↔ Product & Design; Product & Design ↔ Sales & Marketing; Operations & People ↔ Leadership",
+    adjacencyPairs: [{ a: "eng", b: "prod" }, { a: "prod", b: "gtm" }, { a: "ops", b: "lead" }],
+  },
   spaces: {
     // Leaders take offices; senior ICs take dedicated desks (mutually exclusive).
     privateOfficesByDept: { lead: 6, ops: 2, eng: 4, prod: 3 },
@@ -129,7 +133,11 @@ const law: SurveyResult = {
     totalHeadcount: 60,
     companyGrowthPct: 8,
   },
-  work: { daysInOffice: 5, fullyRemote: 2, dedicatedByDept: { para: 8, admin: 4 } },
+  work: {
+    daysInOffice: 5, fullyRemote: 2, dedicatedByDept: { para: 8, admin: 4 },
+    adjacencyNotes: "Partners ↔ Associates; Associates ↔ Paralegals",
+    adjacencyPairs: [{ a: "ptr", b: "assoc" }, { a: "assoc", b: "para" }],
+  },
   spaces: {
     privateOfficesByDept: { ptr: 14, assoc: 20 },
     officePlacement: "exterior",
@@ -166,7 +174,11 @@ const enterprise: SurveyResult = {
     totalHeadcount: 400,
     companyGrowthPct: 8,
   },
-  work: { daysInOffice: 4, fullyRemote: 24, dedicatedByDept: { tech: 40, ops: 30, fin: 10 } },
+  work: {
+    daysInOffice: 4, fullyRemote: 24, dedicatedByDept: { tech: 40, ops: 30, fin: 10 },
+    adjacencyNotes: "Finance ↔ Risk & Compliance; Technology ↔ Operations; Corporate & Legal ↔ Executive",
+    adjacencyPairs: [{ a: "fin", b: "risk" }, { a: "tech", b: "ops" }, { a: "corp", b: "exec" }],
+  },
   spaces: {
     // Executives/corporate/finance leaders take offices; ICs take dedicated desks.
     privateOfficesByDept: { exec: 10, corp: 8, fin: 6 },

@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import {
-  ArrowRight, TrendingUp, TrendingDown, Minus, Building2, Users, Presentation, Box,
-  Crown, AlertTriangle, LayoutDashboard, ListChecks, GitCompareArrows, Sun, Moon,
+  TrendingUp, TrendingDown, Minus, Building2, Users, Presentation, Box,
+  Crown, AlertTriangle, LayoutDashboard, ListChecks, GitCompareArrows, Sun, Moon, Network, Wrench,
 } from "lucide-react"
 import { loadSurveySeed, saveSurveySeed } from "@/lib/survey/seedStorage"
 import {
@@ -17,6 +17,8 @@ import {
   GOAL_MOTIVATORS, SPACE_POSTURES, OFFICE_PLACEMENT_OPTIONS,
 } from "@/lib/survey/sections"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
+import { buildProgramMap } from "@/lib/survey/programMap"
+import { ProgramMapView } from "@/components/survey/program-map"
 import type { SurveyResult } from "@/lib/survey/types"
 
 const CAT_ICON: Record<CompCategory, typeof Users> = {
@@ -31,7 +33,7 @@ const PLACEMENT_BLURB: Record<string, string> = {
   mixed: "A mix of perimeter and interior",
 }
 
-type Tab = "dashboard" | "responses" | "validation"
+type Tab = "dashboard" | "map" | "responses" | "validation"
 
 export default function ReviewPage() {
   const [result, setResult] = useState<SurveyResult | null>(null)
@@ -56,6 +58,10 @@ export default function ReviewPage() {
   const profile = useMemo(
     () => (result ? computeProfile(surveyStateFromResult(result)) : null),
     [result],
+  )
+  const programMap = useMemo(
+    () => (result && comp ? buildProgramMap(result, comp.lines) : null),
+    [result, comp],
   )
 
   if (!comp || !inputs || !result || !profile) {
@@ -87,6 +93,7 @@ export default function ReviewPage() {
 
   const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "map", label: "Program map", icon: Network },
     { id: "responses", label: "Detailed responses", icon: ListChecks },
     { id: "validation", label: "Recommended program", icon: GitCompareArrows },
   ]
@@ -108,6 +115,16 @@ export default function ReviewPage() {
                 {s.label}
               </button>
             ))}
+            {/* NELSON-only: the Advanced Canvas is our tool, never a client affordance.
+                Deliberately quiet — a presenter knows to look for it. */}
+            <button
+              type="button"
+              onClick={openCanvas}
+              title="NELSON only — open this program in the Advanced Canvas"
+              className="ml-2 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-white/30 transition-colors hover:border-white/25 hover:text-white/70"
+            >
+              <Wrench className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
 
@@ -136,6 +153,18 @@ export default function ReviewPage() {
             gapCount={gapCount} onOpenValidation={() => { setShowGaps(true); setTab("validation") }}
           />
         )}
+        {tab === "map" && programMap && (
+          <div className="space-y-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Your program, on the whiteboard.</h1>
+              <p className="mt-1.5 text-white/55">
+                Teams as clusters, spaces sized by square footage, named offices, and your adjacency
+                priorities pulling neighborhoods together. The shared program sits in the middle.
+              </p>
+            </div>
+            <ProgramMapView map={programMap} />
+          </div>
+        )}
         {tab === "responses" && <ResponsesTab result={result} />}
         {tab === "validation" && (
           <ValidationTab
@@ -146,15 +175,14 @@ export default function ReviewPage() {
           />
         )}
 
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
-          <p className="max-w-xl text-sm text-white/50">
+        <div className="mt-10 border-t border-white/10 pt-6">
+          <p className="max-w-2xl text-sm text-white/50">
             {tab === "validation"
               ? "Adjust counts and sizes line by line — the difference column tracks each against today. Toggle gaps to see what's missing."
-              : "Walk the dashboard, then open the detailed responses and the recommended program. Open the canvas to go deeper."}
+              : tab === "map"
+                ? "This is the conversation piece — walk it team by team, then confirm the numbers on the Recommended program tab."
+                : "Walk the dashboard, see it on the whiteboard, then dig into responses and the recommended program."}
           </p>
-          <button onClick={openCanvas} className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]">
-            Open in Advanced Canvas <ArrowRight className="h-4 w-4" />
-          </button>
         </div>
       </main>
     </div>

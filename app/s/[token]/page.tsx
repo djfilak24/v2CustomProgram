@@ -21,7 +21,7 @@ import type { ProfileScores } from "@/lib/survey/sections"
  * skip the session.
  *
  * TODO(imagery): swap office-1/2/3.jpg for the NELSON-provided photography and
- * update INDUSTRY_STATS/TICKER with the firm's preferred stats when supplied.
+ * update INDUSTRY_STATS with the firm's preferred stats when supplied.
  */
 export default function ClientLanding({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
@@ -178,15 +178,15 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
       </section>
 
       {/* 3 · Stats — the world changed; the numbers say so */}
-      <section className="overflow-hidden bg-[#0e1a2e] py-16 text-white sm:py-20">
+      <section className="bg-[#0e1a2e] py-16 text-white sm:py-20">
         <Reveal className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#00badc]">
             The workplace has changed
           </p>
         </Reveal>
-        <div className="mx-auto mt-12 grid max-w-6xl gap-10 px-6 sm:grid-cols-3">
+        <div className="mx-auto mt-12 grid max-w-none gap-10 px-6 sm:grid-cols-2 lg:grid-cols-4 lg:px-16">
           {INDUSTRY_STATS.map((s, i) => (
-            <Reveal key={s.caption} delay={i * 130} className="text-center">
+            <Reveal key={s.caption} delay={i * 110} className="text-center">
               <div className="text-6xl font-bold tracking-tight text-white">
                 <CountUp value={s.value} decimals={s.decimals} prefix={s.prefix} suffix={s.suffix} />
               </div>
@@ -195,16 +195,6 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
             </Reveal>
           ))}
         </div>
-        <div className="ticker-track mt-16 flex w-max items-center gap-8 whitespace-nowrap text-[15px] font-medium text-white/80 motion-reduce:[animation:none]">
-          {[...TICKER, ...TICKER].map((t, i) => (
-            <span key={i} className="flex items-center gap-8">
-              {t} <span className="text-[#00badc]">◆</span>
-            </span>
-          ))}
-        </div>
-        <p className="mt-10 text-center text-[11px] text-white/30">
-          Industry planning benchmarks — we&apos;ll replace these with your numbers.
-        </p>
       </section>
 
       {/* 4 · The aggregation — what's actually happening here */}
@@ -362,7 +352,6 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
 
       <style>{`
         .ticker-track { animation: ticker 36s linear infinite; }
-        @keyframes ticker { to { transform: translateX(-50%); } }
       `}</style>
     </div>
   )
@@ -373,14 +362,7 @@ const INDUSTRY_STATS = [
   { value: 40, decimals: 0, prefix: "~", suffix: "%", caption: "of assigned desks sit unused on a typical day in hybrid workplaces" },
   { value: 3.1, decimals: 1, prefix: "", suffix: "", caption: "average in-office days per week — planning for peaks, not averages, wastes floors" },
   { value: 1.5, decimals: 1, prefix: "", suffix: "×", caption: "more collaborative space in high-performing workplaces than five years ago" },
-]
-
-const TICKER = [
-  "The workplace has changed",
-  "Hybrid rewrote the math",
-  "Desks are not people",
-  "Collaboration keeps growing",
-  "Space should fit how you work",
+  { value: 20, decimals: 0, prefix: "", suffix: "%", caption: "average footprint reduction when a program is rightsized to real usage" },
 ]
 
 function emptyResultFor(clientName: string): import("@/lib/survey/types").SurveyResult {

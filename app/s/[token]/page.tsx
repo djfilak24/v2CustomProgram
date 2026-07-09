@@ -2,22 +2,26 @@
 
 import { use, useEffect, useState } from "react"
 import Image from "next/image"
-import { ArrowDown, FileDown, FileSpreadsheet, Upload, CheckCircle2, Sparkles } from "lucide-react"
+import { ArrowDown, ArrowRight, FileDown, FileSpreadsheet, Upload, CheckCircle2, Sparkles } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
+import { HeroCarousel } from "@/components/landing/hero-carousel"
+import { Reveal, CountUp } from "@/components/landing/motion"
+import { AggregationScene, RadarTeaser, MapTeaser, WorkbookVignette, ProgramVignette, SessionVignette } from "@/components/landing/scenes"
 import { importIntakeWorkbook } from "@/lib/survey/workbookImport"
 import { exportIntakeWorkbook } from "@/lib/survey/excelExport"
 import type { SurveyResult } from "@/lib/survey/types"
 import type { ProfileScores } from "@/lib/survey/sections"
 
 /**
- * The client landing — the ONLY link a client receives. A scroll story
- * (imagery → why this matters → how it works) ending at their kit: the intake
- * workbook + guide to fill, circulate, and return. Returning the workbook here
- * submits it to NELSON and pays off with their Workplace Profile — enough to
- * whet the appetite, never enough to skip the session.
+ * The client landing — the ONLY link a client receives. A cinematic scroll
+ * story (rotating imagery → why this matters → what they'll see → how it
+ * works) ending at their kit: the intake workbook + guide to fill, circulate,
+ * and return. Returning the workbook here submits it to NELSON and pays off
+ * with their Workplace Profile — enough to whet the appetite, never enough to
+ * skip the session.
  *
  * TODO(imagery): swap office-1/2/3.jpg for the NELSON-provided photography and
- * update INDUSTRY_STATS with the firm's preferred stats when supplied.
+ * update INDUSTRY_STATS/TICKER with the firm's preferred stats when supplied.
  */
 export default function ClientLanding({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
@@ -26,6 +30,7 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState<ProfileScores | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
     fetch(`/api/engagements/${token}`)
@@ -70,7 +75,7 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
       <div className="min-h-screen bg-[#f3f7fa] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-slate-900">
         <header className="px-8 py-6"><Logo /></header>
         <main className="mx-auto grid max-w-5xl gap-10 px-6 py-10 lg:grid-cols-[1.1fr_1fr] lg:items-center">
-          <div>
+          <Reveal>
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-50 px-3.5 py-1.5 text-sm font-medium text-emerald-700">
               <CheckCircle2 className="h-4 w-4" /> We got it{meta?.clientName ? `, ${meta.clientName}` : ""}.
             </span>
@@ -95,13 +100,13 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
             <p className="mt-6 text-sm text-slate-500">
               Your NELSON contact will reach out to schedule the session.
             </p>
-          </div>
-          <div>
+          </Reveal>
+          <Reveal delay={150}>
             <WorkplaceProfile scores={profile} />
             <p className="mt-3 text-center text-xs text-slate-400">
               A first read of your workplace&apos;s character — we&apos;ll unpack it together.
             </p>
-          </div>
+          </Reveal>
         </main>
       </div>
     )
@@ -110,118 +115,201 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
   // ── The scroll story ───────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f3f7fa] text-slate-900">
-      {/* Hero */}
-      <section className="relative flex min-h-[88vh] flex-col overflow-hidden">
-        <Image src="/office-1.jpg" alt="" fill priority className="object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[#0b1830]/80" />
+      {/* 1 · Hero — rotating imagery, minimal words */}
+      <HeroCarousel images={["/office-1.jpg", "/office-2.jpg", "/office-3.jpg"]}>
         <header className="relative z-10 px-8 py-6"><Logo light /></header>
-        <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 text-center text-white">
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-16 text-center text-white">
           {meta?.clientName && (
             <span className="mb-6 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
               Prepared for {meta.clientName}
             </span>
           )}
-          <h1 className="max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-            Your workplace has a <span className="text-[#00badc]">next chapter</span>.
+          <h1 className="max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-7xl">
+            Your workplace has a<br /><span className="text-[#00badc]">next chapter</span>.
           </h1>
-          <p className="mt-6 max-w-xl text-lg text-white/80">
-            NELSON turns how your teams actually work into a space program you can see,
-            question, and believe in — before a single wall moves.
-          </p>
-          <a href="#why" className="mt-10 inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-7 py-3.5 text-base font-semibold text-slate-900 transition-all hover:bg-[#2fd0ee]">
-            See how it works <ArrowDown className="h-4 w-4" />
+          <a
+            href="#stage"
+            className="group mt-12 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3 text-sm font-semibold backdrop-blur-sm transition-all hover:border-white/60 hover:bg-white/20"
+          >
+            See how it works
+            <ArrowDown className="h-4 w-4 transition-transform group-hover:translate-y-0.5" />
           </a>
         </div>
-      </section>
+      </HeroCarousel>
 
-      {/* Stats band — "you're in the right place" */}
-      <section id="why" className="bg-[#0e1a2e] px-6 py-16 text-white">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-[#00badc]">
-            The workplace has changed
-          </p>
-          <div className="mt-8 grid gap-8 sm:grid-cols-3">
-            {INDUSTRY_STATS.map((s) => (
-              <div key={s.stat} className="text-center">
-                <div className="text-5xl font-bold tabular-nums tracking-tight text-white">{s.stat}</div>
-                <p className="mx-auto mt-2 max-w-[26ch] text-sm leading-relaxed text-white/60">{s.caption}</p>
-              </div>
-            ))}
-          </div>
-          <p className="mt-8 text-center text-[11px] text-white/30">
-            Industry planning benchmarks — we&apos;ll replace these with your numbers.
-          </p>
+      {/* 2 · Setting the stage */}
+      <section id="stage" className="px-6 py-24 sm:py-28">
+        <div className="mx-auto max-w-3xl text-center">
+          <Reveal>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#0089a3]">
+              A guided discovery, prepared for you
+            </p>
+            <h2 className="mt-5 text-3xl font-bold leading-tight tracking-tight sm:text-[2.6rem]">
+              You&apos;re about to see your organization the way workplace designers do.
+            </h2>
+          </Reveal>
+          <Reveal delay={150}>
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
+              NELSON turns how your teams actually work into a space program you can see, question,
+              and believe in — before a single wall moves. No forms into the void: every answer you
+              give becomes something you&apos;ll recognize on screen.
+            </p>
+          </Reveal>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="px-6 py-20">
+      {/* 3 · Stats — the world changed; the numbers say so */}
+      <section className="overflow-hidden bg-[#0e1a2e] py-16 text-white sm:py-20">
+        <div className="ticker-track flex w-max items-center gap-8 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.22em] text-white/35 motion-reduce:[animation:none]">
+          {[...TICKER, ...TICKER].map((t, i) => (
+            <span key={i} className="flex items-center gap-8">
+              {t} <span className="text-[#00badc]/60">◆</span>
+            </span>
+          ))}
+        </div>
+        <div className="mx-auto mt-14 grid max-w-6xl gap-10 px-6 sm:grid-cols-3">
+          {INDUSTRY_STATS.map((s, i) => (
+            <Reveal key={s.caption} delay={i * 130} className="text-center">
+              <div className="text-6xl font-bold tracking-tight text-white">
+                <CountUp value={s.value} decimals={s.decimals} prefix={s.prefix} suffix={s.suffix} />
+              </div>
+              <div className="mx-auto mt-3 h-0.5 w-10 rounded-full bg-[#00badc]" />
+              <p className="mx-auto mt-3 max-w-[26ch] text-sm leading-relaxed text-white/60">{s.caption}</p>
+            </Reveal>
+          ))}
+        </div>
+        <p className="mt-12 text-center text-[11px] text-white/30">
+          Industry planning benchmarks — we&apos;ll replace these with your numbers.
+        </p>
+      </section>
+
+      {/* 4 · The aggregation — what's actually happening here */}
+      <section className="px-6 py-24">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[0.9fr_1.1fr]">
+          <Reveal>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#0089a3]">How it comes together</p>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Every voice, one picture.</h2>
+            <p className="mt-5 text-lg leading-relaxed text-slate-600">
+              Your workbook circulates — each department leader answers for their own team, someone
+              wrangles it home — and every response streams into a single living program. Nobody
+              has to know everything; together, you already do.
+            </p>
+          </Reveal>
+          <Reveal delay={150} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <AggregationScene />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* 5 · What you'll see on the other side */}
+      <section className="border-y border-slate-200 bg-white px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight">Three steps to a program you can stand behind</h2>
+          <Reveal className="text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#0089a3]">The reveal</p>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">What you&apos;ll see on the other side</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-slate-600">
+              Your answers come back as pictures your whole organization can point at.
+            </p>
+          </Reveal>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2">
+            <TeaserCard title="Your Workplace Profile" caption="Six axes of how your organization wants to work — drawn from your own answers." delay={0}>
+              <RadarTeaser />
+            </TeaserCard>
+            <TeaserCard title="Your Program Map" caption="Teams as neighborhoods on a designer's whiteboard — sized, named, and pulled together by who needs whom." delay={140}>
+              <MapTeaser />
+            </TeaserCard>
+          </div>
+        </div>
+      </section>
+
+      {/* 6 · Three steps, shown not told */}
+      <section className="px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Three steps to a program you can stand behind</h2>
+          </Reveal>
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
-            <StoryCard img="/office-2.jpg" step="01" title="Tell us how you work">
+            <StepCard step="01" title="Tell us how you work" delay={0} vignette={<WorkbookVignette />}>
               The workbook below captures your teams, growth, and the spaces that matter — on your
               own time, split across department leaders if that&apos;s easier. Most finish in 30–45 minutes.
-            </StoryCard>
-            <StoryCard img="/office-3.jpg" step="02" title="We turn it into a program">
+            </StepCard>
+            <StepCard step="02" title="We turn it into a program" delay={140} vignette={<ProgramVignette />}>
               Planning ratios meet your reality: every space type counted and sized, your existing
               footprint compared side-by-side with what your future actually needs.
-            </StoryCard>
-            <StoryCard img="/office-1.jpg" step="03" title="We validate it together">
+            </StepCard>
+            <StepCard step="03" title="We validate it together" delay={280} vignette={<SessionVignette />}>
               A live working session — your teams mapped on a whiteboard, trade-offs moving in real
               time, every open question decided in the room. You leave with the plan.
-            </StoryCard>
+            </StepCard>
           </div>
         </div>
       </section>
 
-      {/* The kit */}
-      <section className="border-t border-slate-200 bg-white px-6 py-20">
+      {/* 7 · The kit */}
+      <section className="border-t border-slate-200 bg-white px-6 py-24">
         <div className="mx-auto max-w-3xl text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3.5 py-1.5 text-sm font-medium text-[#0089a3]">
-            <Sparkles className="h-4 w-4" /> Get started
-          </span>
-          <h2 className="mt-5 text-3xl font-bold tracking-tight">Your discovery kit{meta?.clientName ? ` for ${meta.clientName}` : ""}</h2>
-          <p className="mx-auto mt-3 max-w-xl text-slate-600">
-            Two files: a guide that explains everything, and the workbook itself. Fill it, pass it
-            around, wrangle the answers — then bring it back here.
-          </p>
-
-          <div className="mt-8 grid gap-3 sm:grid-cols-2">
-            <button
-              onClick={() => exportIntakeWorkbook(emptyResultFor(meta?.clientName ?? ""))}
-              className="flex items-center justify-center gap-2.5 rounded-xl bg-[#00badc] px-6 py-4 text-base font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
-            >
-              <FileSpreadsheet className="h-5 w-5" /> Download the workbook
-            </button>
-            <a
-              href={`/workbook-guide${meta?.clientName ? `?client=${encodeURIComponent(meta.clientName)}` : ""}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-center gap-2.5 rounded-xl border border-slate-300 bg-white px-6 py-4 text-base font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-900"
-            >
-              <FileDown className="h-5 w-5" /> Read the guide
-            </a>
-          </div>
-
-          {/* The return slot */}
-          <div className="mt-10 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-8">
-            <Upload className="mx-auto h-6 w-6 text-slate-400" />
-            <p className="mt-2 font-semibold text-slate-800">Finished? Return it here.</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Upload the completed workbook and it flows straight into your program.
+          <Reveal>
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3.5 py-1.5 text-sm font-medium text-[#0089a3]">
+              <Sparkles className="h-4 w-4" /> Get started
+            </span>
+            <h2 className="mt-5 text-3xl font-bold tracking-tight">Your discovery kit{meta?.clientName ? ` for ${meta.clientName}` : ""}</h2>
+            <p className="mx-auto mt-3 max-w-xl text-slate-600">
+              Two files: a guide that explains everything, and the workbook itself. Fill it, pass it
+              around, wrangle the answers — then bring it back here.
             </p>
-            <label className={`mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700 ${submitting ? "pointer-events-none opacity-60" : ""}`}>
-              <input
-                type="file" accept=".xlsx" className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadWorkbook(f); e.target.value = "" }}
-              />
-              {submitting ? "Reading your workbook…" : "Upload completed workbook"}
-            </label>
-            {importError && (
-              <p className="mx-auto mt-3 max-w-md rounded-lg border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-700">{importError}</p>
-            )}
-          </div>
+          </Reveal>
+
+          <Reveal delay={120}>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <button
+                onClick={() => exportIntakeWorkbook(emptyResultFor(meta?.clientName ?? ""))}
+                className="group flex items-center justify-center gap-2.5 rounded-xl bg-[#00badc] px-6 py-4 text-base font-semibold text-slate-900 shadow-lg shadow-[#00badc]/25 transition-all hover:-translate-y-0.5 hover:bg-[#2fd0ee] hover:shadow-xl hover:shadow-[#00badc]/30 active:translate-y-0"
+              >
+                <FileSpreadsheet className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" /> Download the workbook
+              </button>
+              <a
+                href={`/workbook-guide${meta?.clientName ? `?client=${encodeURIComponent(meta.clientName)}` : ""}`}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center justify-center gap-2.5 rounded-xl border border-slate-300 bg-white px-6 py-4 text-base font-semibold text-slate-700 transition-all hover:-translate-y-0.5 hover:border-slate-400 hover:text-slate-900 hover:shadow-md active:translate-y-0"
+              >
+                <FileDown className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" /> Read the guide
+              </a>
+            </div>
+          </Reveal>
+
+          {/* The return slot — also a drop target */}
+          <Reveal delay={220}>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault(); setDragging(false)
+                const f = e.dataTransfer.files?.[0]
+                if (f) uploadWorkbook(f)
+              }}
+              className={`mt-10 rounded-2xl border-2 border-dashed px-6 py-8 transition-all ${
+                dragging ? "scale-[1.01] border-[#00badc] bg-[#e9f7fb]" : "border-slate-300 bg-slate-50"
+              }`}
+            >
+              <Upload className={`mx-auto h-6 w-6 transition-colors ${dragging ? "text-[#0089a3]" : "text-slate-400"}`} />
+              <p className="mt-2 font-semibold text-slate-800">Finished? Return it here.</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Drop the completed workbook anywhere in this box — it flows straight into your program.
+              </p>
+              <label className={`mt-4 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-slate-700 hover:shadow-md ${submitting ? "pointer-events-none opacity-60" : ""}`}>
+                <input
+                  type="file" accept=".xlsx" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadWorkbook(f); e.target.value = "" }}
+                />
+                {submitting ? "Reading your workbook…" : "Upload completed workbook"}
+                {!submitting && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}
+              </label>
+              {importError && (
+                <p className="mx-auto mt-3 max-w-md rounded-lg border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-700">{importError}</p>
+              )}
+            </div>
+          </Reveal>
 
           <p className="mt-8 text-xs text-slate-400">
             Questions while you fill it in? Email your NELSON contact — or note them in the
@@ -233,15 +321,28 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
       <footer className="border-t border-slate-200 px-6 py-8 text-center text-xs text-slate-400">
         NELSON · Workplace Strategy Discovery
       </footer>
+
+      <style>{`
+        .ticker-track { animation: ticker 36s linear infinite; }
+        @keyframes ticker { to { transform: translateX(-50%); } }
+      `}</style>
     </div>
   )
 }
 
 /* TODO(founder): replace with NELSON's preferred stats when provided. */
 const INDUSTRY_STATS = [
-  { stat: "~40%", caption: "of assigned desks sit unused on a typical day in hybrid workplaces" },
-  { stat: "3.1", caption: "average in-office days per week — planning for peaks, not averages, wastes floors" },
-  { stat: "1.5×", caption: "more collaborative space in high-performing workplaces than five years ago" },
+  { value: 40, decimals: 0, prefix: "~", suffix: "%", caption: "of assigned desks sit unused on a typical day in hybrid workplaces" },
+  { value: 3.1, decimals: 1, prefix: "", suffix: "", caption: "average in-office days per week — planning for peaks, not averages, wastes floors" },
+  { value: 1.5, decimals: 1, prefix: "", suffix: "×", caption: "more collaborative space in high-performing workplaces than five years ago" },
+]
+
+const TICKER = [
+  "The workplace has changed",
+  "Hybrid rewrote the math",
+  "Desks are not people",
+  "Collaboration keeps growing",
+  "Space should fit how you work",
 ]
 
 function emptyResultFor(clientName: string): import("@/lib/survey/types").SurveyResult {
@@ -275,17 +376,31 @@ function NextStep({ n, title, children }: { n: number; title: string; children: 
   )
 }
 
-function StoryCard({ img, step, title, children }: { img: string; step: string; title: string; children: React.ReactNode }) {
+function TeaserCard({ title, caption, delay, children }: { title: string; caption: string; delay: number; children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative h-44">
-        <Image src={img} alt="" fill className="object-cover" />
-        <span className="absolute left-4 top-4 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-900">{step}</span>
+    <Reveal delay={delay}>
+      <div className="group h-full rounded-3xl border border-slate-200 bg-[#f8fafc] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-[#00badc]/40 hover:shadow-xl hover:shadow-slate-200/60">
+        <div className="mx-auto max-w-sm">{children}</div>
+        <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+        <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{caption}</p>
       </div>
-      <div className="p-5">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600">{children}</p>
+    </Reveal>
+  )
+}
+
+function StepCard({ step, title, delay, vignette, children }: { step: string; title: string; delay: number; vignette: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <Reveal delay={delay}>
+      <div className="group h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+        <div className="relative border-b border-slate-100 bg-[#f8fafc] px-3 pt-3">
+          {vignette}
+          <span className="absolute left-4 top-4 rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums text-slate-900 shadow-sm">{step}</span>
+        </div>
+        <div className="p-5">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">{children}</p>
+        </div>
       </div>
-    </div>
+    </Reveal>
   )
 }

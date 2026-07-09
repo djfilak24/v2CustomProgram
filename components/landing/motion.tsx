@@ -43,6 +43,20 @@ export function Reveal({
   )
 }
 
+/** Cyan marker-underline that sweeps across a phrase when it scrolls into view. */
+export function Highlight({ children }: { children: React.ReactNode }) {
+  const { ref, inView } = useInView<HTMLSpanElement>(0.7)
+  return (
+    <span
+      ref={ref}
+      className="bg-gradient-to-r from-[#00badc]/45 to-[#2fd0ee]/35 bg-no-repeat transition-[background-size] duration-1000 ease-out motion-reduce:transition-none"
+      style={{ backgroundSize: inView ? "100% 0.4em" : "0% 0.4em", backgroundPosition: "0 92%" }}
+    >
+      {children}
+    </span>
+  )
+}
+
 /** Number that counts up (ease-out cubic) the first time it enters the viewport. */
 export function CountUp({
   value, decimals = 0, prefix = "", suffix = "", duration = 1600, className = "",

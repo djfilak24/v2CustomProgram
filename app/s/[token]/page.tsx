@@ -5,7 +5,7 @@ import Image from "next/image"
 import { ArrowDown, ArrowRight, FileDown, FileSpreadsheet, Upload, CheckCircle2, Sparkles } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { HeroCarousel } from "@/components/landing/hero-carousel"
-import { Reveal, CountUp } from "@/components/landing/motion"
+import { Reveal, CountUp, Highlight } from "@/components/landing/motion"
 import { AggregationScene, RadarTeaser, MapTeaser, WorkbookVignette, ProgramVignette, SessionVignette } from "@/components/landing/scenes"
 import { importIntakeWorkbook } from "@/lib/survey/workbookImport"
 import { exportIntakeWorkbook } from "@/lib/survey/excelExport"
@@ -138,36 +138,53 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
       </HeroCarousel>
 
       {/* 2 · Setting the stage */}
-      <section id="stage" className="px-6 py-24 sm:py-28">
-        <div className="mx-auto max-w-3xl text-center">
+      <section
+        id="stage"
+        className="relative overflow-hidden bg-[radial-gradient(900px_460px_at_50%_-10%,rgba(0,186,220,0.14),transparent),radial-gradient(700px_420px_at_92%_110%,rgba(0,186,220,0.10),transparent)] px-6 py-24 sm:py-32"
+      >
+        {/* Oversized fin watermark */}
+        <svg viewBox="0 0 20 20" aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-64 w-64 opacity-[0.07]">
+          <path d="M 0 0 L 20 0 L 0 20 Z" fill="#00badc" />
+        </svg>
+        <div className="relative mx-auto max-w-3xl text-center">
           <Reveal>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#0089a3]">
+            <p className="flex items-center justify-center gap-4 text-xs font-semibold uppercase tracking-[0.25em] text-[#0089a3]">
+              <span className="h-px w-10 bg-[#00badc]/50" />
               A guided discovery, prepared for you
+              <span className="h-px w-10 bg-[#00badc]/50" />
             </p>
-            <h2 className="mt-5 text-3xl font-bold leading-tight tracking-tight sm:text-[2.6rem]">
-              You&apos;re about to see your organization the way workplace designers do.
+            <h2 className="mt-6 text-4xl font-bold leading-[1.12] tracking-tight sm:text-5xl">
+              You&apos;re about to see your organization{" "}
+              <Highlight>the way workplace designers do</Highlight>.
             </h2>
           </Reveal>
           <Reveal delay={150}>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
+            <p className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-slate-600">
               NELSON turns how your teams actually work into a space program you can see, question,
               and believe in — before a single wall moves. No forms into the void: every answer you
               give becomes something you&apos;ll recognize on screen.
             </p>
+          </Reveal>
+          <Reveal delay={280}>
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-2 text-sm font-medium text-slate-700 sm:gap-3">
+              <span className="rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">The workbook</span>
+              <ArrowRight className="h-4 w-4 text-[#0089a3]" />
+              <span className="rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">Your program, drawn</span>
+              <ArrowRight className="h-4 w-4 text-[#0089a3]" />
+              <span className="rounded-full border border-[#00badc]/40 bg-[#e9f7fb] px-4 py-2 text-[#0089a3] shadow-sm">One working session</span>
+            </div>
           </Reveal>
         </div>
       </section>
 
       {/* 3 · Stats — the world changed; the numbers say so */}
       <section className="overflow-hidden bg-[#0e1a2e] py-16 text-white sm:py-20">
-        <div className="ticker-track flex w-max items-center gap-8 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.22em] text-white/35 motion-reduce:[animation:none]">
-          {[...TICKER, ...TICKER].map((t, i) => (
-            <span key={i} className="flex items-center gap-8">
-              {t} <span className="text-[#00badc]/60">◆</span>
-            </span>
-          ))}
-        </div>
-        <div className="mx-auto mt-14 grid max-w-6xl gap-10 px-6 sm:grid-cols-3">
+        <Reveal className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#00badc]">
+            The workplace has changed
+          </p>
+        </Reveal>
+        <div className="mx-auto mt-12 grid max-w-6xl gap-10 px-6 sm:grid-cols-3">
           {INDUSTRY_STATS.map((s, i) => (
             <Reveal key={s.caption} delay={i * 130} className="text-center">
               <div className="text-6xl font-bold tracking-tight text-white">
@@ -178,7 +195,14 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
             </Reveal>
           ))}
         </div>
-        <p className="mt-12 text-center text-[11px] text-white/30">
+        <div className="ticker-track mt-16 flex w-max items-center gap-8 whitespace-nowrap text-[15px] font-medium text-white/80 motion-reduce:[animation:none]">
+          {[...TICKER, ...TICKER].map((t, i) => (
+            <span key={i} className="flex items-center gap-8">
+              {t} <span className="text-[#00badc]">◆</span>
+            </span>
+          ))}
+        </div>
+        <p className="mt-10 text-center text-[11px] text-white/30">
           Industry planning benchmarks — we&apos;ll replace these with your numbers.
         </p>
       </section>
@@ -318,8 +342,22 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 px-6 py-8 text-center text-xs text-slate-400">
-        NELSON · Workplace Strategy Discovery
+      <footer className="bg-[#0e1a2e] px-6 py-12 text-white">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
+            <Logo light />
+            <p className="text-sm text-white/60">
+              Workplace Strategy <span className="text-[#00badc]">·</span> Discovery
+            </p>
+          </div>
+          <div className="mt-8 flex flex-col items-start justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 sm:flex-row sm:items-center">
+            <p>© {new Date().getFullYear()} NELSON Worldwide. All rights reserved.</p>
+            <p>
+              {meta?.clientName ? <>Prepared exclusively for <span className="text-white/70">{meta.clientName}</span> · </> : null}
+              Questions? Your NELSON contact is one email away.
+            </p>
+          </div>
+        </div>
       </footer>
 
       <style>{`
@@ -355,11 +393,12 @@ function emptyResultFor(clientName: string): import("@/lib/survey/types").Survey
   }
 }
 
+/** Light variant keeps the cyan fin (white-text SVG) instead of flattening it. */
 function Logo({ light }: { light?: boolean }) {
   return (
     <Image
-      src="/nelson-logo.png" alt="NELSON" width={110} height={28}
-      className={`h-7 w-auto ${light ? "brightness-0 invert" : ""}`} priority
+      src={light ? "/nelson-logo-white.svg" : "/nelson-logo.png"}
+      alt="NELSON" width={110} height={33} className="h-8 w-auto" priority
     />
   )
 }

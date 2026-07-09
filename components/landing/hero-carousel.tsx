@@ -21,8 +21,9 @@ export function HeroCarousel({ images, children }: { images: string[]; children:
 
   return (
     <section className="relative flex min-h-screen flex-col overflow-hidden bg-[#0b1830]">
-      {/* Outgoing image sits still underneath; incoming wipes over it. */}
-      <div className="absolute inset-0">
+      {/* Outgoing image holds the drift's END scale underneath (so it never
+          snaps back to 1 before being wiped over); incoming wipes over it. */}
+      <div className="absolute inset-0" style={{ transform: "scale(1.13)" }}>
         <Image src={images[prev]} alt="" fill priority className="object-cover" sizes="100vw" />
       </div>
       <div key={idx} className="absolute inset-0 hero-wipe motion-reduce:[animation:none]">
@@ -53,7 +54,10 @@ export function HeroCarousel({ images, children }: { images: string[]; children:
       <style>{`
         .hero-wipe { clip-path: inset(0 0 0 100%); animation: heroWipe 950ms cubic-bezier(0.77, 0, 0.18, 1) forwards; }
         @keyframes heroWipe { to { clip-path: inset(0 0 0 0); } }
-        .hero-drift { animation: heroDrift ${HOLD_MS + 1200}ms linear forwards; }
+        /* Drift duration matches the hold exactly: the incoming image reaches
+           scale(1.13) right as the next wipe starts, and the outgoing layer
+           holds that same scale — no reset, ever. */
+        .hero-drift { animation: heroDrift ${HOLD_MS}ms linear forwards; }
         @keyframes heroDrift { from { transform: scale(1.06) translateX(1.2%); } to { transform: scale(1.13) translateX(0); } }
         .hero-timer { width: 0; animation: heroTimer ${HOLD_MS}ms linear forwards; }
         @keyframes heroTimer { to { width: 100%; } }

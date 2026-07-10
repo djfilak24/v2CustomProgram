@@ -25,7 +25,8 @@ import { PerDeptRows } from "@/components/survey/per-dept-rows"
 import { DeptAllocationRows } from "@/components/survey/dept-allocation-rows"
 import { SpaceListRow } from "@/components/survey/space-list-row"
 import { ExistingConditionsStep } from "@/components/survey/existing-conditions"
-import { SUPPORT_CATALOG } from "@/lib/survey/catalog"
+import { SUPPORT_CATALOG, type CatalogSpace } from "@/lib/survey/catalog"
+import { SpaceDetailModal } from "@/components/survey/space-detail-modal"
 import { DaysRows } from "@/components/survey/days-rows"
 import { CollabTree } from "@/components/survey/collab-tree"
 import { AdjacencyGraph } from "@/components/survey/adjacency-graph"
@@ -195,17 +196,14 @@ export default function SurveyPage() {
   if (phase === "summary")
     return (
       <>
-        {sentToNelson && (
-          <div className="fixed left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-emerald-500/30 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-md">
-            ✓ Your responses are with NELSON — we&apos;ll take it from here.
-          </div>
-        )}
         <Summary
           state={state}
           lanes={lanes}
           deferred={deferred}
           scores={scores}
           onBack={() => { setPhase("survey"); setStepIndex(steps.length - 1) }}
+          engagementHome={engagement ? `/s/${engagement}` : null}
+          sentToNelson={sentToNelson}
         />
         {demoBar}
       </>
@@ -358,6 +356,8 @@ function StepBody({
   state: SurveyState
   patch: (p: Partial<SurveyState>) => void
 }) {
+  // Space drill-down ("Learn more") for the support step; collab manages its own.
+  const [spaceDetail, setSpaceDetail] = useState<CatalogSpace | null>(null)
   switch (step.id) {
     case "people":
       return lane === "detailed" ? (
@@ -654,6 +654,7 @@ function StepBody({
     case "support":
       return (
         <div className="space-y-4">
+          {spaceDetail && <SpaceDetailModal space={spaceDetail} onClose={() => setSpaceDetail(null)} />}
           <div className="grid gap-2.5 lg:grid-cols-2">
             {SUPPORT_CATALOG.map((sp) => (
               <SpaceListRow
@@ -673,6 +674,7 @@ function StepBody({
                 }
                 today={state.existingSupport[sp.id]}
                 onTodayChange={(n) => patch({ existingSupport: { ...state.existingSupport, [sp.id]: n } })}
+                onInfo={() => setSpaceDetail(sp)}
               />
             ))}
           </div>

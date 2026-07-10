@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowRight, ArrowLeft, MessageCircle, TrendingUp, TrendingDown } from "lucide-react"
+import { ArrowRight, ArrowLeft, MessageCircle, TrendingUp, TrendingDown, CheckCircle2, Home } from "lucide-react"
 import { WorkplaceProfile } from "./workplace-profile"
 import {
   SURVEY_STEPS, WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES, GROWTH_PRESETS,
@@ -25,12 +25,18 @@ export function Summary({
   deferred,
   scores,
   onBack,
+  engagementHome,
+  sentToNelson,
 }: {
   state: SurveyState
   lanes: LaneMap
   deferred: Set<StepId>
   scores: ProfileScores
   onBack: () => void
+  /** The client's engagement home page (/s/<token>) when this run belongs to one. */
+  engagementHome?: string | null
+  /** True once the result has landed with NELSON automatically. */
+  sentToNelson?: boolean
 }) {
   const named = state.departments.filter((d) => d.name.trim())
   const nameOf = (id: string) => named.find((d) => d.id === id)?.name ?? id
@@ -68,6 +74,27 @@ export function Summary({
   return (
     <div className="min-h-screen bg-[#f3f7fa] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-slate-900">
       <div className="mx-auto w-full max-w-[1700px] px-6 py-7 lg:px-10">
+        {/* Engagement acknowledgment — their answers are home, and so is this link */}
+        {engagementHome && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-50 px-5 py-4">
+            <span className="flex items-center gap-2.5 text-sm text-emerald-800">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+              <span>
+                <span className="font-semibold">
+                  {sentToNelson ? "Your responses are with NELSON." : "Sending your responses to NELSON…"}
+                </span>{" "}
+                Your NELSON contact will reach out to schedule your working session.
+              </span>
+            </span>
+            <a
+              href={engagementHome}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+            >
+              <Home className="h-4 w-4" /> Go to your home page
+            </a>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3 py-1 text-xs font-medium text-[#0089a3]">

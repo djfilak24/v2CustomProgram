@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { COLLAB_BUILD_OPTIONS, COLLAB_MONITOR_OPTIONS, type Lane } from "@/lib/survey/sections"
-import { COLLAB_CATALOG } from "@/lib/survey/catalog"
+import { COLLAB_CATALOG, type CatalogSpace } from "@/lib/survey/catalog"
 import { SpaceListRow } from "./space-list-row"
+import { SpaceDetailModal } from "./space-detail-modal"
 
 /**
  * Collaboration selection. Both lanes use the same chunky rows (icon + SF +
@@ -28,8 +30,10 @@ export function CollabTree({
   existing: Record<string, number>
   onChangeExisting: (typeId: string, n: number) => void
 }) {
+  const [detail, setDetail] = useState<CatalogSpace | null>(null)
   return (
     <div className={`grid gap-2.5 ${lane === "detailed" ? "" : "lg:grid-cols-2"}`}>
+      {detail && <SpaceDetailModal space={detail} onClose={() => setDetail(null)} />}
       {COLLAB_CATALOG.map((t) => {
         const isOn = selected.includes(t.id)
         const cfg = config[t.id] ?? {}
@@ -45,6 +49,7 @@ export function CollabTree({
             onToggle={() => onToggleType(t.id)}
             today={existing[t.id]}
             onTodayChange={(n) => onChangeExisting(t.id, n)}
+            onInfo={() => setDetail(t)}
           >
             {lane === "detailed" && (
               <div className="space-y-3 border-t border-slate-100 px-5 py-3.5">

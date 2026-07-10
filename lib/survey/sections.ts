@@ -249,30 +249,64 @@ export const REUSE_POSTURES: CardOption[] = [
   { id: "new", label: "All new", description: "Fresh furniture standard", icon: "sparkles" },
 ]
 
+/**
+ * One size that exists on the floor today — organizations often run several
+ * (Sales on 6×6, Engineering on 8×8). Captured per size with a count and a
+ * note so future furniture purchases can be tied back to real inventory.
+ */
+export interface SizeMixRow {
+  sf: number | null
+  count: number | null
+  note: string
+}
+
 export interface ExistingConditions {
   /** Overall furniture posture (reuse vs. new). */
   furniture: ReusePosture | null
-  /** WORKSTATION_SIZES id of today's (or planned) workstation footprint. */
+  /** WORKSTATION_SIZES id of today's (or planned) workstation footprint — or "custom". */
   workstationSize: string | null
-  /** OFFICE_SIZES id of today's (or planned) office footprint. */
+  /** SF when workstationSize is "custom" (standard buttons didn't fit). */
+  workstationCustomSF: number | null
+  /** OFFICE_SIZES id of today's (or planned) office footprint — or "custom". */
   officeSize: string | null
+  /** SF when officeSize is "custom". */
+  officeCustomSF: number | null
   /** Re-using existing conference tables? */
   reuseConfTables: boolean | null
   /** Counts that exist today — optional, pulled forward into later steps. */
   existingWorkstations: number | null
   existingOffices: number | null
+  /** Today's size mix — multiple sizes across departments, for furniture planning. */
+  workstationMix: SizeMixRow[]
+  officeMix: SizeMixRow[]
 }
 
 export function emptyExisting(): ExistingConditions {
   return {
     furniture: null,
     workstationSize: null,
+    workstationCustomSF: null,
     officeSize: null,
+    officeCustomSF: null,
     reuseConfTables: null,
     existingWorkstations: null,
     existingOffices: null,
+    workstationMix: [],
+    officeMix: [],
   }
 }
+
+/** Resolve the going-forward footprint, honoring a custom SF entry. */
+export const resolveSizeSf = (
+  catalog: SizeOption[], id: string | null, customSf: number | null,
+): number | undefined =>
+  id === "custom" ? (customSf && customSf > 0 ? customSf : undefined) : sizeSf(catalog, id)
+
+/** Mix rows worth persisting: a real size with a real count. */
+const mixRows = (rows: SizeMixRow[]): { sf: number; count: number; note?: string }[] =>
+  rows
+    .filter((r) => (r.sf ?? 0) > 0 && (r.count ?? 0) > 0)
+    .map((r) => ({ sf: r.sf as number, count: r.count as number, ...(r.note.trim() ? { note: r.note.trim() } : {}) }))
 
 // ── Steps ────────────────────────────────────────────────────────────────────
 
@@ -613,13 +647,20 @@ export function surveyStateFromResult(r: import("./types").SurveyResult): Survey
   s.support = [...r.spaces.support]
 
   const ex = r.existing ?? {}
+  // An SF with no matching standard option round-trips as a custom size.
+  const wsStd = WORKSTATION_SIZES.find((o) => o.sf === ex.workstationSF)?.id ?? null
+  const offStd = OFFICE_SIZES.find((o) => o.sf === ex.officeSF)?.id ?? null
   s.existing = {
     furniture: ex.furniture ?? null,
-    workstationSize: WORKSTATION_SIZES.find((o) => o.sf === ex.workstationSF)?.id ?? null,
-    officeSize: OFFICE_SIZES.find((o) => o.sf === ex.officeSF)?.id ?? null,
+    workstationSize: wsStd ?? (ex.workstationSF ? "custom" : null),
+    workstationCustomSF: wsStd == null && ex.workstationSF ? ex.workstationSF : null,
+    officeSize: offStd ?? (ex.officeSF ? "custom" : null),
+    officeCustomSF: offStd == null && ex.officeSF ? ex.officeSF : null,
     reuseConfTables: ex.reuseConfTables ?? null,
     existingWorkstations: ex.existingWorkstations ?? null,
     existingOffices: ex.existingOffices ?? null,
+    workstationMix: (ex.workstationMix ?? []).map((m) => ({ sf: m.sf, count: m.count, note: m.note ?? "" })),
+    officeMix: (ex.officeMix ?? []).map((m) => ({ sf: m.sf, count: m.count, note: m.note ?? "" })),
   }
   s.existingCollab = { ...(ex.existingCollab ?? {}) }
   s.existingSupport = { ...(ex.existingSupport ?? {}) }
@@ -834,12 +875,14 @@ export function buildSurveyResult(
     special: {},
     existing: {
       ...(s.existing.furniture ? { furniture: s.existing.furniture } : {}),
-      ...(sizeSf(WORKSTATION_SIZES, s.existing.workstationSize) !== undefined
-        ? { workstationSF: sizeSf(WORKSTATION_SIZES, s.existing.workstationSize) }
+      ...(resolveSizeSf(WORKSTATION_SIZES, s.existing.workstationSize, s.existing.workstationCustomSF) !== undefined
+        ? { workstationSF: resolveSizeSf(WORKSTATION_SIZES, s.existing.workstationSize, s.existing.workstationCustomSF) }
         : {}),
-      ...(sizeSf(OFFICE_SIZES, s.existing.officeSize) !== undefined
-        ? { officeSF: sizeSf(OFFICE_SIZES, s.existing.officeSize) }
+      ...(resolveSizeSf(OFFICE_SIZES, s.existing.officeSize, s.existing.officeCustomSF) !== undefined
+        ? { officeSF: resolveSizeSf(OFFICE_SIZES, s.existing.officeSize, s.existing.officeCustomSF) }
         : {}),
+      ...(mixRows(s.existing.workstationMix).length ? { workstationMix: mixRows(s.existing.workstationMix) } : {}),
+      ...(mixRows(s.existing.officeMix).length ? { officeMix: mixRows(s.existing.officeMix) } : {}),
       ...(s.existing.reuseConfTables !== null ? { reuseConfTables: s.existing.reuseConfTables } : {}),
       ...(s.existing.existingWorkstations !== null ? { existingWorkstations: s.existing.existingWorkstations } : {}),
       ...(s.existing.existingOffices !== null ? { existingOffices: s.existing.existingOffices } : {}),

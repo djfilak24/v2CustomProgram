@@ -129,6 +129,13 @@ export interface SurveyResult {
     reuseConfTables?: boolean
     existingWorkstations?: number
     existingOffices?: number
+    /**
+     * Today's size inventory when the floor runs multiple footprints (e.g.
+     * Sales on 6×6, Engineering on 8×8) — per size, a count and an optional
+     * note. Ties future furniture purchases back to real inventory.
+     */
+    workstationMix?: { sf: number; count: number; note?: string }[]
+    officeMix?: { sf: number; count: number; note?: string }[]
     /** Collaboration spaces in place today (type id → count). */
     existingCollab?: Record<string, number>
     /** Support spaces in place today (type id → count). */

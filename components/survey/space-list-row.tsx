@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  Check, Users, Presentation, Phone, Coffee, Printer, Box, Heart, Building2,
+  Check, Users, Presentation, Phone, Coffee, Printer, Box, Heart, Building2, Info,
   type LucideIcon,
 } from "lucide-react"
 
@@ -25,6 +25,7 @@ export function SpaceListRow({
   onToggle,
   today,
   onTodayChange,
+  onInfo,
   children,
 }: {
   icon: string
@@ -37,6 +38,8 @@ export function SpaceListRow({
   /** Optional "how many exist today" count, shown when selected. */
   today?: number
   onTodayChange?: (n: number) => void
+  /** Opens the space drill-down (photo + how it's used). */
+  onInfo?: () => void
   children?: React.ReactNode
 }) {
   const Icon = ICONS[icon] ?? Box
@@ -63,6 +66,20 @@ export function SpaceListRow({
             <span>{ratio}</span>
           </span>
         </span>
+
+        {onInfo && (
+          <span
+            role="button"
+            tabIndex={0}
+            title={`Learn more about ${label}`}
+            aria-label={`Learn more about ${label}`}
+            onClick={(e) => { e.stopPropagation(); onInfo() }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onInfo() } }}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-[#00badc]/10 hover:text-[#0089a3]"
+          >
+            <Info className="h-4 w-4" />
+          </span>
+        )}
 
         <span
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${

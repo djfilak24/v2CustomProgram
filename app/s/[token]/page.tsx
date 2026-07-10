@@ -109,6 +109,10 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
             <p className="mt-6 text-sm text-slate-500">
               Your NELSON contact will reach out to schedule the session.
             </p>
+            <p className="mt-3 text-xs text-slate-400">
+              Bookmark this page — it stays your home for the whole process, and we&apos;ll point you
+              back here whenever there&apos;s something new to see.
+            </p>
           </Reveal>
           <Reveal delay={150}>
             <WorkplaceProfile scores={profile} />

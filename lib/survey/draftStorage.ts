@@ -11,7 +11,7 @@
 import type { LaneMap, StepId, SurveyState } from "./sections"
 
 const KEY = "nelson:surveyDraft"
-const VERSION = 1
+const VERSION = 2 // v2: ExistingConditions gained custom sizes + size mix
 
 export interface SurveyDraft {
   v: number

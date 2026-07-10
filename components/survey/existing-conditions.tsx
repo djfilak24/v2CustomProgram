@@ -1,9 +1,10 @@
 "use client"
 
+import { Plus, X } from "lucide-react"
 import { ChoiceCard } from "./choice-card"
 import {
   REUSE_POSTURES, WORKSTATION_SIZES, OFFICE_SIZES,
-  type ExistingConditions, type Lane,
+  type ExistingConditions, type Lane, type SizeMixRow,
 } from "@/lib/survey/sections"
 
 /**
@@ -50,6 +51,8 @@ export function ExistingConditionsStep({
           options={WORKSTATION_SIZES}
           value={value.workstationSize}
           onChange={(id) => set({ workstationSize: id })}
+          customSf={value.workstationCustomSF}
+          onCustomSf={(sf) => set({ workstationCustomSF: sf })}
         />
         <SizePicker
           label="Private office size"
@@ -57,6 +60,8 @@ export function ExistingConditionsStep({
           options={OFFICE_SIZES}
           value={value.officeSize}
           onChange={(id) => set({ officeSize: id })}
+          customSf={value.officeCustomSF}
+          onCustomSf={(sf) => set({ officeCustomSF: sf })}
         />
       </div>
 
@@ -102,19 +107,108 @@ export function ExistingConditionsStep({
           </p>
         </div>
       )}
+
+      {/* Detailed: today's size inventory — several sizes across departments is
+          normal; documenting each ties future furniture purchases to reality. */}
+      {lane === "detailed" && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SizeMixEditor
+            label="Workstation sizes in place today"
+            help="Running more than one desk size? Document each — size, how many, and where."
+            noun="workstations"
+            rows={value.workstationMix}
+            onChange={(rows) => set({ workstationMix: rows })}
+          />
+          <SizeMixEditor
+            label="Office sizes in place today"
+            help="Same for private offices — each size you have, counted."
+            noun="offices"
+            rows={value.officeMix}
+            onChange={(rows) => set({ officeMix: rows })}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Rows of [SF · count · note] documenting the real size inventory on the floor. */
+function SizeMixEditor({
+  label, help, noun, rows, onChange,
+}: {
+  label: string
+  help: string
+  noun: string
+  rows: SizeMixRow[]
+  onChange: (rows: SizeMixRow[]) => void
+}) {
+  const update = (i: number, patch: Partial<SizeMixRow>) =>
+    onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <p className="mb-3 text-xs text-slate-400">{help}</p>
+      {rows.length > 0 && (
+        <div className="mb-2 space-y-2">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="number" min={1} value={r.sf ?? ""} placeholder="SF"
+                onChange={(e) => update(i, { sf: e.target.value === "" ? null : Math.max(1, Number(e.target.value)) })}
+                className="w-20 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm tabular-nums text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
+              />
+              <span className="text-xs text-slate-400">SF ×</span>
+              <input
+                type="number" min={1} value={r.count ?? ""} placeholder="Qty"
+                onChange={(e) => update(i, { count: e.target.value === "" ? null : Math.max(1, Number(e.target.value)) })}
+                className="w-[70px] rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm tabular-nums text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
+              />
+              <input
+                value={r.note} placeholder="Where / which dept (optional)"
+                onChange={(e) => update(i, { note: e.target.value })}
+                className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => onChange(rows.filter((_, j) => j !== i))}
+                aria-label="Remove size"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => onChange([...rows, { sf: null, count: null, note: "" }])}
+        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-[#0089a3] transition-colors hover:bg-[#00badc]/10"
+      >
+        <Plus className="h-4 w-4" /> Add a size you have today
+      </button>
+      {rows.length > 0 && (
+        <p className="mt-2 text-[11px] text-slate-400">
+          {rows.filter((r) => (r.sf ?? 0) > 0 && (r.count ?? 0) > 0).reduce((a, r) => a + (r.count ?? 0), 0)} {noun} documented across {rows.length} size{rows.length === 1 ? "" : "s"} — we&apos;ll tie new furniture planning to this.
+        </p>
+      )}
     </div>
   )
 }
 
 function SizePicker({
-  label, help, options, value, onChange,
+  label, help, options, value, onChange, customSf, onCustomSf,
 }: {
   label: string
   help: string
   options: { id: string; label: string; sf: number }[]
   value: string | null
   onChange: (id: string) => void
+  /** SF for the "Custom" choice, when the standard buttons don't fit. */
+  customSf: number | null
+  onCustomSf: (sf: number | null) => void
 }) {
+  const customOn = value === "custom"
   return (
     <div>
       <p className="text-sm font-medium text-slate-600">{label}</p>
@@ -136,7 +230,29 @@ function SizePicker({
             </button>
           )
         })}
+        <button
+          type="button"
+          onClick={() => onChange("custom")}
+          className={`rounded-lg border px-3.5 py-2 text-left transition-colors ${
+            customOn ? "border-[#00badc] bg-[#00badc]/10" : "border-dashed border-slate-300 bg-white hover:border-slate-400"
+          }`}
+        >
+          <span className="block text-sm font-semibold text-slate-900">Custom…</span>
+          <span className="block text-[11px] tabular-nums text-slate-500">
+            {customOn && customSf ? `${customSf} SF` : "your own size"}
+          </span>
+        </button>
       </div>
+      {customOn && (
+        <div className="mt-2.5 flex items-center gap-2">
+          <input
+            type="number" min={1} value={customSf ?? ""} placeholder="e.g. 56" autoFocus
+            onChange={(e) => onCustomSf(e.target.value === "" ? null : Math.max(1, Number(e.target.value)))}
+            className="w-28 rounded-lg border border-[#00badc]/50 bg-white px-3 py-2 text-sm tabular-nums text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
+          />
+          <span className="text-sm text-slate-500">SF per unit</span>
+        </div>
+      )}
     </div>
   )
 }

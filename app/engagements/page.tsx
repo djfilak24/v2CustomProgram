@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Image from "next/image"
-import { KeyRound, Plus, Copy, Check, ExternalLink, RefreshCw, LockOpen } from "lucide-react"
+import { KeyRound, Plus, Copy, Check, ExternalLink, RefreshCw, LockOpen, Rocket } from "lucide-react"
 import { isNelsonMode, unlockNelsonMode, nelsonCode } from "@/lib/nelsonMode"
 import { saveSurveySeed } from "@/lib/survey/seedStorage"
 
@@ -11,8 +11,30 @@ interface Row {
   clientName: string
   status: "sent" | "submitted"
   hasResult: boolean
+  progress?: { stage: "landing" | "survey" | "workbook"; step?: number; total?: number; updatedAt: string }
   updatedAt: string
 }
+
+/** Human status: how far the client actually got, not just sent/returned. */
+function rowStatus(r: Row): { label: string; tone: "done" | "active" | "idle" } {
+  if (r.status === "submitted") return { label: "Returned ✓", tone: "done" }
+  if (r.progress?.stage === "survey")
+    return { label: `Survey · step ${r.progress.step ?? "?"} of ${r.progress.total ?? "?"}`, tone: "active" }
+  if (r.progress?.stage === "workbook") return { label: "Workbook downloaded", tone: "active" }
+  if (r.progress?.stage === "landing") return { label: "Link opened", tone: "active" }
+  return { label: "Sent", tone: "idle" }
+}
+
+/** Every screen we show clients, one click away — the pitch launchpad. */
+const LAUNCHPAD: { label: string; href: string; note: string }[] = [
+  { label: "Survey — blank", href: "/survey", note: "what a fresh respondent sees" },
+  { label: "Survey — Law Firm demo", href: "/survey?demo=law", note: "pre-filled, presenter pill on" },
+  { label: "Survey — Tech demo", href: "/survey?demo=tech", note: "pre-filled" },
+  { label: "Survey — Enterprise demo", href: "/survey?demo=enterprise", note: "pre-filled" },
+  { label: "Workbook guide", href: "/workbook-guide", note: "the send-along PDF" },
+  { label: "Program review", href: "/review", note: "validation session view" },
+  { label: "Advanced Canvas", href: "/", note: "NELSON-only — Fast-Track inside" },
+]
 
 /**
  * The NELSON console — passcode-gated. Create an engagement (client name →
@@ -154,14 +176,21 @@ export default function EngagementsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rows.map((r) => (
+                {rows.map((r) => {
+                  const st = rowStatus(r)
+                  return (
                   <tr key={r.token}>
                     <td className="px-5 py-3 font-medium text-slate-900">{r.clientName}</td>
                     <td className="px-3 py-3">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        r.status === "submitted" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-                      }`}>
-                        {r.status === "submitted" ? "Returned ✓" : "Sent"}
+                      <span
+                        title={r.progress ? `Last activity ${new Date(r.progress.updatedAt).toLocaleString()}` : undefined}
+                        className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          st.tone === "done" ? "bg-emerald-50 text-emerald-700"
+                            : st.tone === "active" ? "bg-[#00badc]/10 text-[#0089a3]"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {st.label}
                       </span>
                     </td>
                     <td className="px-3 py-3 tabular-nums text-slate-500">{new Date(r.updatedAt).toLocaleDateString()}</td>
@@ -184,7 +213,8 @@ export default function EngagementsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           )}
@@ -192,8 +222,32 @@ export default function EngagementsPage() {
 
         <p className="mt-4 text-xs text-slate-400">
           The client link (<code className="text-slate-500">/s/&lt;token&gt;</code>) shows only their landing —
-          story, kit, and the return slot. No demos, no canvas, no numbers until the session.
+          story, paths in, and the return slot. No demos, no canvas, no numbers until the session.
         </p>
+
+        {/* Launchpad — every pitch screen one click away */}
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <Rocket className="h-4 w-4 text-[#0089a3]" /> Demo launchpad
+          </h2>
+          <p className="mt-1 text-xs text-slate-400">
+            The screens you pitch with, one click away. Client landings open from each engagement&apos;s Preview above.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {LAUNCHPAD.map((l) => (
+              <a
+                key={l.href}
+                href={l.href}
+                target="_blank"
+                rel="noreferrer"
+                title={l.note}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-[#00badc]/50 hover:bg-[#00badc]/[0.06] hover:text-slate-900"
+              >
+                <ExternalLink className="h-3 w-3 text-slate-400" /> {l.label}
+              </a>
+            ))}
+          </div>
+        </div>
       </main>
     </div>
   )

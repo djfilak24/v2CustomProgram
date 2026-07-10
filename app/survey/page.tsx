@@ -6,7 +6,7 @@ import {
   ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info, Wand2,
 } from "lucide-react"
 import {
-  SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, deptAllocated,
+  SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, deptAllocated, buildSurveyResult,
   WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES, OFFICE_PLACEMENT_OPTIONS,
   GROWTH_PRESETS, PEOPLE_MODES, GOAL_MOTIVATORS, SPACE_POSTURES, rosterForMode,
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
@@ -49,6 +49,12 @@ export default function SurveyPage() {
   // Presenter chrome (demo pill, hero demo buttons) is NELSON-only.
   const [nelson, setNelson] = useState(false)
   useEffect(() => { setNelson(isNelsonMode()) }, [])
+
+  // Engagement link (?e=<token>): this survey run belongs to a client
+  // engagement — progress pings while they work, and Finish submits the
+  // result to NELSON automatically.
+  const [engagement, setEngagement] = useState<string | null>(null)
+  const [sentToNelson, setSentToNelson] = useState(false)
 
   const steps = SURVEY_STEPS
   const step = steps[stepIndex]
@@ -106,11 +112,33 @@ export default function SurveyPage() {
     setDemoKey(key)
   }
   useEffect(() => {
-    const key = new URLSearchParams(window.location.search).get("demo")
+    const params = new URLSearchParams(window.location.search)
+    setEngagement(params.get("e"))
+    const key = params.get("demo")
     if (key && DEMO_SCENARIOS[key]) startDemo(key)
     else setDraft(loadSurveyDraft()) // offer to resume a saved in-progress survey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Engagement heartbeat: each step change pings the console's status board
+  // ("survey · step 4 of 10"). Fire-and-forget — never blocks the client.
+  useEffect(() => {
+    if (!engagement || phase !== "survey") return
+    fetch(`/api/engagements/${engagement}`, {
+      method: "PATCH",
+      body: JSON.stringify({ stage: "survey", step: stepIndex + 1, total: SURVEY_STEPS.length }),
+    }).catch(() => {})
+  }, [engagement, phase, stepIndex])
+
+  // Finish → the result lands with NELSON without the client doing anything.
+  useEffect(() => {
+    if (!engagement || phase !== "summary" || sentToNelson) return
+    const result = buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" })
+    fetch(`/api/engagements/${engagement}`, { method: "POST", body: JSON.stringify(result) })
+      .then((r) => { if (r.ok) setSentToNelson(true) })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engagement, phase])
 
   // Autosave: every answer persists as it's given — closing the tab loses
   // nothing. Skipped while on the hero so an untouched visit never writes.
@@ -167,6 +195,11 @@ export default function SurveyPage() {
   if (phase === "summary")
     return (
       <>
+        {sentToNelson && (
+          <div className="fixed left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-emerald-500/30 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-md">
+            ✓ Your responses are with NELSON — we&apos;ll take it from here.
+          </div>
+        )}
         <Summary
           state={state}
           lanes={lanes}

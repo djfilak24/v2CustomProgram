@@ -35,6 +35,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   })
 }
 
+/**
+ * Lightweight progress ping — "the client is on survey step 4 of 10". Public
+ * like POST (the token is the credential); powers the console's live status.
+ */
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  if (!storeConfigured()) return unconfigured()
+  const { token } = await params
+  const body = (await req.json().catch(() => null)) as { stage?: string; step?: number; total?: number } | null
+  if (!body || !["landing", "survey", "workbook"].includes(body.stage ?? "")) {
+    return NextResponse.json({ error: "stage must be landing | survey | workbook" }, { status: 400 })
+  }
+  const e = await engagementStore().get(token)
+  if (!e) return NextResponse.json({ error: "Unknown engagement" }, { status: 404 })
+  // A landing revisit never downgrades a deeper stage (survey/workbook).
+  if (body.stage === "landing" && e.progress && e.progress.stage !== "landing") {
+    return NextResponse.json({ ok: true, kept: e.progress.stage })
+  }
+  await engagementStore().setProgress(token, {
+    stage: body.stage as "landing" | "survey" | "workbook",
+    ...(typeof body.step === "number" ? { step: body.step } : {}),
+    ...(typeof body.total === "number" ? { total: body.total } : {}),
+    updatedAt: new Date().toISOString(),
+  })
+  return NextResponse.json({ ok: true })
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   if (!storeConfigured()) return unconfigured()
   const { token } = await params

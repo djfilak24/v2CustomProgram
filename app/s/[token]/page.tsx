@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react"
 import Image from "next/image"
-import { ArrowDown, ArrowRight, FileDown, FileSpreadsheet, Upload, CheckCircle2, Sparkles } from "lucide-react"
+import { ArrowDown, ArrowRight, FileDown, FileSpreadsheet, Upload, CheckCircle2, Sparkles, MousePointerClick, MessagesSquare } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { HeroCarousel } from "@/components/landing/hero-carousel"
 import { Reveal, CountUp, Highlight } from "@/components/landing/motion"
@@ -34,7 +34,16 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
 
   useEffect(() => {
     fetch(`/api/engagements/${token}`)
-      .then(async (r) => (r.ok ? setMeta(await r.json()) : setMissing((await r.json()).error ?? "Unknown link")))
+      .then(async (r) => {
+        if (!r.ok) { setMissing((await r.json()).error ?? "Unknown link"); return }
+        const m = await r.json()
+        setMeta(m)
+        // Console pulse: the client opened their link. Never overwrite a
+        // deeper stage (survey/workbook) or a submitted engagement.
+        if (m.status !== "submitted" && !m.profile) {
+          fetch(`/api/engagements/${token}`, { method: "PATCH", body: JSON.stringify({ stage: "landing" }) }).catch(() => {})
+        }
+      })
       .catch(() => setMissing("We couldn't reach the server — try again shortly."))
   }, [token])
 
@@ -259,38 +268,76 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
         </div>
       </section>
 
-      {/* 7 · The kit */}
-      <section className="border-t border-slate-200 bg-white px-6 py-24">
-        <div className="mx-auto max-w-3xl text-center">
+      {/* 7 · Choose your path — three doors, one program */}
+      <section id="start" className="border-t border-slate-200 bg-white px-6 py-24">
+        <div className="mx-auto max-w-6xl text-center">
           <Reveal>
             <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3.5 py-1.5 text-sm font-medium text-[#0089a3]">
               <Sparkles className="h-4 w-4" /> Get started
             </span>
-            <h2 className="mt-5 text-3xl font-bold tracking-tight">Your discovery kit{meta?.clientName ? ` for ${meta.clientName}` : ""}</h2>
-            <p className="mx-auto mt-3 max-w-xl text-slate-600">
-              Two files: a guide that explains everything, and the workbook itself. Fill it, pass it
-              around, wrangle the answers — then bring it back here.
+            <h2 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
+              How would you like to begin{meta?.clientName ? `, ${meta.clientName}` : ""}?
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-slate-600">
+              Three ways in — all of them land at the same working session. The more you bring
+              upfront, the faster we get to validating; how engaged you want to be is up to you.
             </p>
           </Reveal>
 
-          <Reveal delay={120}>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <button
-                onClick={() => exportIntakeWorkbook(emptyResultFor(meta?.clientName ?? ""))}
-                className="group flex items-center justify-center gap-2.5 rounded-xl bg-[#00badc] px-6 py-4 text-base font-semibold text-slate-900 shadow-lg shadow-[#00badc]/25 transition-all hover:-translate-y-0.5 hover:bg-[#2fd0ee] hover:shadow-xl hover:shadow-[#00badc]/30 active:translate-y-0"
-              >
-                <FileSpreadsheet className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" /> Download the workbook
-              </button>
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            <PathCard
+              delay={0}
+              featured
+              icon={<MousePointerClick className="h-5 w-5" />}
+              title="Take the survey"
+              blurb="Interactive and quick — about 5 minutes. Your answers flow straight to your NELSON team the moment you finish."
+            >
               <a
-                href={`/workbook-guide${meta?.clientName ? `?client=${encodeURIComponent(meta.clientName)}` : ""}`}
-                target="_blank"
-                rel="noreferrer"
-                className="group flex items-center justify-center gap-2.5 rounded-xl border border-slate-300 bg-white px-6 py-4 text-base font-semibold text-slate-700 transition-all hover:-translate-y-0.5 hover:border-slate-400 hover:text-slate-900 hover:shadow-md active:translate-y-0"
+                href={`/survey?e=${token}`}
+                className="group mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#00badc] px-6 py-3.5 text-base font-semibold text-slate-900 shadow-lg shadow-[#00badc]/25 transition-all hover:-translate-y-0.5 hover:bg-[#2fd0ee] hover:shadow-xl hover:shadow-[#00badc]/30 active:translate-y-0"
               >
-                <FileDown className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" /> Read the guide
+                Start the survey <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </a>
-            </div>
-          </Reveal>
+            </PathCard>
+
+            <PathCard
+              delay={130}
+              icon={<FileSpreadsheet className="h-5 w-5" />}
+              title="Fill the workbook"
+              blurb="Download the Excel, split it across department leaders, wrangle the answers on your own time — then return it below."
+            >
+              <div className="mt-5 grid gap-2">
+                <button
+                  onClick={() => {
+                    exportIntakeWorkbook(emptyResultFor(meta?.clientName ?? ""))
+                    fetch(`/api/engagements/${token}`, { method: "PATCH", body: JSON.stringify({ stage: "workbook" }) }).catch(() => {})
+                  }}
+                  className="group flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-slate-700 hover:shadow-md active:translate-y-0"
+                >
+                  <FileSpreadsheet className="h-4 w-4" /> Download the workbook
+                </button>
+                <a
+                  href={`/workbook-guide${meta?.clientName ? `?client=${encodeURIComponent(meta.clientName)}` : ""}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-all hover:-translate-y-0.5 hover:border-slate-400 hover:text-slate-900 hover:shadow-md active:translate-y-0"
+                >
+                  <FileDown className="h-4 w-4" /> Read the guide
+                </a>
+              </div>
+            </PathCard>
+
+            <PathCard
+              delay={260}
+              icon={<MessagesSquare className="h-5 w-5" />}
+              title="Do it live with us"
+              blurb="No homework required. Bring what you know and we'll capture everything together, live in your working session."
+            >
+              <p className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Nothing to click — your NELSON contact will schedule the session.
+              </p>
+            </PathCard>
+          </div>
 
           {/* The return slot — also a drop target */}
           <Reveal delay={220}>
@@ -307,7 +354,7 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
               }`}
             >
               <Upload className={`mx-auto h-6 w-6 transition-colors ${dragging ? "text-[#0089a3]" : "text-slate-400"}`} />
-              <p className="mt-2 font-semibold text-slate-800">Finished? Return it here.</p>
+              <p className="mt-2 font-semibold text-slate-800">Finished the workbook? Return it here.</p>
               <p className="mt-1 text-sm text-slate-500">
                 Drop the completed workbook anywhere in this box — it flows straight into your program.
               </p>
@@ -394,6 +441,30 @@ function NextStep({ n, title, children }: { n: number; title: string; children: 
         <span className="text-sm text-slate-600">{children}</span>
       </span>
     </li>
+  )
+}
+
+/** One of the three engagement doors — featured gets the cyan halo. */
+function PathCard({ icon, title, blurb, featured, delay, children }: {
+  icon: React.ReactNode; title: string; blurb: string; featured?: boolean; delay: number; children: React.ReactNode
+}) {
+  return (
+    <Reveal delay={delay} className="h-full">
+      <div className={`flex h-full flex-col rounded-3xl border p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+        featured
+          ? "border-[#00badc]/50 bg-[#e9f7fb]/60 shadow-lg shadow-[#00badc]/10 hover:shadow-[#00badc]/20"
+          : "border-slate-200 bg-white shadow-sm hover:shadow-slate-200/60"
+      }`}>
+        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+          featured ? "bg-[#00badc] text-slate-900" : "bg-[#00badc]/12 text-[#0089a3]"
+        }`}>
+          {icon}
+        </span>
+        <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+        <p className="mt-1.5 flex-1 text-sm leading-relaxed text-slate-600">{blurb}</p>
+        {children}
+      </div>
+    </Reveal>
   )
 }
 

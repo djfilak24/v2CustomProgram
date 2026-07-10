@@ -7,11 +7,20 @@
  */
 import type { SurveyResult } from "@/lib/survey/types"
 
+/** Where the client last was in the journey — the console's live pulse. */
+export interface EngagementProgress {
+  stage: "landing" | "survey" | "workbook"
+  step?: number
+  total?: number
+  updatedAt: string
+}
+
 export interface Engagement {
   token: string
   clientName: string
   status: "sent" | "submitted"
   result?: SurveyResult
+  progress?: EngagementProgress
   createdAt: string
   updatedAt: string
 }
@@ -21,6 +30,7 @@ export interface EngagementStore {
   get(token: string): Promise<Engagement | null>
   list(): Promise<Engagement[]>
   submit(token: string, result: SurveyResult): Promise<Engagement | null>
+  setProgress(token: string, progress: EngagementProgress): Promise<void>
 }
 
 const newToken = () => {
@@ -42,12 +52,14 @@ function postgresStore(): EngagementStore {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS progress JSONB`
     return sql
   })()
 
   const fromRow = (r: any): Engagement => ({
     token: r.token, clientName: r.client_name, status: r.status,
     ...(r.result ? { result: r.result as SurveyResult } : {}),
+    ...(r.progress ? { progress: r.progress as EngagementProgress } : {}),
     createdAt: new Date(r.created_at).toISOString(), updatedAt: new Date(r.updated_at).toISOString(),
   })
 
@@ -75,6 +87,12 @@ function postgresStore(): EngagementStore {
         UPDATE engagements SET result = ${JSON.stringify(result)}::jsonb, status = 'submitted', updated_at = now()
         WHERE token = ${token} RETURNING *`
       return rows[0] ? fromRow(rows[0]) : null
+    },
+    async setProgress(token, progress) {
+      const sql = await ready
+      await sql`
+        UPDATE engagements SET progress = ${JSON.stringify(progress)}::jsonb, updated_at = now()
+        WHERE token = ${token}`
     },
   }
 }
@@ -109,6 +127,13 @@ function fileStore(): EngagementStore {
       e.result = result; e.status = "submitted"; e.updatedAt = new Date().toISOString()
       await save(all)
       return e
+    },
+    async setProgress(token, progress) {
+      const all = await load()
+      const e = all.find((x) => x.token === token)
+      if (!e) return
+      e.progress = progress; e.updatedAt = new Date().toISOString()
+      await save(all)
     },
   }
 }

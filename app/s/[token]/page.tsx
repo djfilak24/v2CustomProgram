@@ -375,12 +375,12 @@ function emptyResultFor(clientName: string): import("@/lib/survey/types").Survey
   }
 }
 
-/** Light variant keeps the cyan fin (white-text SVG) instead of flattening it. */
+/** Official NELSON marks: white+fin on dark surfaces, color on light. */
 function Logo({ light }: { light?: boolean }) {
   return (
     <Image
-      src={light ? "/nelson-logo-white.svg" : "/nelson-logo.png"}
-      alt="NELSON" width={110} height={33} className="h-8 w-auto" priority
+      src={light ? "/NELSON_whiteBlueFin.png" : "/NELSON_color.png"}
+      alt="NELSON" width={170} height={40} className="h-8 w-auto" priority
     />
   )
 }

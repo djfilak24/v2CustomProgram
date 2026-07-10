@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense } from "react"
+import Image from "next/image"
 import { useSearchParams } from "next/navigation"
 import { FileDown, FileSpreadsheet, MessagesSquare, MailCheck, Sparkles, Clock, LayoutGrid, FileType } from "lucide-react"
 
@@ -39,8 +40,11 @@ function Guide() {
         {/* Brand header */}
         <div className="flex items-end justify-between border-b-2 border-slate-900 pb-4">
           <div>
-            <div className="text-2xl font-extrabold tracking-tight">NELSON</div>
-            <div className="mt-0.5 text-[11px] uppercase tracking-[0.2em] text-slate-500">
+            <Image
+              src="/NELSON_color.png" alt="NELSON" width={170} height={40}
+              className="h-8 w-auto" priority
+            />
+            <div className="mt-1.5 text-[11px] uppercase tracking-[0.2em] text-slate-500">
               Workplace Strategy Discovery
             </div>
           </div>

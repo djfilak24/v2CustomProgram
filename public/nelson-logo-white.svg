@@ -1,7 +1,0 @@
-<svg viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg" fill="none">
-  <!-- NELSON text in white, for dark surfaces -->
-  <text x="0" y="45" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="700" fill="#ffffff" letter-spacing="-1">NELSON</text>
-
-  <!-- Blue fin accent in top right -->
-  <path d="M 180 5 L 200 5 L 180 25 Z" fill="#00badc"/>
-</svg>

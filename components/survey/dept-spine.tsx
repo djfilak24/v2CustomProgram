@@ -41,7 +41,8 @@ export function DeptSpine({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="mb-2 grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+      {/* Column labels — desktop only; the stacked phone layout labels inline */}
+      <div className="mb-2 hidden grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-1 text-xs font-medium uppercase tracking-wide text-slate-400 sm:grid">
         <span>Department</span>
         <span className="w-[120px] text-center">Current</span>
         <span className="w-[120px] text-center">3–5 yr</span>
@@ -56,7 +57,9 @@ export function DeptSpine({
           const isOpen = open.has(d.id)
           return (
             <div key={d.id} className="rounded-xl border border-slate-100 bg-white">
-              <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 p-1.5">
+              {/* Phone: name row + labeled stepper row. ≥sm: the classic 4-col grid
+                  (the stepper wrapper dissolves into the grid via sm:contents). */}
+              <div className="p-2 sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:items-center sm:gap-3 sm:p-1.5">
                 <div className="flex items-center gap-1.5">
                   {named && (
                     <button
@@ -72,25 +75,41 @@ export function DeptSpine({
                     value={d.name}
                     onChange={(e) => update(d.id, { name: e.target.value })}
                     placeholder="Department name"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
+                    className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={() => remove(d.id)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 sm:hidden"
+                    aria-label="Remove department"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
 
-                <Stepper value={d.headcount} onChange={(n) => update(d.id, { headcount: Math.max(n, mode === "full" ? roster.length : 0) })} />
+                <div className="mt-2.5 flex items-end justify-between gap-3 sm:mt-0 sm:contents">
+                  <div className="flex flex-col gap-1">
+                    <span className="pl-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Today</span>
+                    <Stepper value={d.headcount} onChange={(n) => update(d.id, { headcount: Math.max(n, mode === "full" ? roster.length : 0) })} />
+                  </div>
 
-                <div className="flex items-center gap-1.5">
-                  <Stepper value={future} onChange={(n) => update(d.id, { futureHeadcount: n })} />
-                  <span className="flex w-7 justify-center" title={`${delta >= 0 ? "+" : ""}${delta} vs today`}>
-                    {delta > 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
-                      : delta < 0 ? <TrendingDown className="h-3.5 w-3.5 text-amber-600" />
-                      : <MinusIcon className="h-3.5 w-3.5 text-slate-300" />}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className="pl-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">3–5 yr</span>
+                    <div className="flex items-center gap-1.5">
+                      <Stepper value={future} onChange={(n) => update(d.id, { futureHeadcount: n })} />
+                      <span className="flex w-7 justify-center" title={`${delta >= 0 ? "+" : ""}${delta} vs today`}>
+                        {delta > 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                          : delta < 0 ? <TrendingDown className="h-3.5 w-3.5 text-amber-600" />
+                          : <MinusIcon className="h-3.5 w-3.5 text-slate-300" />}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => remove(d.id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  className="hidden h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 sm:flex"
                   aria-label="Remove department"
                 >
                   <Trash2 className="h-4 w-4" />

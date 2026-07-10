@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import { useEffect, useRef } from "react"
 import { Check } from "lucide-react"
 import { SURVEY_STEPS } from "@/lib/survey/sections"
 
@@ -8,7 +9,8 @@ import { SURVEY_STEPS } from "@/lib/survey/sections"
  * Sticky survey chrome: NELSON brand + a sectioned step tracker. Steps are
  * grouped by section, each rendered as a dot (done / current / upcoming) so the
  * respondent always sees where they are and what's ahead. Past steps are
- * clickable to jump back. Full-bleed on large screens.
+ * clickable to jump back. Full-bleed on large screens; on phones the tracker
+ * scrolls horizontally and auto-centers the active section.
  */
 export function ProgressHeader({
   stepIndex,
@@ -19,6 +21,7 @@ export function ProgressHeader({
 }) {
   const total = SURVEY_STEPS.length
   const pct = Math.round(((stepIndex + 1) / total) * 100)
+  const activeGroupRef = useRef<HTMLDivElement | null>(null)
 
   // Group consecutive steps by section, preserving each step's global index.
   const groups: { section: string; steps: { index: number }[] }[] = []
@@ -28,24 +31,33 @@ export function ProgressHeader({
     else groups.push({ section: s.section, steps: [{ index: i }] })
   })
 
+  // Keep the active section visible when the tracker overflows (phones).
+  useEffect(() => {
+    activeGroupRef.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" })
+  }, [stepIndex])
+
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1760px] items-center justify-between gap-6 px-6 py-3.5 lg:px-10">
-        <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-6 w-auto" priority />
+      <div className="mx-auto flex max-w-[1760px] items-center justify-between gap-4 px-4 py-2.5 sm:gap-6 sm:px-6 sm:py-3.5 lg:px-10">
+        <Image src="/nelson-logo.png" alt="NELSON" width={104} height={28} className="h-5 w-auto sm:h-6" priority />
         <div className="text-right">
-          <div className="text-sm font-semibold text-slate-900">Workplace Strategy Discovery</div>
+          <div className="hidden text-sm font-semibold text-slate-900 sm:block">Workplace Strategy Discovery</div>
           <div className="text-xs text-slate-500">Step {stepIndex + 1} of {total} · {pct}%</div>
         </div>
       </div>
 
-      {/* Sectioned step tracker */}
-      <div className="mx-auto max-w-[1760px] px-6 pb-3 lg:px-10">
-        <div className="flex items-center gap-3 overflow-x-auto">
+      {/* Sectioned step tracker — horizontally scrollable when it overflows */}
+      <div className="mx-auto max-w-[1760px] px-4 pb-2.5 sm:px-6 sm:pb-3 lg:px-10">
+        <div className="flex items-center gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {groups.map((g, gi) => {
             const groupActive = g.steps.some((s) => s.index === stepIndex)
             const groupDone = g.steps.every((s) => s.index < stepIndex)
             return (
-              <div key={g.section} className="flex items-center gap-3">
+              <div
+                key={g.section}
+                ref={groupActive ? activeGroupRef : undefined}
+                className="flex items-center gap-3"
+              >
                 <div className="flex items-center gap-2">
                   <span
                     className={`whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide transition-colors ${
@@ -67,7 +79,7 @@ export function ProgressHeader({
                           onClick={() => clickable && onJump?.(index)}
                           aria-label={`Step ${index + 1}: ${SURVEY_STEPS[index].title}`}
                           title={SURVEY_STEPS[index].title}
-                          className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold transition-all ${
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-all ${
                             current
                               ? "bg-[#00badc] text-slate-900 ring-4 ring-[#00badc]/20"
                               : done

@@ -58,7 +58,7 @@ export function AggregationScene() {
             <animate attributeName="stroke-opacity" values="0.4;0.08;0.4" dur="3.2s" repeatCount="indefinite" />
           </circle>
           <text x={d.x} y={d.y + (d.y > CY ? 28 : -20)} textAnchor="middle"
-            fontSize="12" fontWeight="600" fill="#475569">{d.name}</text>
+            fontSize="15" fontWeight="600" fill="#475569">{d.name}</text>
         </g>
       ))}
 
@@ -72,7 +72,7 @@ export function AggregationScene() {
       <circle cx={CX - 12} cy={CY - 8} r="11" fill="#06b6d4" opacity="0.85" />
       <circle cx={CX + 13} cy={CY - 4} r="8" fill="#8b5cf6" opacity="0.85" />
       <circle cx={CX + 1} cy={CY + 14} r="9" fill="#f97316" opacity="0.85" />
-      <text x={CX} y={CY + 78} textAnchor="middle" fontSize="13" fontWeight="700" fill="#0f172a">
+      <text x={CX} y={CY + 80} textAnchor="middle" fontSize="17" fontWeight="700" fill="#0f172a">
         One program
       </text>
     </svg>

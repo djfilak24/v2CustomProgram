@@ -63,8 +63,9 @@ export function AdjacencyGraph({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[480px_minmax(0,1fr)]">
-      <div className="rounded-2xl border border-slate-200 bg-white p-3">
-        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto h-auto w-full max-w-[460px]">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 px-6 sm:px-3">
+        {/* overflow-visible lets edge labels render into the card padding instead of clipping */}
+        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto h-auto w-full max-w-[460px] overflow-visible">
           {/* connections, drawn low-priority first so the top ones sit on top */}
           {[...pairs].map((k, rank) => ({ k, rank })).reverse().map(({ k, rank }) => {
             const [a, b] = k.split("|")

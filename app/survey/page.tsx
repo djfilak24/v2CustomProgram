@@ -193,7 +193,7 @@ export default function SurveyPage() {
       <ProgressHeader stepIndex={stepIndex} onJump={(i) => setStepIndex(i)} />
 
       <main
-        className={`mx-auto grid max-w-[1760px] grid-cols-1 gap-8 px-6 py-10 lg:gap-10 lg:px-10 xl:gap-14 ${
+        className={`mx-auto grid max-w-[1760px] grid-cols-1 gap-8 px-4 py-6 sm:px-6 sm:py-10 lg:gap-10 lg:px-10 xl:gap-14 ${
           wide ? "" : "lg:grid-cols-[minmax(0,1fr)_380px]"
         }`}
       >
@@ -251,14 +251,14 @@ export default function SurveyPage() {
             />
           </div>
 
-          {/* Nav */}
-          <div className="mt-9 flex items-center justify-between border-t border-slate-200 pt-6">
+          {/* Nav — pinned to the bottom on phones so Continue is always in reach */}
+          <div className="sticky bottom-0 z-10 -mx-4 mt-9 flex items-center justify-between border-t border-slate-200 bg-[#f3f7fa]/95 px-4 py-3 backdrop-blur-sm sm:static sm:z-auto sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:pt-6 sm:backdrop-blur-none">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={goBack}
                 disabled={stepIndex === 0}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30"
+                className="inline-flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 sm:px-4"
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </button>
@@ -281,7 +281,7 @@ export default function SurveyPage() {
                 <button
                   type="button"
                   onClick={deferStep}
-                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-700"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 sm:gap-2 sm:px-4 sm:text-sm"
                   title="We'll cover this together in the live session"
                 >
                   <MessageCircle className="h-4 w-4" /> We&apos;ll talk live
@@ -834,11 +834,11 @@ function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, impo
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/80" />
 
       <div className="relative z-10 flex min-h-screen flex-col">
-        <header className="flex items-center justify-between px-8 py-6">
+        <header className="flex items-center justify-between gap-3 px-5 py-5 sm:px-8 sm:py-6">
           <div className="flex items-center gap-3">
-            <Image src="/nelson-logo.png" alt="NELSON" width={110} height={28} className="h-7 w-auto brightness-0 invert" priority />
-            <span className="text-white/30">|</span>
-            <span className="text-sm font-medium text-white/70">Workplace Strategy Discovery</span>
+            <Image src="/NELSON_whiteBlueFin.png" alt="NELSON" width={170} height={40} className="h-7 w-auto" priority />
+            <span className="hidden text-white/30 sm:inline">|</span>
+            <span className="hidden text-sm font-medium text-white/70 sm:inline">Workplace Strategy Discovery</span>
           </div>
           {draft ? (
             <button
@@ -849,7 +849,7 @@ function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, impo
             </button>
           ) : (
             <span
-              className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/60 backdrop-blur-sm"
+              className="hidden rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/60 backdrop-blur-sm sm:inline-block"
               title="Your answers save automatically as you go — close the tab and pick up later on this device"
             >
               Progress saves automatically
@@ -884,11 +884,11 @@ function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, impo
           <span className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/80 backdrop-blur-sm">
             <Sparkles className="h-4 w-4 text-[#00badc]" /> 3–5 minutes
           </span>
-          <h1 className="max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
+          <h1 className="max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl sm:leading-[1.05]">
             Let&apos;s understand your{" "}
             <span className="text-[#00badc]">workplace vision</span>
           </h1>
-          <p className="mt-6 max-w-xl text-lg text-white/70">
+          <p className="mt-6 max-w-xl text-base text-white/70 sm:text-lg">
             This short experience helps us understand your team&apos;s goals and
             realities. There are no wrong answers — just honest insights.
           </p>

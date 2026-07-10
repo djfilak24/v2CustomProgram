@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, ChevronRight, Crown } from "lucide-react"
+import { Check, ChevronRight, Crown, X, CheckCheck, Eraser } from "lucide-react"
 import { Stepper } from "./stepper"
 import type { SpineDept } from "@/lib/survey/sections"
 
@@ -22,6 +22,8 @@ export function DeptAllocationRows({
   showFlex = false,
   employeeSelections,
   onToggleEmployee,
+  onBulkEmployees,
+  onReleaseExcluded,
   excludedEmployees,
   excludedNoun,
 }: {
@@ -38,6 +40,14 @@ export function DeptAllocationRows({
   /** Per-person selection (employee id → checked). Enables the nested roster. */
   employeeSelections?: Record<string, boolean>
   onToggleEmployee?: (empId: string) => void
+  /** Bulk set a list of people to checked/unchecked in one update (select all / clear). */
+  onBulkEmployees?: (empIds: string[], value: boolean) => void
+  /**
+   * Release a person from the complementary seat (office ⇄ desk) so they can be
+   * assigned here instead — powers the "× office" undo in the desk step and the
+   * reverse. When omitted, complementary holders stay hard-locked.
+   */
+  onReleaseExcluded?: (empId: string) => void
   /**
    * People already assigned to the complementary seat type (office ⇄ desk).
    * They're locked out here — a person holds at most one assigned seat.
@@ -170,46 +180,112 @@ export function DeptAllocationRows({
 
             {/* Nested per-person assignment */}
             {perPerson && isOpen && (
-              <div className="mt-3 grid gap-1.5 border-t border-slate-100 pt-3 sm:grid-cols-2">
-                {[...roster].sort((a, b) => Number(!!b.isLeader) - Number(!!a.isLeader)).map((emp) => {
-                  const on = !!employeeSelections![emp.id]
-                  const locked = !on && !!excludedEmployees?.[emp.id]
-                  const leader = !!emp.isLeader
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                {/* Bulk controls — assign or clear the whole team at once */}
+                {onBulkEmployees && (() => {
+                  const eligible = roster.filter((e) => !excludedEmployees?.[e.id])
+                  const checkedIds = roster.filter((e) => employeeSelections![e.id]).map((e) => e.id)
+                  const allEligibleOn = eligible.length > 0 && eligible.every((e) => employeeSelections![e.id])
                   return (
-                    <button
-                      key={emp.id}
-                      type="button"
-                      disabled={locked}
-                      onClick={() => !locked && onToggleEmployee?.(emp.id)}
-                      title={locked ? `Already has ${excludedNoun ?? "the other seat"} — one assigned seat per person` : undefined}
-                      className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                        locked
-                          ? "cursor-not-allowed border-slate-100 bg-slate-50/60 text-slate-400"
-                          : on
-                            ? "border-[#00badc]/50 bg-[#00badc]/[0.08] text-slate-900"
-                            : leader
-                              ? "border-amber-400/70 bg-amber-50 text-slate-900 hover:border-amber-500/70"
-                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                          on ? "border-[#00badc] bg-[#00badc] text-slate-900" : locked ? "border-slate-300" : "border-slate-300"
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={allEligibleOn || eligible.length === 0}
+                        onClick={() => onBulkEmployees(eligible.map((e) => e.id), true)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[#00badc]/40 bg-[#00badc]/[0.08] px-2.5 py-1 text-xs font-medium text-[#0089a3] transition-colors hover:bg-[#00badc]/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <CheckCheck className="h-3.5 w-3.5" /> Select all
+                      </button>
+                      <button
+                        type="button"
+                        disabled={checkedIds.length === 0}
+                        onClick={() => onBulkEmployees(checkedIds, false)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Eraser className="h-3.5 w-3.5" /> Clear
+                      </button>
+                      <span className="ml-auto text-xs text-slate-400">
+                        {checked} of {roster.length} assigned
+                      </span>
+                    </div>
+                  )
+                })()}
+
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {[...roster].sort((a, b) => Number(!!b.isLeader) - Number(!!a.isLeader)).map((emp) => {
+                    const on = !!employeeSelections![emp.id]
+                    const excluded = !on && !!excludedEmployees?.[emp.id]
+                    // A complementary-seat holder is releasable (× to free them) when the
+                    // parent supplies onReleaseExcluded; otherwise hard-locked.
+                    const releasable = excluded && !!onReleaseExcluded
+                    const locked = excluded && !releasable
+                    const leader = !!emp.isLeader
+
+                    // Releasable row: not a selection button — carries its own × control.
+                    if (releasable) {
+                      return (
+                        <div
+                          key={emp.id}
+                          className="flex items-center gap-2.5 rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2 text-sm text-slate-500"
+                        >
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-violet-300 bg-white">
+                            <span className="h-2 w-2 rounded-[1px] bg-violet-400" />
+                          </span>
+                          {leader && <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500/60" />}
+                          <span className="truncate">{emp.name || "Unnamed"}</span>
+                          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                            <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-500">
+                              {excludedNoun}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => onReleaseExcluded!(emp.id)}
+                              title={`Remove their ${excludedNoun ?? "other seat"} to free them for a ${thisNoun}`}
+                              className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                            >
+                              <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+                            </button>
+                          </span>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <button
+                        key={emp.id}
+                        type="button"
+                        disabled={locked}
+                        onClick={() => !locked && onToggleEmployee?.(emp.id)}
+                        title={locked ? `Already has ${excludedNoun ?? "the other seat"} — one assigned seat per person` : undefined}
+                        className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                          locked
+                            ? "cursor-not-allowed border-slate-100 bg-slate-50/60 text-slate-400"
+                            : on
+                              ? "border-[#00badc]/50 bg-[#00badc]/[0.08] text-slate-900"
+                              : leader
+                                ? "border-amber-400/70 bg-amber-50 text-slate-900 hover:border-amber-500/70"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                         }`}
                       >
-                        {on && <Check className="h-3 w-3" strokeWidth={3} />}
-                        {locked && <span className="h-2 w-2 rounded-[1px] bg-white/25" />}
-                      </span>
-                      {leader && <Crown className={`h-3.5 w-3.5 shrink-0 ${locked ? "text-amber-600/40" : "text-amber-500"}`} />}
-                      <span className="truncate">{emp.name || "Unnamed"}</span>
-                      {locked && excludedNoun && (
-                        <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                          {excludedNoun}
+                        <span
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            on ? "border-[#00badc] bg-[#00badc] text-slate-900" : "border-slate-300"
+                          }`}
+                        >
+                          {on && <Check className="h-3 w-3" strokeWidth={3} />}
+                          {locked && <span className="h-2 w-2 rounded-[1px] bg-white/25" />}
                         </span>
-                      )}
-                    </button>
-                  )
-                })}
+                        {leader && <Crown className={`h-3.5 w-3.5 shrink-0 ${locked ? "text-amber-600/40" : "text-amber-500"}`} />}
+                        <span className="truncate">{emp.name || "Unnamed"}</span>
+                        {locked && excludedNoun && (
+                          <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                            {excludedNoun}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>

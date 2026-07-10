@@ -488,6 +488,16 @@ function StepBody({
                   officeByEmployee: { ...state.officeByEmployee, [id]: false },
                 })
               }
+              onBulkEmployees={(ids, value) =>
+                patch({
+                  deskByEmployee: { ...state.deskByEmployee, ...Object.fromEntries(ids.map((i) => [i, value])) },
+                  // Assigning desks releases any offices those people held.
+                  ...(value ? { officeByEmployee: { ...state.officeByEmployee, ...Object.fromEntries(ids.map((i) => [i, false])) } } : {}),
+                })
+              }
+              onReleaseExcluded={(id) =>
+                patch({ officeByEmployee: { ...state.officeByEmployee, [id]: false } })
+              }
             />
           ) : (
             <CardGrid
@@ -537,6 +547,16 @@ function StepBody({
                   // XOR: taking an office releases any dedicated desk this person held.
                   deskByEmployee: { ...state.deskByEmployee, [id]: false },
                 })
+              }
+              onBulkEmployees={(ids, value) =>
+                patch({
+                  officeByEmployee: { ...state.officeByEmployee, ...Object.fromEntries(ids.map((i) => [i, value])) },
+                  // Assigning offices releases any desks those people held.
+                  ...(value ? { deskByEmployee: { ...state.deskByEmployee, ...Object.fromEntries(ids.map((i) => [i, false])) } } : {}),
+                })
+              }
+              onReleaseExcluded={(id) =>
+                patch({ deskByEmployee: { ...state.deskByEmployee, [id]: false } })
               }
             />
           ) : (

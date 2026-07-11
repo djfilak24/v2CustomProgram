@@ -409,3 +409,65 @@ workbook loop — already exists and is the strong part of the audit.
    proper auth first (slower). Council: passcode now, auth later.
 4. **Which door does the first real client get:** solo link, distributed
    department mini-links, or the workbook? Determines polish order.
+
+---
+
+# Advisory #5 — Deliverable v2, and the Studio (Canvas v2)
+
+*Convened at the founder's request after the first deliverable shipped: "the PDF
+was decent, the program summary was decent for a first pass — push it further.
+And show me what Canvas v2 looks like from the NELSON point of view."*
+
+## 1. Deliverable v2 — the committee's push list
+
+The Broker: "The verdict slide already closes deals. What's missing is rhythm —
+every slide currently lands at the same volume." The Designer: "First pass is
+honest scaffolding. v2 is typography and pacing, not more features."
+
+Ranked findings:
+
+1. **Pacing/rhythm (Designer, Broker — unanimous):** alternate dark/light slides
+   deliberately (dark = moments: cover, verdict; light = information). Add a
+   subtle slide transition (fade/slide, 200–300ms) — hard cuts read as a web
+   page, not a presentation. *(quick win — shipped with this advisory)*
+2. **Cover carries the brand (Designer):** client name is right; add the client's
+   own photography when NELSON has it, and a program one-liner ("60 → 67 people ·
+   ~15,000 USF · hybrid") so the cover alone summarizes the engagement.
+3. **Presenter notes (Strategist):** each slide gets a NELSON-only talking-points
+   strip (hidden from clients and print) — the deck should coach the presenter.
+4. **Print polish (Operator):** page footers (client · date · page N), and the
+   program table must never break a category across pages.
+5. **The program table earns a "what changed" story (Broker):** when overrides
+   exist, show original → edited deltas subtly, so the session's decisions are
+   visible in the take-home.
+6. **Radar slide annotation (Strategist):** call out the two strongest axes in
+   words next to the chart — clients remember sentences, not hexagons.
+
+## 2. The Studio — Canvas v2 from the NELSON point of view
+
+Ruling: **the Studio is an engagement workbench, not a canvas.** The old canvas
+is a document you assemble; the Studio is a place you *inspect and adjust* a
+program that already exists (because intake built it). Desktop-only by design —
+below lg it shows a branded "open on desktop" screen and nothing else.
+
+Blueprint (v1, prototyped alongside this advisory at /studio):
+
+- **Left rail — the engagement:** picker (any returned engagement, or the local
+  seed), live totals (net → circulation → gross → rentable), category rollups,
+  and the handoff actions.
+- **Center — the Spaces browser:** the one canvas pattern worth keeping, reborn.
+  Every program line as a card: photo, qty × unit SF (both editable), planning
+  ratio, and department allocation chips (who holds the offices/desks; collab
+  by-dept counts where captured). Grouped by category, filterable.
+- **Handoff — the Fit-Planning Package:** one button; an Excel with Program /
+  Departments / Adjacencies / Existing & size-mix / Notes sheets — everything
+  the fit-planning team needs to test the program on real floor plates.
+
+What the Studio does NOT do (v1): scenario A/B, floorplate testing, ratio
+editing (stays in the review), anything client-facing.
+
+## 3. Retirement path for the old canvas (unchanged, reaffirmed)
+
+Freeze `/` as-is. The Studio absorbs inspect + handoff now; the review keeps
+adjust-in-session; when both cover daily use, retiring the canvas is a deletion.
+The founder decides the date; nothing forces it.

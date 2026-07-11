@@ -153,7 +153,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
       {slides.map((s, i) => (
         <section
           key={s}
-          className={`slide relative ${i === idx ? "flex" : "hidden"} min-h-screen flex-col print:flex print:min-h-0 print:h-[7.25in] print:overflow-hidden`}
+          className={`slide relative ${i === idx ? "flex slide-in" : "hidden"} min-h-screen flex-col print:flex print:min-h-0 print:h-[7.25in] print:overflow-hidden`}
         >
           {s === "cover" && <CoverSlide clientName={meta.clientName} />}
           {s === "who" && <WhoSlide d={d} result={result!} />}
@@ -181,6 +181,10 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
             <ProgramSlide d={d} nelson={nelson} keyed={KEYED} overrides={overrides} onOverride={setOverride} />
           )}
           {s === "next" && <NextSlide d={d} result={result!} />}
+          {/* Print footer — the take-home is paginated like a document */}
+          <div className="absolute bottom-2 left-0 right-0 hidden text-center text-[9px] tracking-wide text-slate-400 print:block">
+            {meta.clientName} · Workplace Program · NELSON · {i + 1} / {slides.length}
+          </div>
         </section>
       ))}
 
@@ -206,6 +210,9 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
       <style>{`
         @page { size: letter landscape; margin: 0.4in; }
         @media print { .slide { break-after: page; } }
+        .slide-in { animation: slideIn 260ms ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { .slide-in { animation: none; } }
       `}</style>
     </div>
   )

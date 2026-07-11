@@ -55,11 +55,18 @@ export interface Deliverable {
   strategy: SpaceStrategy
 }
 
-export function buildDeliverable(result: SurveyResult, overrides: DeliverableOverrides = {}): Deliverable {
+export function buildDeliverable(
+  result: SurveyResult,
+  overrides: DeliverableOverrides = {},
+  /** Optional proposed-count overrides (line key → qty) — the Studio's second dial. */
+  counts: Record<string, number> = {},
+): Deliverable {
   const comp = buildComparison(result)
-  const lines = comp.lines.map((l) =>
-    overrides[l.key] && overrides[l.key] > 0 ? { ...l, unitSF: overrides[l.key] } : l,
-  )
+  const lines = comp.lines.map((l) => ({
+    ...l,
+    unitSF: overrides[l.key] && overrides[l.key] > 0 ? overrides[l.key] : l.unitSF,
+    proposedCount: counts[l.key] !== undefined && counts[l.key] >= 0 ? counts[l.key] : l.proposedCount,
+  }))
 
   const cats = (["Workstations", "Offices", "Collaboration", "Support"] as const).map((name) => {
     const ls = lines.filter((l) => l.category === name)

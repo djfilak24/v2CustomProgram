@@ -103,14 +103,18 @@ a fourth landing door, saving its config to the engagement.
 The deliverable reads the latest; the console shows the history. Cheap now,
 painful after the deliverable and explorer both write to the same slot.
 
-## 5 · Open decisions (founder)
+## 5 · Decisions — LOCKED (founder, 2026-07-10)
 
-1. **Deliverable reveal**: gated behind NELSON "share" flag (recommended) or
-   visible to the client immediately on submit?
-2. **Which decisions are editable on slide 7?** Proposed v1: workstation size,
-   office size, growth %. (Collab ratios stay NELSON-only in the review.)
-3. **PDF depth**: mirror all 8 slides, or a 4-page executive cut (cover, profile,
-   map, verdict+table)?
+1. **Deliverable reveal: gated behind the share flag.** Never visible on submit.
+   The intake gets audited and human expertise layered in before anything is
+   presented — data collection is automated; the answer comes from real dialogue.
+2. **Editable on the program slide**: workstation size and office size as the
+   headline chips, plus the big frequent movers — conference / huddle / focus
+   booth sizes, the break room (work café), reception, and any custom spaces.
+   Everything else lives in the full table/row readout (every space, unit sizes,
+   circulation, load factor all visible) — and unit sizes are editable there too.
+3. **PDF mirrors the full keynote** — it's the take-home after the presentation —
+   ending with the technical table that carries all the space detail.
 4. **Email flow** (noted for later): submit-confirmation + "your deliverable is
    ready" emails pointing back to the home page — needs a send provider (Resend
    or similar) and a founder decision on sender identity. Not in Phase 2 builds.

@@ -15,12 +15,25 @@ export interface EngagementProgress {
   updatedAt: string
 }
 
+/** One intake arriving on the engagement — the audit trail of who sent what, when. */
+export interface SubmissionMeta {
+  source: "survey" | "workbook" | "unknown"
+  at: string
+}
+
 export interface Engagement {
   token: string
   clientName: string
   status: "sent" | "submitted"
+  /** Latest result — what the deliverable and review read. */
   result?: SurveyResult
   progress?: EngagementProgress
+  /** Deliverable presentation edits (comparison line key → unit SF), saved so the printed PDF matches what was presented. */
+  overrides?: Record<string, number>
+  /** Human-in-the-loop gate: the deliverable is only visible to the client after NELSON shares it. */
+  shared?: boolean
+  /** Submission log — every intake that landed, newest last. */
+  submissions?: SubmissionMeta[]
   createdAt: string
   updatedAt: string
 }
@@ -29,8 +42,10 @@ export interface EngagementStore {
   create(clientName: string): Promise<Engagement>
   get(token: string): Promise<Engagement | null>
   list(): Promise<Engagement[]>
-  submit(token: string, result: SurveyResult): Promise<Engagement | null>
+  submit(token: string, result: SurveyResult, source?: SubmissionMeta["source"]): Promise<Engagement | null>
   setProgress(token: string, progress: EngagementProgress): Promise<void>
+  setShared(token: string, shared: boolean): Promise<void>
+  setOverrides(token: string, overrides: Record<string, number>): Promise<void>
 }
 
 const newToken = () => {
@@ -53,6 +68,9 @@ function postgresStore(): EngagementStore {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS progress JSONB`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS overrides JSONB`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS shared BOOLEAN NOT NULL DEFAULT false`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS submissions JSONB`
     return sql
   })()
 
@@ -60,6 +78,9 @@ function postgresStore(): EngagementStore {
     token: r.token, clientName: r.client_name, status: r.status,
     ...(r.result ? { result: r.result as SurveyResult } : {}),
     ...(r.progress ? { progress: r.progress as EngagementProgress } : {}),
+    ...(r.overrides ? { overrides: r.overrides as Record<string, number> } : {}),
+    ...(r.shared ? { shared: true } : {}),
+    ...(r.submissions ? { submissions: r.submissions as SubmissionMeta[] } : {}),
     createdAt: new Date(r.created_at).toISOString(), updatedAt: new Date(r.updated_at).toISOString(),
   })
 
@@ -81,10 +102,15 @@ function postgresStore(): EngagementStore {
       const { rows } = await sql`SELECT * FROM engagements ORDER BY updated_at DESC LIMIT 200`
       return rows.map(fromRow)
     },
-    async submit(token, result) {
+    async submit(token, result, source = "unknown") {
       const sql = await ready
+      const sub: SubmissionMeta = { source, at: new Date().toISOString() }
       const { rows } = await sql`
-        UPDATE engagements SET result = ${JSON.stringify(result)}::jsonb, status = 'submitted', updated_at = now()
+        UPDATE engagements SET
+          result = ${JSON.stringify(result)}::jsonb,
+          status = 'submitted',
+          submissions = COALESCE(submissions, '[]'::jsonb) || ${JSON.stringify([sub])}::jsonb,
+          updated_at = now()
         WHERE token = ${token} RETURNING *`
       return rows[0] ? fromRow(rows[0]) : null
     },
@@ -92,6 +118,16 @@ function postgresStore(): EngagementStore {
       const sql = await ready
       await sql`
         UPDATE engagements SET progress = ${JSON.stringify(progress)}::jsonb, updated_at = now()
+        WHERE token = ${token}`
+    },
+    async setShared(token, shared) {
+      const sql = await ready
+      await sql`UPDATE engagements SET shared = ${shared}, updated_at = now() WHERE token = ${token}`
+    },
+    async setOverrides(token, overrides) {
+      const sql = await ready
+      await sql`
+        UPDATE engagements SET overrides = ${JSON.stringify(overrides)}::jsonb, updated_at = now()
         WHERE token = ${token}`
     },
   }
@@ -120,11 +156,12 @@ function fileStore(): EngagementStore {
     },
     async get(token) { return (await load()).find((e) => e.token === token) ?? null },
     async list() { return load() },
-    async submit(token, result) {
+    async submit(token, result, source = "unknown") {
       const all = await load()
       const e = all.find((x) => x.token === token)
       if (!e) return null
       e.result = result; e.status = "submitted"; e.updatedAt = new Date().toISOString()
+      e.submissions = [...(e.submissions ?? []), { source, at: e.updatedAt }]
       await save(all)
       return e
     },
@@ -133,6 +170,20 @@ function fileStore(): EngagementStore {
       const e = all.find((x) => x.token === token)
       if (!e) return
       e.progress = progress; e.updatedAt = new Date().toISOString()
+      await save(all)
+    },
+    async setShared(token, shared) {
+      const all = await load()
+      const e = all.find((x) => x.token === token)
+      if (!e) return
+      e.shared = shared; e.updatedAt = new Date().toISOString()
+      await save(all)
+    },
+    async setOverrides(token, overrides) {
+      const all = await load()
+      const e = all.find((x) => x.token === token)
+      if (!e) return
+      e.overrides = overrides; e.updatedAt = new Date().toISOString()
       await save(all)
     },
   }

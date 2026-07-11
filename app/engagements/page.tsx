@@ -11,6 +11,7 @@ interface Row {
   clientName: string
   status: "sent" | "submitted"
   hasResult: boolean
+  shared?: boolean
   progress?: { stage: "landing" | "survey" | "workbook"; step?: number; total?: number; updatedAt: string }
   updatedAt: string
 }
@@ -205,10 +206,30 @@ export default function EngagementsPage() {
                           <ExternalLink className="h-3.5 w-3.5" /> Preview
                         </a>
                         {r.status === "submitted" && (
-                          <button onClick={() => openInReview(r.token)}
-                            className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700">
-                            Open in review →
-                          </button>
+                          <>
+                            <a href={`/d/${r.token}`} target="_blank" rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-md border border-[#00badc]/50 bg-[#00badc]/10 px-2.5 py-1 text-xs font-semibold text-[#0089a3] hover:bg-[#00badc]/20">
+                              Deliverable
+                            </a>
+                            <button
+                              onClick={async () => {
+                                await fetch(`/api/engagements/${r.token}`, {
+                                  method: "PATCH", headers: headers(), body: JSON.stringify({ shared: !r.shared }),
+                                })
+                                refresh()
+                              }}
+                              title={r.shared ? "Client can see the deliverable — click to unshare" : "Deliverable is private — click to share with the client"}
+                              className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ${
+                                r.shared ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "border border-slate-200 text-slate-500 hover:border-slate-300"
+                              }`}
+                            >
+                              {r.shared ? "Shared ✓" : "Share"}
+                            </button>
+                            <button onClick={() => openInReview(r.token)}
+                              className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700">
+                              Open in review →
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>

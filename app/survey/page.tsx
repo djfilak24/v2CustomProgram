@@ -135,7 +135,7 @@ export default function SurveyPage() {
   useEffect(() => {
     if (!engagement || phase !== "summary" || sentToNelson) return
     const result = buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" })
-    fetch(`/api/engagements/${engagement}`, { method: "POST", body: JSON.stringify(result) })
+    fetch(`/api/engagements/${engagement}?source=survey`, { method: "POST", body: JSON.stringify(result) })
       .then((r) => { if (r.ok) setSentToNelson(true) })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps

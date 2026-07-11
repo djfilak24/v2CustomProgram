@@ -53,7 +53,7 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
     try {
       const result: SurveyResult = importIntakeWorkbook(await file.arrayBuffer())
       if (meta?.clientName && !result.meta.clientName) result.meta.clientName = meta.clientName
-      const res = await fetch(`/api/engagements/${token}`, { method: "POST", body: JSON.stringify(result) })
+      const res = await fetch(`/api/engagements/${token}?source=workbook`, { method: "POST", body: JSON.stringify(result) })
       if (!res.ok) throw new Error()
       const { profile } = await res.json()
       setSubmitted(profile)

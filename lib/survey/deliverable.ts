@@ -129,6 +129,20 @@ export function buildDeliverable(
   }
 }
 
+/**
+ * The category color language — one hue per use type, used everywhere a
+ * category appears (Studio rails, cards, charts) so use-type reads at a glance.
+ * CVD-validated as a set; deliberately avoids rose/violet, which the Studio
+ * reserves for change dots. `accent` marks (bars, dots, borders), `text` is the
+ * readable dark step of the same hue, `tint` is the chip/row wash.
+ */
+export const CATEGORY_COLORS: Record<keyof typeof CIRC, { accent: string; text: string; tint: string }> = {
+  Workstations: { accent: "#00badc", text: "#0089a3", tint: "rgba(0,186,220,0.10)" },
+  Offices: { accent: "#2563eb", text: "#1d4ed8", tint: "rgba(37,99,235,0.08)" },
+  Collaboration: { accent: "#f59e0b", text: "#b45309", tint: "rgba(245,158,11,0.12)" },
+  Support: { accent: "#10b981", text: "#047857", tint: "rgba(16,185,129,0.10)" },
+}
+
 /** The big, most-frequent presentation decisions — surfaced as chips on the program slide. */
 export const KEY_DECISION_KEYS = [
   "workstations",

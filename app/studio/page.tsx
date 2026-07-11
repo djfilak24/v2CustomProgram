@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
   Monitor, KeyRound, FileSpreadsheet, RefreshCw, Undo2, Search, ExternalLink, Eye, Copy, Trash2,
   Crown, AlertTriangle, ClipboardList, Users, LayoutGrid, Table2, Presentation, CheckCircle2, X,
+  Map as MapIcon, Settings2,
 } from "lucide-react"
-import { buildDeliverable, type DeliverableOverrides, type DeliverableAddition } from "@/lib/survey/deliverable"
+import { buildDeliverable, CATEGORY_COLORS, type DeliverableOverrides, type DeliverableAddition } from "@/lib/survey/deliverable"
+import { ProgramMapView } from "@/components/survey/program-map"
 import { exportFitPlanningPackage } from "@/lib/survey/fitPlanning"
 import { lineGaps, type ComparisonLine } from "@/lib/survey/comparison"
 import { COLLAB_CATALOG, SUPPORT_CATALOG, type CatalogSpace } from "@/lib/survey/catalog"
@@ -18,6 +20,7 @@ import { demoResult } from "@/lib/survey/demo-scenarios"
 import type { SurveyResult } from "@/lib/survey/types"
 
 interface EngRow { token: string; clientName: string; status: string; hasResult: boolean }
+interface SeatGroup { dept: string; names: string[]; extra: number }
 type View = "workbench" | "focus" | "briefing"
 type Drawer = "gaps" | "decisions" | "survey" | null
 
@@ -46,8 +49,26 @@ export default function StudioPage() {
   const [surveyTab, setSurveyTab] = useState<"people" | "answers" | "existing">("people")
   const [filter, setFilter] = useState("")
   const [detail, setDetail] = useState<CatalogSpace | null>(null)
+  const [showMap, setShowMap] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  // Display toggles (the old canvas's show/hide dials, reborn in settings)
+  const [showDeptChips, setShowDeptChips] = useState(true)
+  const [showRatios, setShowRatios] = useState(true)
 
   useEffect(() => { setNelson(isNelsonMode()) }, [])
+
+  // Close the settings menu on any click outside it. (A fixed backdrop can't
+  // work here: the header's backdrop-blur makes it the containing block for
+  // fixed descendants, clipping the overlay to the header strip.)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener("pointerdown", onDown)
+    return () => document.removeEventListener("pointerdown", onDown)
+  }, [menuOpen])
 
   useEffect(() => {
     if (!nelson) return
@@ -116,6 +137,29 @@ export default function StudioPage() {
 
   const editedCount = decisions.length
 
+  // ── Derived: who gets the seats. Per-person picks live in the survey UI;
+  // what survives is the per-dept counts + the ordered roster, so we apply the
+  // same hierarchy convention as assignSeatHierarchy: offices go to the first
+  // names (leaders first), dedicated desks to the next names.
+  const seats = useMemo(() => {
+    const byId: Record<string, "office" | "desk"> = {}
+    const offices: SeatGroup[] = []
+    const desks: SeatGroup[] = []
+    if (!result) return { byId, offices, desks }
+    for (const dep of result.people.departments) {
+      const roster = [...(dep.employees ?? [])].sort((a, b) => (b.isLeader ? 1 : 0) - (a.isLeader ? 1 : 0))
+      const nOff = result.spaces.privateOfficesByDept[dep.id] ?? 0
+      const nDesk = result.work.dedicatedByDept?.[dep.id] ?? 0
+      const offNames = roster.slice(0, Math.min(nOff, roster.length))
+      const deskNames = roster.slice(offNames.length, Math.min(offNames.length + nDesk, roster.length))
+      for (const e of offNames) byId[e.id] = "office"
+      for (const e of deskNames) byId[e.id] = "desk"
+      if (nOff > 0) offices.push({ dept: dep.name, names: offNames.map((e) => e.name || "Unnamed"), extra: nOff - offNames.length })
+      if (nDesk > 0) desks.push({ dept: dep.name, names: deskNames.map((e) => e.name || "Unnamed"), extra: nDesk - deskNames.length })
+    }
+    return { byId, offices, desks }
+  }, [result])
+
   if (nelson === false) {
     return (
       <Gate icon={<KeyRound className="h-5 w-5" />} title="NELSON only.">
@@ -162,6 +206,9 @@ export default function StudioPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <DrawerBtn active={showMap} onClick={() => setShowMap(!showMap)} icon={<MapIcon className="h-3.5 w-3.5" />}>
+                Map
+              </DrawerBtn>
               {!briefing && (
                 <>
                   <DrawerBtn active={drawer === "gaps"} onClick={() => setDrawer(drawer === "gaps" ? null : "gaps")} icon={<AlertTriangle className="h-3.5 w-3.5" />}>
@@ -195,6 +242,41 @@ export default function StudioPage() {
               >
                 <FileSpreadsheet className="h-4 w-4" /> Fit-Planning Package
               </button>
+
+              {/* Settings — display toggles + open-elsewhere links */}
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  title="Display & links"
+                  aria-label="Display & links"
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+                    menuOpen ? "border-[#00badc]/50 bg-[#00badc]/10 text-slate-900" : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-800"
+                  }`}
+                >
+                  <Settings2 className="h-4 w-4" />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-full z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                      <p className="px-2 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Display</p>
+                      <MenuToggle on={showDeptChips} onClick={() => setShowDeptChips((v) => !v)}>Department chips</MenuToggle>
+                      <MenuToggle on={showRatios} onClick={() => setShowRatios((v) => !v)}>Ratio · survey · today</MenuToggle>
+                      <p className="mt-2 border-t border-slate-100 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Open elsewhere</p>
+                      <MenuLink href="/review">Program review</MenuLink>
+                      {source !== "seed" && source !== "demo" && <MenuLink href={`/d/${source}`}>Client deliverable</MenuLink>}
+                      <MenuLink href="/">Legacy canvas (frozen)</MenuLink>
+                      {editedCount > 0 && (
+                        <div className="mt-2 border-t border-slate-100 pt-1">
+                          <button
+                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setMenuOpen(false) }}
+                            className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                          >
+                            <Undo2 className="h-3 w-3" /> Reset program edits
+                          </button>
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -227,42 +309,54 @@ export default function StudioPage() {
                   <Row k="SF / person" v={`${d.totals.sfPerPerson}`} />
                 </div>
               </div>
+              {/* Space allocation — the category color key IS the chart */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">By category</h3>
-                <div className="mt-3 space-y-2 text-sm tabular-nums">
-                  {d.categories.map((c) => <Row key={c.name} k={c.name} v={`${c.proposedTotalSF.toLocaleString()} SF`} />)}
+                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Space allocation</h3>
+                <div className="mt-3 flex h-3 gap-[2px] overflow-hidden rounded-full">
+                  {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
+                    <span
+                      key={c.name}
+                      title={`${c.name} · ${c.proposedTotalSF.toLocaleString()} SF incl. circulation`}
+                      className="h-full rounded-[2px] first:rounded-l-full last:rounded-r-full"
+                      style={{
+                        width: `${(c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100}%`,
+                        backgroundColor: CATEGORY_COLORS[c.name].accent,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 space-y-2 text-[13px] tabular-nums">
+                  {d.categories.map((c) => (
+                    <div key={c.name} className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: CATEGORY_COLORS[c.name].accent }} />
+                      <span className="text-slate-600">{c.name}</span>
+                      <span className="ml-auto font-medium text-slate-800">{c.proposedTotalSF.toLocaleString()} SF</span>
+                      <span className="w-9 shrink-0 text-right text-[11px] text-slate-400">
+                        {Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              {!briefing && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-xs text-slate-500">
-                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Open elsewhere</h3>
-                  <div className="flex flex-col gap-1.5">
-                    <a className="inline-flex items-center gap-1.5 hover:text-slate-800" href="/review"><ExternalLink className="h-3 w-3" /> Program review</a>
-                    {source !== "seed" && source !== "demo" && (
-                      <a className="inline-flex items-center gap-1.5 hover:text-slate-800" href={`/d/${source}`}><ExternalLink className="h-3 w-3" /> Client deliverable</a>
-                    )}
-                    <a className="inline-flex items-center gap-1.5 hover:text-slate-800" href="/"><ExternalLink className="h-3 w-3" /> Legacy canvas (frozen)</a>
-                  </div>
-                  {editedCount > 0 && (
-                    <button
-                      onClick={() => { setOverrides({}); setCounts({}); setAdditions([]) }}
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 font-medium hover:border-slate-300 hover:text-slate-800"
-                    >
-                      <Undo2 className="h-3 w-3" /> Reset program edits
-                    </button>
-                  )}
-                </div>
-              )}
             </aside>
 
             {/* ── Center: the spaces (Workbench cards / Focus table / Briefing) ─ */}
             <section>
+              {showMap && (
+                <div className="mb-8">
+                  <div className="mb-3 flex items-baseline justify-between gap-4">
+                    <h2 className="text-xl font-bold tracking-tight">Program map</h2>
+                    <p className="text-xs text-slate-400">Live from intake + session edits — teams, adjacencies, shared program.</p>
+                  </div>
+                  <ProgramMapView map={d.map} />
+                </div>
+              )}
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h2 className="text-xl font-bold tracking-tight">Spaces</h2>
                 {!briefing && (
                   <div className="flex items-center gap-4">
                     <span className="flex items-center gap-3 text-[11px] text-slate-400">
-                      <span className="flex items-center gap-1"><Dot c="#00badc" /> size changed</span>
+                      <span className="flex items-center gap-1"><Dot c="#f43f5e" /> size changed</span>
                       <span className="flex items-center gap-1"><Dot c="#8b5cf6" /> qty changed</span>
                     </span>
                     <label className="relative">
@@ -277,7 +371,7 @@ export default function StudioPage() {
               </div>
 
               {view === "focus" ? (
-                <FocusTable d={d} baseOf={baseOf} onSf={(k, n) => setSf(k, n)} onQty={(k, n) => setQty(k, n)} filter={filter} />
+                <FocusTable d={d} baseOf={baseOf} onSf={(k, n) => setSf(k, n)} onQty={(k, n) => setQty(k, n)} filter={filter} showRatios={showRatios} />
               ) : (
                 d.categories.map((cat) => {
                   const visible = cat.lines.filter(
@@ -285,11 +379,13 @@ export default function StudioPage() {
                       l.label.toLowerCase().includes(filter.toLowerCase()),
                   )
                   if (!visible.length) return null
+                  const cc = CATEGORY_COLORS[cat.name]
                   return (
                     <div key={cat.name} className="mb-8">
-                      <h3 className="mb-3 flex items-baseline gap-3 text-xs font-bold uppercase tracking-[0.15em] text-[#0089a3]">
+                      <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: cc.text }}>
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.accent }} />
                         {cat.name}
-                        <span className="font-medium normal-case tracking-normal text-slate-400">
+                        <span className="ml-1 font-medium normal-case tracking-normal text-slate-400">
                           {cat.proposedTotalSF.toLocaleString()} SF incl. circulation
                         </span>
                       </h3>
@@ -297,6 +393,8 @@ export default function StudioPage() {
                         {visible.map((l) => (
                           <SpaceCard
                             key={l.key} line={l} base={baseOf(l.key)} result={result} briefing={briefing}
+                            colors={cc} showChips={showDeptChips} showRatios={showRatios}
+                            people={l.key === "offices" ? seats.offices : l.key === "workstations" ? seats.desks : undefined}
                             onQty={(n) => setQty(l.key, n)}
                             onSf={(n) => setSf(l.key, n)}
                             onInfo={() => setDetail(detailFor(l))}
@@ -379,7 +477,7 @@ export default function StudioPage() {
                         </button>
                       ))}
                     </div>
-                    <SurveyDrawer result={result} tab={surveyTab} />
+                    <SurveyDrawer result={result} tab={surveyTab} seatOf={seats.byId} />
                   </>
                 )}
               </aside>
@@ -450,12 +548,17 @@ function dims(sf: number): string | null {
 /* ── The card ──────────────────────────────────────────────────────────── */
 
 function SpaceCard({
-  line, base, result, briefing, onQty, onSf, onInfo, onDuplicate, onDelete, onRename,
+  line, base, result, briefing, colors, showChips, showRatios, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename,
 }: {
   line: ComparisonLine
   base?: ComparisonLine
   result: SurveyResult
   briefing: boolean
+  colors: { accent: string; text: string; tint: string }
+  showChips: boolean
+  showRatios: boolean
+  /** Named seat assignments (offices/workstations only) — who actually sits here. */
+  people?: SeatGroup[]
   onQty: (n: number) => void
   onSf: (n: number | null) => void
   onInfo: () => void
@@ -463,10 +566,12 @@ function SpaceCard({
   onDelete?: () => void
   onRename?: (name: string) => void
 }) {
+  const [who, setWho] = useState(false)
   const deptName = (id: string) => result.people.departments.find((x) => x.id === id)?.name ?? id
   const sfChanged = !!base && line.unitSF !== base.unitSF
   const qtyChanged = !!base && line.proposedCount !== base.proposedCount
   const isAddition = line.key.startsWith("studio:")
+  const hasPeople = (people?.length ?? 0) > 0
 
   // Ratio · Survey · Today — the validation triangle (Advisory #6.4)
   const surveyAsk = (() => {
@@ -495,7 +600,10 @@ function SpaceCard({
   }
 
   return (
-    <div className={`rounded-2xl border bg-white transition-shadow hover:shadow-md ${isAddition ? "border-[#00badc]/40" : "border-slate-200"}`}>
+    <div
+      className={`rounded-2xl border bg-white transition-shadow hover:shadow-md ${isAddition ? "border-[#00badc]/40" : "border-slate-200"}`}
+      style={{ borderLeft: `3px solid ${colors.accent}` }}
+    >
       <div className="flex items-center gap-2 px-4 pb-1 pt-3">
         {onRename ? (
           <input
@@ -507,11 +615,16 @@ function SpaceCard({
           <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-slate-900">{line.label}</span>
         )}
         <span className="flex shrink-0 items-center gap-1">
-          {sfChanged && <Dot c="#00badc" title="Unit size changed from ratio baseline" />}
+          {sfChanged && <Dot c="#f43f5e" title="Unit size changed from ratio baseline" />}
           {qtyChanged && <Dot c="#8b5cf6" title="Quantity changed from ratio baseline" />}
         </span>
         {!briefing && (
           <span className="flex shrink-0 items-center">
+            {hasPeople && (
+              <IconBtn title="Who gets these seats" onClick={() => setWho((v) => !v)}>
+                <Users className={`h-3.5 w-3.5 ${who ? "text-[#0089a3]" : ""}`} />
+              </IconBtn>
+            )}
             <IconBtn title="About this space" onClick={onInfo}><Eye className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn title="Duplicate — e.g. a second size standard" onClick={onDuplicate}><Copy className="h-3.5 w-3.5" /></IconBtn>
             {onDelete && <IconBtn title="Remove this added line" onClick={onDelete}><Trash2 className="h-3.5 w-3.5 text-red-400" /></IconBtn>}
@@ -520,11 +633,13 @@ function SpaceCard({
       </div>
 
       {/* Ratio · Survey · Today */}
-      <p className="px-4 text-[11px] text-slate-400">
-        {line.ratio ? <>ratio {line.ratio}{base ? ` → ${base.proposedCount}` : ""}</> : "added in studio"}
-        {surveyAsk !== null && <> · survey {surveyAsk}</>}
-        {line.existingCount > 0 && <> · today {line.existingCount}</>}
-      </p>
+      {showRatios && (
+        <p className="px-4 text-[11px] text-slate-400">
+          {line.ratio ? <>ratio {line.ratio}{base ? ` → ${base.proposedCount}` : ""}</> : "added in studio"}
+          {surveyAsk !== null && <> · survey {surveyAsk}</>}
+          {line.existingCount > 0 && <> · today {line.existingCount}</>}
+        </p>
+      )}
 
       <div className="flex items-center gap-3 px-4 py-2.5">
         {briefing ? (
@@ -557,10 +672,26 @@ function SpaceCard({
         </span>
       </div>
 
-      {alloc.length > 0 && (
+      {showChips && alloc.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 px-4 py-2">
           {alloc.map(([name, n]) => (
-            <span key={name} className="rounded-full bg-[#00badc]/10 px-2 py-0.5 text-[11px] font-medium text-[#0089a3]">{name} · {n}</span>
+            <span key={name} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: colors.tint, color: colors.text }}>
+              {name} · {n}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Who gets these seats — names by the survey's seating hierarchy */}
+      {who && !briefing && hasPeople && (
+        <div className="space-y-1 border-t border-slate-100 px-4 py-2.5">
+          {people!.map((p) => (
+            <p key={p.dept} className="text-[11px] leading-relaxed text-slate-600">
+              <span className="font-semibold text-slate-800">{p.dept}</span>
+              {" — "}
+              {p.names.join(", ")}
+              {p.extra > 0 && `${p.names.length ? " + " : ""}${p.extra} unnamed`}
+            </p>
           ))}
         </div>
       )}
@@ -571,21 +702,23 @@ function SpaceCard({
 /* ── Focus view: the dense table ───────────────────────────────────────── */
 
 function FocusTable({
-  d, baseOf, onSf, onQty, filter,
+  d, baseOf, onSf, onQty, filter, showRatios,
 }: {
   d: NonNullable<ReturnType<typeof buildDeliverable>>
   baseOf: (k: string) => ComparisonLine | undefined
   onSf: (k: string, n: number | null) => void
   onQty: (k: string, n: number) => void
   filter: string
+  showRatios: boolean
 }) {
+  const cols = showRatios ? 7 : 6
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wide text-slate-400">
             <th className="px-4 py-2.5 font-semibold">Space</th>
-            <th className="px-3 py-2.5 font-semibold">Ratio</th>
+            {showRatios && <th className="px-3 py-2.5 font-semibold">Ratio</th>}
             <th className="px-3 py-2.5 text-right font-semibold">Today</th>
             <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
             <th className="px-3 py-2.5 text-right font-semibold">Unit SF</th>
@@ -598,11 +731,11 @@ function FocusTable({
             const visible = c.lines.filter((l) => (l.proposedCount > 0 || l.existingCount > 0 || l.key.startsWith("studio:")) && l.label.toLowerCase().includes(filter.toLowerCase()))
             if (!visible.length) return null
             return (
-              <FocusRows key={c.name} name={c.name} circ={c.circulationSF} lines={visible} baseOf={baseOf} onSf={onSf} onQty={onQty} />
+              <FocusRows key={c.name} name={c.name} colors={CATEGORY_COLORS[c.name]} circ={c.circulationSF} lines={visible} baseOf={baseOf} onSf={onSf} onQty={onQty} showRatios={showRatios} />
             )
           })}
           <tr className="bg-slate-50 font-semibold">
-            <td className="px-4 py-2.5" colSpan={6}>Gross usable (net + circulation)</td>
+            <td className="px-4 py-2.5" colSpan={cols - 1}>Gross usable (net + circulation)</td>
             <td className="px-4 py-2.5 text-right">{d.totals.grossUsableSF.toLocaleString()}</td>
           </tr>
         </tbody>
@@ -612,19 +745,25 @@ function FocusTable({
 }
 
 function FocusRows({
-  name, circ, lines, baseOf, onSf, onQty,
+  name, colors, circ, lines, baseOf, onSf, onQty, showRatios,
 }: {
   name: string
+  colors: { accent: string; text: string; tint: string }
   circ: number
   lines: ComparisonLine[]
   baseOf: (k: string) => ComparisonLine | undefined
   onSf: (k: string, n: number | null) => void
   onQty: (k: string, n: number) => void
+  showRatios: boolean
 }) {
+  const cols = showRatios ? 7 : 6
   return (
     <>
-      <tr className="bg-[#00badc]/[0.06]">
-        <td className="px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[#0089a3]" colSpan={7}>{name}</td>
+      <tr style={{ backgroundColor: colors.tint }}>
+        <td className="px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: colors.text }} colSpan={cols}>
+          <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: colors.accent }} />
+          {name}
+        </td>
       </tr>
       {lines.map((l) => {
         const b = baseOf(l.key)
@@ -632,12 +771,12 @@ function FocusRows({
           <tr key={l.key}>
             <td className="px-4 py-1.5 font-medium text-slate-900">
               <span className="mr-1.5 inline-flex gap-1 align-middle">
-                {b && l.unitSF !== b.unitSF && <Dot c="#00badc" />}
+                {b && l.unitSF !== b.unitSF && <Dot c="#f43f5e" />}
                 {b && l.proposedCount !== b.proposedCount && <Dot c="#8b5cf6" />}
               </span>
               {l.label}
             </td>
-            <td className="px-3 py-1.5 text-xs text-slate-500">{l.ratio ?? "—"}</td>
+            {showRatios && <td className="px-3 py-1.5 text-xs text-slate-500">{l.ratio ?? "—"}</td>}
             <td className="px-3 py-1.5 text-right text-slate-500">{l.existingCount || "—"}</td>
             <td className="px-3 py-1.5 text-right">
               <input type="number" min={0} value={l.proposedCount} onChange={(e) => onQty(l.key, Math.max(0, Number(e.target.value)))}
@@ -653,7 +792,7 @@ function FocusRows({
         )
       })}
       <tr className="text-slate-400">
-        <td className="px-4 py-1 text-xs" colSpan={6}>{name} circulation</td>
+        <td className="px-4 py-1 text-xs" colSpan={cols - 1}>{name} circulation</td>
         <td className="px-4 py-1 text-right text-xs">{circ.toLocaleString()}</td>
       </tr>
     </>
@@ -662,10 +801,13 @@ function FocusRows({
 
 /* ── Survey drawer: everything from intake ─────────────────────────────── */
 
-function SurveyDrawer({ result, tab }: { result: SurveyResult; tab: "people" | "answers" | "existing" }) {
+function SurveyDrawer({ result, tab, seatOf }: { result: SurveyResult; tab: "people" | "answers" | "existing"; seatOf: Record<string, "office" | "desk"> }) {
   if (tab === "people") {
     return (
       <div className="space-y-3">
+        <p className="text-[11px] leading-relaxed text-slate-400">
+          Seats follow the survey hierarchy — private offices to the first names (leaders lead), dedicated desks next.
+        </p>
         {result.people.departments.map((dep) => (
           <div key={dep.id} className="rounded-xl border border-slate-200 p-3">
             <div className="flex items-baseline justify-between">
@@ -677,6 +819,11 @@ function SurveyDrawer({ result, tab }: { result: SurveyResult; tab: "people" | "
                 {dep.employees!.map((e) => (
                   <span key={e.id} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${e.isLeader ? "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-300" : "bg-slate-100 text-slate-600"}`}>
                     {e.isLeader && <Crown className="h-2.5 w-2.5" />}{e.name || "Unnamed"}
+                    {seatOf[e.id] && (
+                      <span className="font-semibold" style={{ color: seatOf[e.id] === "office" ? CATEGORY_COLORS.Offices.text : CATEGORY_COLORS.Workstations.text }}>
+                        · {seatOf[e.id]}
+                      </span>
+                    )}
                   </span>
                 ))}
               </div>
@@ -783,6 +930,28 @@ function DrawerBtn({ active, onClick, icon, children }: { active: boolean; onCli
       }`}>
       {icon} {children}
     </button>
+  )
+}
+
+function MenuToggle({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+    >
+      {children}
+      <span className={`h-4 w-7 shrink-0 rounded-full p-0.5 transition-colors ${on ? "bg-[#00badc]" : "bg-slate-200"}`}>
+        <span className={`block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${on ? "translate-x-3" : ""}`} />
+      </span>
+    </button>
+  )
+}
+
+function MenuLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a href={href} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900">
+      <ExternalLink className="h-3 w-3" /> {children}
+    </a>
   )
 }
 

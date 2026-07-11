@@ -232,12 +232,15 @@ export default function SurveyPage() {
           {/* Global depth control — everything is shown in full by default; the
               client can Simplify to save time without compromising the program.
               Highlighted, and pulses on the first step to orient the user. */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#00badc]/30 bg-[#00badc]/[0.05] px-4 py-2.5">
-            <span className="flex items-center gap-2 text-sm text-slate-700">
-              <Wand2 className="h-4 w-4 text-[#0089a3]" />
-              {anyDetailed
-                ? "You're seeing every question in full — answer what you can, or simplify."
-                : "Simplified path — a complete program, just quicker. Same result, less time."}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#00badc]/30 bg-[#00badc]/[0.05] px-3 py-2 sm:mb-6 sm:gap-3 sm:px-4 sm:py-2.5">
+            <span className="flex items-center gap-2 text-xs text-slate-700 sm:text-sm">
+              <Wand2 className="h-4 w-4 shrink-0 text-[#0089a3]" />
+              <span className="sm:hidden">{anyDetailed ? "Full detail on" : "Simplified path"}</span>
+              <span className="hidden sm:inline">
+                {anyDetailed
+                  ? "You're seeing every question in full — answer what you can, or simplify."
+                  : "Simplified path — a complete program, just quicker. Same result, less time."}
+              </span>
             </span>
             <button
               type="button"
@@ -252,8 +255,8 @@ export default function SurveyPage() {
 
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{step.title}</h1>
-              <p className="mt-2 text-slate-500">{step.subtitle}</p>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{step.title}</h1>
+              <p className="mt-1.5 text-sm text-slate-500 sm:mt-2 sm:text-base">{step.subtitle}</p>
             </div>
             {step.hasDetailed && (
               <LaneToggle
@@ -321,7 +324,7 @@ export default function SurveyPage() {
               <button
                 type="button"
                 onClick={() => { clearDefer(step.id); goNext() }}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#00badc] px-5 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#00badc] px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee] sm:gap-2 sm:px-5 sm:py-2.5"
               >
                 {stepIndex === steps.length - 1 ? "Finish" : "Continue"}
                 <ArrowRight className="h-4 w-4" />
@@ -828,25 +831,50 @@ function TextField({
  * law firm vs. an enterprise. Never shown to real respondents (demo-only).
  */
 function DemoSwitcher({ active, onSwitch }: { active: string | null; onSwitch: (key: string) => void }) {
+  // Phones: a tiny collapsed chip above the sticky action bar that expands to a
+  // vertical scenario stack on tap — never a full-width slab over the content.
+  const [open, setOpen] = useState(false)
+  const chips = (vertical: boolean) =>
+    Object.entries(DEMO_SCENARIOS).map(([key, s]) => (
+      <button
+        key={key}
+        type="button"
+        onClick={() => { onSwitch(key); if (vertical) setOpen(false) }}
+        title={s.blurb}
+        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${vertical ? "w-full text-left" : ""} ${
+          key === active
+            ? "bg-[#00badc] text-slate-900"
+            : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+        }`}
+      >
+        {s.label}
+      </button>
+    ))
   return (
-    <div className="fixed bottom-5 left-5 z-40 flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 py-1.5 pl-3.5 pr-1.5 shadow-lg shadow-slate-900/10 backdrop-blur-sm">
-      <span className="mr-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Demo</span>
-      {Object.entries(DEMO_SCENARIOS).map(([key, s]) => (
+    <>
+      {/* ≥sm: the classic pill */}
+      <div className="fixed bottom-5 left-5 z-40 hidden items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 py-1.5 pl-3.5 pr-1.5 shadow-lg shadow-slate-900/10 backdrop-blur-sm sm:flex">
+        <span className="mr-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Demo</span>
+        {chips(false)}
+      </div>
+      {/* Phones: collapsed chip + pop-up stack */}
+      <div className="fixed bottom-[4.25rem] left-3 z-40 sm:hidden">
+        {open && (
+          <div className="mb-2 flex w-44 flex-col gap-1 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-lg shadow-slate-900/10 backdrop-blur-sm">
+            {chips(true)}
+          </div>
+        )}
         <button
-          key={key}
           type="button"
-          onClick={() => onSwitch(key)}
-          title={s.blurb}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            key === active
-              ? "bg-[#00badc] text-slate-900"
-              : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          onClick={() => setOpen((o) => !o)}
+          className={`rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest shadow-lg shadow-slate-900/10 backdrop-blur-sm transition-colors ${
+            open ? "border-[#00badc] bg-[#00badc] text-slate-900" : "border-slate-200 bg-white/95 text-slate-500"
           }`}
         >
-          {s.label}
+          Demo{active ? ` · ${DEMO_SCENARIOS[active]?.label ?? ""}` : ""}
         </button>
-      ))}
-    </div>
+      </div>
+    </>
   )
 }
 

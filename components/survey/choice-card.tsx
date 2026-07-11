@@ -41,7 +41,7 @@ export function ChoiceCard({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`group relative flex w-full flex-col items-center gap-3 rounded-2xl border p-6 text-center transition-all ${
+      className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl border p-3.5 text-center transition-all sm:gap-3 sm:rounded-2xl sm:p-6 ${
         selected
           ? "border-[#00badc] bg-[#00badc]/10 shadow-[0_0_0_1px_#00badc]"
           : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-100"
@@ -55,21 +55,21 @@ export function ChoiceCard({
 
       {Icon && (
         <span
-          className={`flex h-12 w-12 items-center justify-center rounded-full transition-colors ${
+          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors sm:h-12 sm:w-12 ${
             selected ? "bg-[#00badc]/20 text-[#0089a3]" : "bg-slate-100 text-slate-600 group-hover:text-slate-700"
           }`}
         >
-          <Icon className="h-6 w-6" />
+          <Icon className="h-4.5 w-4.5 sm:h-6 sm:w-6" />
         </span>
       )}
 
-      <span className="text-base font-semibold text-slate-900">{label}</span>
-      {description && <span className="text-sm text-slate-500">{description}</span>}
+      <span className="text-sm font-semibold text-slate-900 sm:text-base">{label}</span>
+      {description && <span className="text-xs text-slate-500 sm:text-sm">{description}</span>}
 
       {stats && stats.length > 0 && (
         <span className="mt-1 flex flex-col gap-0.5">
           {stats.map((s) => (
-            <span key={s} className="text-xs text-slate-500">{s}</span>
+            <span key={s} className="text-[11px] text-slate-500 sm:text-xs">{s}</span>
           ))}
         </span>
       )}

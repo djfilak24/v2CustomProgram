@@ -61,16 +61,6 @@ export function DeptSpine({
                   (the stepper wrapper dissolves into the grid via sm:contents). */}
               <div className="p-2 sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:items-center sm:gap-3 sm:p-1.5">
                 <div className="flex items-center gap-1.5">
-                  {named && (
-                    <button
-                      type="button"
-                      onClick={() => toggle(d.id)}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                      aria-label="Toggle roster"
-                    >
-                      <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-                    </button>
-                  )}
                   <input
                     value={d.name}
                     onChange={(e) => update(d.id, { name: e.target.value })}
@@ -116,10 +106,32 @@ export function DeptSpine({
                 </button>
               </div>
 
+              {/* Explicit roster toggle — a labeled strip beats a bare chevron */}
+              {named && (
+                <button
+                  type="button"
+                  onClick={() => toggle(d.id)}
+                  className={`mx-2 mb-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                    isOpen ? "bg-[#00badc]/10 text-[#0089a3]" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                  }`}
+                >
+                  <span>
+                    {mode === "leaders" ? "Leaders" : "Team roster"} ·{" "}
+                    {mode === "leaders"
+                      ? `${roster.length} named`
+                      : `${roster.length} of ${d.headcount || 0} named`}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {isOpen ? "Close" : roster.length === 0 ? "Add names" : "Edit"}
+                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                  </span>
+                </button>
+              )}
+
               {named && isOpen && (() => {
                 const leaderCount = roster.filter((e) => e.isLeader).length
                 return (
-                <div className="border-t border-slate-100 px-3 py-3">
+                <div className="rounded-b-xl border-t border-slate-100 bg-slate-50/70 px-3 py-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
                       {mode === "leaders" ? "Leaders" : "Team roster"}

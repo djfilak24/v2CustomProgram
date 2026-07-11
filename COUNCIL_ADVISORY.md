@@ -471,3 +471,54 @@ editing (stays in the review), anything client-facing.
 Freeze `/` as-is. The Studio absorbs inspect + handoff now; the review keeps
 adjust-in-session; when both cover daily use, retiring the canvas is a deletion.
 The founder decides the date; nothing forces it.
+
+---
+
+# Advisory #6 — Studio v2: the founder's brief, ruled and sequenced
+
+*The founder reviewed the Studio prototype: right skeleton, wrong emphasis in
+places. His thesis becomes the committee's standing law:*
+
+> **"There should never be a question asked that doesn't appear somewhere
+> downstream. The designer should have access to everything — organized in a
+> way that can be displayed in front of a client."**
+
+## Rulings on the brief
+
+1. **SF speaks designer (unanimous):** a square-footage number always shows its
+   footprint — 36 SF reads "6′ × 6′"; non-preset values read "≈ 8′ × 7′". The
+   Operator: "Fit planning thinks in dimensions; make the tool bilingual."
+2. **Photos off the cards; the eye brings them back.** Cards are working
+   surfaces — dense, scannable. An eye icon opens the same drill-down modal the
+   survey uses (photo, uses, ratio) when someone needs to explain a space type.
+3. **Duplicate is a first-class move.** Real programs run two office sizes, two
+   conference standards. Duplicating a card creates an addition (renamable,
+   deletable) that participates fully in totals — and lands in the decision log.
+4. **Three numbers on every line: Ratio · Survey · Today.** What the engine's
+   ratios suggest, what the client asked for in intake, what exists now. The
+   Strategist: "That triangle IS the validation conversation."
+5. **Deviation dots:** cyan dot = unit size changed from the ratio baseline,
+   violet dot = quantity changed. Glanceable "what did we touch."
+6. **The decision log is derived, not typed.** Every deviation from baseline,
+   every duplicate/delete, every gap closed IS the log — notes attach to
+   entries. No separate bookkeeping to forget during a live session.
+7. **Gaps get a room of their own.** Missing baselines, unknown sizes, deferred
+   questions — flagged in one panel, resolvable with a note, resolution flows
+   into the decision log and the Fit-Planning Package.
+8. **The survey drawer:** People (every named person, leaders crowned),
+   Answers (goals, cadence, in-their-words, special), Existing (counts, sizes,
+   size-mix). Everything from intake, one keystroke away, presentable.
+9. **Sidebar hierarchy fixed:** ONE hero number (gross usable, with delta vs
+   today) — everything else visibly subordinate. The confusion was two numbers
+   fighting for primacy; now there's a headline and supporting cast.
+10. **Preset views:** **Workbench** (cards + drawer — the daily driver),
+    **Focus** (dense editable table for fast number work), **Briefing**
+    (client-facing: edit chrome hidden, larger type — safe to project).
+
+## Persistence note (deferred, deliberate)
+
+Counts, additions, notes and gap resolutions are session-local in this
+iteration; unit-size overrides persist to the engagement as before. Once the
+session-edit shape settles in real use, the whole working state becomes a
+"session-edit" submission on the engagement (the submissions list built for
+exactly this). Ship the workflow first, then bottle it.

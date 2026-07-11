@@ -37,7 +37,13 @@ function sheet(rows: Cell[][], widths: number[]): XLSX.WorkSheet {
   return ws
 }
 
-export function buildFitPlanningWorkbook(result: SurveyResult, d: Deliverable): XLSX.WorkBook {
+/** Session context from the Studio: what was decided, and which gaps stand. */
+export interface FitPlanningExtras {
+  decisions?: { text: string; note?: string }[]
+  gaps?: { line: string; message: string; resolved: boolean; note?: string }[]
+}
+
+export function buildFitPlanningWorkbook(result: SurveyResult, d: Deliverable, extras?: FitPlanningExtras): XLSX.WorkBook {
   const wb = XLSX.utils.book_new()
   const deptName = (id: string) => result.people.departments.find((x) => x.id === id)?.name ?? id
 
@@ -137,11 +143,31 @@ export function buildFitPlanningWorkbook(result: SurveyResult, d: Deliverable): 
   ]
   XLSX.utils.book_append_sheet(wb, sheet(noteRows.length > 2 ? noteRows : [...noteRows, [cell("(none captured)")]], [80]), "Notes")
 
+  // ── Session decisions & gaps (from the Studio) ─────────────────────────────
+  if (extras?.decisions?.length) {
+    const rows: Cell[][] = [
+      [title("Decisions made in session")],
+      [],
+      [header("Decision"), header("Note")],
+      ...extras.decisions.map((x) => [cell(x.text), cell(x.note ?? "")]),
+    ]
+    XLSX.utils.book_append_sheet(wb, sheet(rows, [56, 44]), "Decisions")
+  }
+  if (extras?.gaps?.length) {
+    const rows: Cell[][] = [
+      [title("Gaps — flagged in intake")],
+      [],
+      [header("Line"), header("Gap"), header("Status"), header("Note")],
+      ...extras.gaps.map((g) => [cell(g.line), cell(g.message), cell(g.resolved ? "Resolved" : "OPEN"), cell(g.note ?? "")]),
+    ]
+    XLSX.utils.book_append_sheet(wb, sheet(rows, [26, 50, 10, 36]), "Gaps")
+  }
+
   return wb
 }
 
-export function exportFitPlanningPackage(result: SurveyResult, d: Deliverable): void {
-  const wb = buildFitPlanningWorkbook(result, d)
+export function exportFitPlanningPackage(result: SurveyResult, d: Deliverable, extras?: FitPlanningExtras): void {
+  const wb = buildFitPlanningWorkbook(result, d, extras)
   const name = (d.clientName || "client").replace(/[^\w]+/g, "-")
   XLSX.writeFile(wb, `NELSON-fit-planning-${name}.xlsx`)
 }

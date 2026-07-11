@@ -10,7 +10,7 @@
  * matches what was presented.
  */
 import type { SurveyResult } from "./types"
-import { buildComparison, spaceStrategy, type Comparison, type ComparisonLine, type SpaceStrategy } from "./comparison"
+import { buildComparison, spaceStrategy, type Comparison, type ComparisonLine, type CompCategory, type SpaceStrategy } from "./comparison"
 import { buildProgramMap, type ProgramMap } from "./programMap"
 import { computeProfile, surveyStateFromResult, type ProfileScores } from "./sections"
 
@@ -55,18 +55,38 @@ export interface Deliverable {
   strategy: SpaceStrategy
 }
 
+/** A Studio-added line (e.g. a duplicated card for a second office size). */
+export interface DeliverableAddition {
+  key: string
+  label: string
+  category: CompCategory
+  unitSF: number
+  proposedCount: number
+  ratio?: string
+}
+
 export function buildDeliverable(
   result: SurveyResult,
   overrides: DeliverableOverrides = {},
   /** Optional proposed-count overrides (line key → qty) — the Studio's second dial. */
   counts: Record<string, number> = {},
+  /** Studio additions — duplicated/custom lines that participate fully in totals. */
+  additions: DeliverableAddition[] = [],
 ): Deliverable {
   const comp = buildComparison(result)
-  const lines = comp.lines.map((l) => ({
-    ...l,
-    unitSF: overrides[l.key] && overrides[l.key] > 0 ? overrides[l.key] : l.unitSF,
-    proposedCount: counts[l.key] !== undefined && counts[l.key] >= 0 ? counts[l.key] : l.proposedCount,
-  }))
+  const lines: ComparisonLine[] = [
+    ...comp.lines.map((l) => ({
+      ...l,
+      unitSF: overrides[l.key] && overrides[l.key] > 0 ? overrides[l.key] : l.unitSF,
+      proposedCount: counts[l.key] !== undefined && counts[l.key] >= 0 ? counts[l.key] : l.proposedCount,
+    })),
+    ...additions.map((a) => ({
+      key: a.key, label: a.label, category: a.category, unitSF: a.unitSF,
+      ...(a.ratio ? { ratio: a.ratio } : {}),
+      existingCount: 0, proposedCount: a.proposedCount,
+      existingCountKnown: true, existingSizeKnown: true,
+    })),
+  ]
 
   const cats = (["Workstations", "Offices", "Collaboration", "Support"] as const).map((name) => {
     const ls = lines.filter((l) => l.category === name)

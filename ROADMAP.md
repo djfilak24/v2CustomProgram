@@ -1,13 +1,51 @@
 # Roadmap
 
-*2026-07-13 · supersedes the phase plans inside Advisories #1–#2 (their built
-items are done; their unbuilt items are re-ranked here). Ordered by the
-founder's stated axis: maximize the client's onboarding flow, and give the
-designer everything needed to reach the client's square-foot goals.*
+*2026-07-13, rev. 2 (same day) · supersedes the phase plans inside Advisories
+#1–#2. Ordered by the founder's stated axis: maximize the client's onboarding
+flow, and give the designer everything needed to reach the client's
+square-foot goals — with the engine recognized as the foundation everything
+amplifies (see [CONCEPT.md → The engine](./CONCEPT.md)).*
 
-Full findings behind this ordering: [COUNCIL_ADVISORY.md → Advisory #7](./COUNCIL_ADVISORY.md).
+Full findings behind this ordering: [COUNCIL_ADVISORY.md → Advisory #7](./COUNCIL_ADVISORY.md)
+and its founder-response addendum.
 
 ---
+
+## Phase 0 — Design discovery *(prototype-style, before the hardening)*
+
+The founder's ruling on rev. 1: the remaining roadmap is the
+"next-level hardening layer," and before hardening anything we get the
+prototype-style discovery, UI, and visual design work out of the way — so
+we harden the *right* surfaces. Phase 0 is exploratory by charter:
+throwaway comps welcome, breadth over polish, decisions recorded.
+
+0.1 **Revisit the Studio environment from a UI standpoint.** The cockpit
+    works; now design it. Layout and density studies, the visual hierarchy
+    of a live session, how the target line / delta map / scenario compare
+    want to live on screen — explored as prototypes against the three view
+    presets, before any of it is production code.
+
+0.2 **Revisit the deliverable experience.** The deck is honest scaffolding
+    (Advisory #5's own words). Explore the presentation arc as a designed
+    object: pacing, the verdict-vs-target beat, how session decisions and
+    compromises read to a client, print parity.
+
+0.3 **Deepen the designer cockpit — concept work pulled up from Phase C.**
+    Scenario A/B, the segment-and-compare workflow (engine ratios vs.
+    survey findings vs. today), and the audit-the-implications view are
+    prototyped here so their real shape informs what Phase A persists.
+
+0.4 **Design the target conversation.** The four-question model (today ·
+    how you're designing work · what the ratios say you should be · can we
+    hit your number) and the delta map with its three verdicts — *room to
+    spare / in line / below industry-recognized density without the hybrid
+    policy to support it* — including how compromises are expressed in the
+    engine's own levers. This is design work first; A3 builds what 0.4
+    settles.
+
+*Exit criteria: founder-approved comps for Studio, deliverable, and the
+target conversation; a decided shape for scenarios/segmentation. Then the
+hardening phases below proceed with confidence.*
 
 ## Phase A — Close the loop *(the program you build is the program they get)*
 
@@ -26,13 +64,18 @@ in the app is a demo of itself.
    lines and closed gaps never reach the client. The deck (and its PDF, and
    the fit-planning package) must consume the persisted session so there is
    exactly one program.
-3. **The square-foot target.** The app's mission is to help clients reach
-   their SF goals — and no target exists anywhere in the data model. Add it
-   end-to-end: an intake question ("do you have a footprint in mind — a
-   lease, a building, a budget?"), a field on the engagement, a target line
-   on the Studio's allocation bar with a live gap-to-target delta, and a
-   verdict-vs-target beat in the deliverable. This turns every session from
-   "here's a number" into "here's how we get to *your* number."
+3. **The target conversation, built.** (Implements what Phase 0.4 designs.)
+   No target exists anywhere in the data model today — nowhere to ask "do
+   you have a lease, a building, a budget in mind?" Add it end-to-end: the
+   intake question, a field on the engagement, a target line on the
+   Studio's allocation bar with a live gap-to-target delta, and the
+   verdict-vs-target beat in the deliverable. Not pass/fail — the delta
+   map: *room to spare* · *in line* · *below industry-recognized density
+   without the hybrid policy to support it*, with compromises expressed in
+   the engine's own levers (days/week, seat sharing, attendance peaks,
+   collab ratios, circulation) so the client decides what they will and
+   won't trade. This turns every session from "here's a number" into
+   "here's how we get to *your* number."
 4. **Planning dials.** Circulation multipliers and the rentable load factor
    are hard-coded (45/45/45/35% · ×1.22). Make them editable in the Studio
    (logged as decisions, exported in the package) — they are the honest
@@ -63,7 +106,7 @@ in the app is a demo of itself.
 
 9. **Scenario A/B.** Save a session as a named scenario ("Conservative" /
    "Growth"), duplicate, compare totals side-by-side, present either.
-   The natural next power tool once sessions persist (A1).
+   Builds the shape prototyped in Phase 0.3, once sessions persist (A1).
 10. **What-changed diff.** The submissions log already appends every
     return; show the delta between submissions (headcount moved, offices
     +2) so re-intake is a conversation, not a re-read.
@@ -90,11 +133,17 @@ in the app is a demo of itself.
 
 ### Sequencing logic, in one paragraph
 
-A before B because onboarding improvements multiply whatever loop they feed
-— and today's loop leaks at its last mile (sessions evaporate; the deck
-ignores session edits). B before C because the client-side funnel is the
-founder's stated maximand and Door 2 + email are its biggest levers. C
-deepens what already works; D is the debt to clear before this carries a
-second concurrent client. The target (A3) is deliberately in the first
-phase: it converts the whole apparatus from "computes a program" to
-"navigates to the client's number," which is the concept.
+Phase 0 first, by founder ruling: everything after it is the hardening
+layer, and you don't harden surfaces you're about to redesign — the Studio
+UI, the deliverable arc, and the target conversation get their
+prototype-style discovery pass before production code commits to a shape.
+Then A before B because onboarding improvements multiply whatever loop
+they feed — and today's loop leaks at its last mile (sessions evaporate;
+the deck ignores session edits). B before C's remainder because the
+client-side funnel is the stated maximand and Door 2 + email are its
+biggest levers (C's conceptual heart — the deeper cockpit — was already
+pulled up into Phase 0). D is the debt to clear before this carries a
+second concurrent client. The target work is deliberately early (0.4
+design, A3 build): it converts the whole apparatus from "computes a
+program" to "navigates to the client's number," which is the concept —
+and it is pure amplification of the engine that started all of this.

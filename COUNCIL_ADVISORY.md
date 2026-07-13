@@ -665,3 +665,37 @@ Persist the session, aim it at a target, let the deck tell the client what
 the session decided, and only then multiply the doors (email, mini-links)
 — because every new client we onboard flows into whatever loop exists on
 that day.
+
+## Addendum — the founder's response, ruled (2026-07-13, same day)
+
+The founder read the audit and returned three corrections. All accepted;
+CONCEPT.md and ROADMAP.md revised the same day.
+
+1. **The engine is the mastermind — say so.** The concept statement
+   under-credited the foundation: the calculation engine born in Fast Track
+   that powered the original Advanced Canvas. The hybrid policy is its
+   hinge — seat-sharing formula, days-per-week, attendance demand, peak
+   usage — and the whole onboarding experience exists to *amplify* that
+   engine with real evidence, not to stand beside it. CONCEPT.md now
+   carries "The engine" as a first-class section and operating principle
+   #0: a feature that doesn't connect to the engine's math is decoration.
+
+2. **The target is a conversation, not a field.** H2 stands, but the
+   framing deepens: the target question is answered through four things
+   together — what you have today · how you're designing your business to
+   work · what your square footage *should* be (per the ratios and how the
+   team actually works) · whether *your* target is achievable. Output is a
+   delta map with three honest verdicts — room to spare / in line / below
+   industry-recognized density without the hybrid policy to support it —
+   and in the compromise case, the trade-offs spelled out in the engine's
+   own levers. "We just need to make you aware of where the big deltas
+   are." The client decides what they will and won't trade.
+
+3. **A Phase 0 precedes the hardening.** The founder's read of the
+   roadmap: Phases A–D are the "next-level hardening layer," and before
+   hardening comes prototype-style discovery, UI, and visual design work —
+   revisit the Studio environment's UI, revisit the deliverable
+   experience, and pull the deepen-the-cockpit concept work (Phase C's
+   heart) up front, so what Phase A persists is the *right* shape.
+   ROADMAP.md rev. 2 inserts Phase 0 with exit criteria (founder-approved
+   comps for Studio, deliverable, and the target conversation).

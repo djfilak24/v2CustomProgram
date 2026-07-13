@@ -8,7 +8,14 @@ import {
   BookOpen, Layers, CheckCircle2,
 } from "lucide-react"
 import { isNelsonMode, unlockNelsonMode, nelsonCode } from "@/lib/nelsonMode"
-import { demoResult } from "@/lib/survey/demo-scenarios"
+import { demoResult, DEMO_SCENARIOS } from "@/lib/survey/demo-scenarios"
+
+/** Per-scenario demo targets — each tells a different verdict story. */
+const DEMO_TARGETS: Record<string, { sf: number; src: "lease" | "building" | "budget" }> = {
+  law: { sf: 12000, src: "lease" },        // compromise story — just under the program
+  tech: { sf: 24000, src: "building" },    // room-to-spare story
+  enterprise: { sf: 60000, src: "budget" }, // in-line-ish story at scale
+}
 
 /**
  * Mission Control — the internal front door. NELSON-gated: the screen the
@@ -25,31 +32,42 @@ export default function MissionControl() {
   const [code, setCode] = useState("")
   const [codeError, setCodeError] = useState(false)
   const [demoToken, setDemoToken] = useState<string | null>(null)
-  const [spinning, setSpinning] = useState(false)
+  const [demoName, setDemoName] = useState<string | null>(null)
+  const [spinning, setSpinning] = useState<string | null>(null)
+  const [picker, setPicker] = useState(false)
 
   useEffect(() => {
     setNelson(isNelsonMode())
-    try { setDemoToken(localStorage.getItem("nelson:demoToken")) } catch { /* fine */ }
+    try {
+      setDemoToken(localStorage.getItem("nelson:demoToken"))
+      setDemoName(localStorage.getItem("nelson:demoName"))
+    } catch { /* fine */ }
   }, [])
 
-  /** One click → a returned engagement with a target, ready to demo end-to-end. */
-  const spinUpDemo = async () => {
-    setSpinning(true)
+  /** Pick a client type → a returned engagement with a target, ready to demo end-to-end. */
+  const spinUpDemo = async (key: string) => {
+    setSpinning(key)
     try {
+      const result = demoResult(key)
+      if (!result) throw new Error()
+      const t = DEMO_TARGETS[key]
+      if (t) result.goals = { ...(result.goals ?? { motivators: [] }), targetSF: t.sf, targetSource: t.src }
+      const clientName = `${result.meta.clientName || DEMO_SCENARIOS[key]?.label || "Demo Client"} (demo)`
       const res = await fetch("/api/engagements", {
         method: "POST",
         headers: { "x-nelson-code": nelsonCode() ?? "", "content-type": "application/json" },
-        body: JSON.stringify({ clientName: "Hartwell & Cross LLP (demo)" }),
+        body: JSON.stringify({ clientName }),
       })
       if (!res.ok) throw new Error()
       const { token } = await res.json()
-      const result = demoResult("law")!
-      result.goals = { ...(result.goals ?? { motivators: [] }), targetSF: 12000, targetSource: "lease" }
       await fetch(`/api/engagements/${token}?source=survey`, { method: "POST", body: JSON.stringify(result) })
       localStorage.setItem("nelson:demoToken", token)
+      localStorage.setItem("nelson:demoName", clientName)
       setDemoToken(token)
+      setDemoName(clientName)
+      setPicker(false)
     } catch { /* surfaces stay generic */ }
-    setSpinning(false)
+    setSpinning(null)
   }
 
   if (nelson === null) {
@@ -114,31 +132,60 @@ export default function MissionControl() {
           All of it converging on one number: the square footage that fits who they actually are.
         </p>
 
-        {/* ── The demo engagement — one click, fully loaded ────────────────── */}
+        {/* ── The demo engagement — pick a client type, fully loaded ───────── */}
         <div className="mt-10 rounded-2xl border border-white/12 bg-white/[0.05] p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="flex items-center gap-2 text-lg font-bold"><Rocket className="h-5 w-5 text-[#00badc]" /> The demo engagement</h2>
               <p className="mt-1 text-sm text-white/55">
                 {t
-                  ? <>Loaded and ready — a returned law-firm intake with a 12,000 SF lease target. Every card below is wired to it.</>
-                  : <>One click creates a returned engagement (law firm, 60 → 67 people, 12,000 SF lease target) and wires every card below to it.</>}
+                  ? <>Loaded and ready — <b className="text-white/80">{demoName ?? "a returned intake"}</b>, target included. Every card below is wired to it.</>
+                  : <>Pick a client type — a returned intake with a fitting SF target is created and every card below wires to it.</>}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="relative flex items-center gap-2">
               {t && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-300">
                   <CheckCircle2 className="h-3.5 w-3.5" /> /{t}
                 </span>
               )}
               <button
-                onClick={spinUpDemo}
-                disabled={spinning}
+                onClick={() => setPicker((v) => !v)}
+                disabled={!!spinning}
                 className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-5 py-2.5 text-sm font-bold text-slate-900 transition-colors hover:bg-[#2fd0ee] disabled:opacity-50"
               >
                 {spinning ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
                 {t ? "Spin up a fresh one" : "Spin up the demo"}
               </button>
+              {picker && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setPicker(false)} />
+                  <div className="absolute right-0 top-full z-40 mt-2 w-80 rounded-2xl border border-white/15 bg-[#13233f] p-2 shadow-2xl">
+                    <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-white/40">Choose the client type</p>
+                    {Object.entries(DEMO_SCENARIOS).map(([key, sc]) => {
+                      const tgt = DEMO_TARGETS[key]
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => spinUpDemo(key)}
+                          disabled={!!spinning}
+                          className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.08] disabled:opacity-50"
+                        >
+                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#00badc]/15 text-[#00badc]">
+                            {spinning === key ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                          </span>
+                          <span>
+                            <span className="block text-sm font-bold text-white">{sc.label}</span>
+                            <span className="block text-xs leading-snug text-white/50">
+                              {sc.blurb}{tgt ? ` · target ${tgt.sf.toLocaleString()} SF (${tgt.src})` : ""}
+                            </span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -63,6 +63,14 @@ comps approved in principle; scenario scorecard run — see
 [SCENARIO_SCORECARD.md](./SCENARIO_SCORECARD.md) for scores, gaps CC-1…CC-6,
 and the loop plan (S4 and S5 are the journeys to re-score).*
 
+*Status 2026-07-13 (overnight, loop iteration 1): **A1, A2, A3 shipped** —
+Studio sessions persist to the engagement and the deck renders them
+(including the "What we decided together" slide); the target runs survey →
+Studio → deck. CC-2/CC-4/CC-5 shipped client-side (prep sheet at
+`/prep/<token>`, survey-complete reframing, recommended program NELSON-first
+for engagement runs). CC-1's event log landed. Re-scores in the scorecard;
+next: CC-1 surface + CC-6 do-it-live lane, then B5/B6.*
+
 ## Phase A — Close the loop *(the program you build is the program they get)*
 
 The Studio can build the right program today — and then lose it. Until a

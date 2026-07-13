@@ -598,6 +598,7 @@ function WhoSlide({ d, result }: { d: NonNullable<ReturnType<typeof buildDeliver
 
 function VerdictSlide({ d }: { d: NonNullable<ReturnType<typeof buildDeliverable>> }) {
   const delta = d.totals.grossUsableSF - d.totals.existingSF
+  const barMax = Math.max(d.totals.existingSF, d.totals.grossUsableSF) || 1
   return (
     <div className="relative flex flex-1 flex-col justify-center overflow-hidden bg-[#0e1a2e] p-10 text-white sm:p-16">
       <Feather src="/office-2.jpg" />
@@ -607,12 +608,39 @@ function VerdictSlide({ d }: { d: NonNullable<ReturnType<typeof buildDeliverable
         <span className="text-7xl font-bold tabular-nums tracking-tight sm:text-8xl">{d.totals.grossUsableSF.toLocaleString()}</span>
         <span className="text-2xl text-white/60">usable SF proposed</span>
       </div>
+
+      {/* Today vs. proposed, drawn — the number backed by a picture, not just a line of text. */}
       {d.totals.existingSF > 0 && (
-        <p className="mt-3 text-lg text-white/70">
-          {delta >= 0 ? "+" : ""}{delta.toLocaleString()} SF vs. today&apos;s program ({d.totals.existingSF.toLocaleString()} SF)
-        </p>
+        <div className="mt-5 max-w-md">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Today vs. proposed</p>
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-400/15 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
+              {delta >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {delta >= 0 ? "+" : ""}{delta.toLocaleString()} SF
+            </span>
+          </div>
+          <div className="mt-2.5 h-2.5 w-full rounded-full bg-white/10">
+            <div className="h-2.5 rounded-full bg-white/35" style={{ width: `${(d.totals.existingSF / barMax) * 100}%` }} />
+          </div>
+          <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-white/5">
+            <div className="flex h-2.5 gap-[2px]" style={{ width: `${(d.totals.grossUsableSF / barMax) * 100}%` }}>
+              {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
+                <span
+                  key={c.name}
+                  className="h-2.5 first:rounded-l-full last:rounded-r-full"
+                  style={{ width: `${(c.proposedTotalSF / d.totals.grossUsableSF) * 100}%`, backgroundColor: CATEGORY_COLORS[c.name].accent }}
+                />
+              ))}
+            </div>
+          </div>
+          <p className="mt-2 flex items-center justify-between text-xs text-white/40">
+            <span>{d.totals.existingSF.toLocaleString()} SF today</span>
+            <span>{d.totals.grossUsableSF.toLocaleString()} SF proposed</span>
+          </p>
+        </div>
       )}
-      <div className="mt-8 max-w-2xl rounded-2xl border border-[#00badc]/30 bg-[#00badc]/10 p-6">
+
+      <div className="mt-6 max-w-2xl rounded-2xl border border-[#00badc]/30 bg-[#00badc]/10 p-6">
         <p className="text-xl font-semibold text-[#7fe3f5]">{d.strategy.headline}</p>
         <p className="mt-2 leading-relaxed text-white/75">{d.strategy.note}</p>
       </div>

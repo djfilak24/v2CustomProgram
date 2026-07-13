@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
   ArrowLeft, ArrowRight, Printer, Share2, Undo2, Lock, Users, CalendarDays, TrendingUp, Target, ClipboardList,
-  Layers, Check,
+  Layers, Check, PartyPopper,
 } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { ProgramMapView } from "@/components/survey/program-map"
@@ -916,30 +916,72 @@ function SizeChips({
 }
 
 function NextSlide({ d, result, clientName }: { d: NonNullable<ReturnType<typeof buildDeliverable>>; result: SurveyResult; clientName: string }) {
+  const completed = [
+    { q: "How much space do we need?", a: `${d.totals.grossUsableSF.toLocaleString()} SF usable — every line of it argued from how you actually work.` },
+    { q: "How will our business look and feel?", a: "Your teams as neighborhoods, your rhythm in the ratios — the program map is your business, drawn." },
+    { q: "What will we experience differently?", a: "More of what you asked for, by name — it's all in the program, sized and counted." },
+  ]
+  const upNext = [
+    { title: "We test-fit your program", desc: "Concepts on your actual floor plate — the first time the numbers become a place." },
+    { title: "We detail every space", desc: "Materials, finishes, the technical set — the program holds; the craft gets added." },
+    { title: "You move in", desc: "Day one, ready for you — the whole reason we started.", celebrate: true },
+  ]
   return (
-    <div className="flex flex-1 flex-col justify-center bg-[#0e1a2e] p-10 text-white sm:p-16">
+    <div className="relative flex flex-1 flex-col justify-center overflow-hidden bg-[#0e1a2e] p-10 text-white sm:p-16">
+      <Feather src="/office-1.jpg" />
+      <div className="relative z-10 max-w-[64%]">
       <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#00badc]">Get ready for design</p>
       <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight">
         The hard work is done. Now comes the fun part.
       </h2>
-      {/* Their three questions — answered, checked off */}
-      <div className="mt-8 grid max-w-4xl gap-4 sm:grid-cols-3">
-        {[
-          ["How much space do we need?", `${d.totals.grossUsableSF.toLocaleString()} SF usable — every line of it argued from how you actually work.`],
-          ["How will our business look and feel?", "Your teams as neighborhoods, your rhythm in the ratios — the program map is your business, drawn."],
-          ["What will we experience differently?", "More of what you asked for, by name — it's all in the program, sized and counted."],
-        ].map(([q, a]) => (
-          <div key={q} className="rounded-2xl border border-white/12 bg-white/[0.05] p-5">
-            <p className="flex items-start gap-2 font-semibold text-white">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300">✓</span>
-              {q}
-            </p>
-            <p className="mt-2 text-sm leading-relaxed text-white/60">{a}</p>
+
+      {/* What's done, greyed to recede; what's next, lit up to foreshadow. */}
+      <div className="mt-8 grid gap-6 sm:grid-cols-2">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/35">What you&apos;ve completed</p>
+          <div className="mt-3 space-y-2.5">
+            {completed.map((c, i) => (
+              <div key={c.q} className="flex gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+                <span className="text-3xl font-black leading-none tabular-nums text-white/15">{i + 1}</span>
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] text-white/50">✓</span>
+                    {c.q}
+                  </p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-white/60">{c.a}</p>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#00badc]">What&apos;s next</p>
+          <div className="mt-3 space-y-2.5">
+            {upNext.map((n, i) => (
+              <div
+                key={n.title}
+                className={`flex gap-3 rounded-2xl border p-4 ${
+                  n.celebrate ? "border-amber-300/40 bg-gradient-to-br from-amber-400/10 to-[#00badc]/10" : "border-[#00badc]/25 bg-[#00badc]/[0.07]"
+                }`}
+              >
+                <span className={`text-3xl font-black leading-none tabular-nums ${n.celebrate ? "text-amber-300" : "text-[#00badc]"}`}>
+                  {completed.length + i + 1}
+                </span>
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                    {n.title}
+                    {n.celebrate && <PartyPopper className="h-4 w-4 shrink-0 text-amber-300" />}
+                  </p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-white/70">{n.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
       {/* The whole journey, drawn — you are HERE, and the fun part is next. */}
-      <div className="mt-10 max-w-5xl">
+      <div className="mt-8">
         <JourneyTimeline />
         <p className="mt-3 text-xs text-white/40">
           The curve is your involvement — highest right now and through design, tapering as construction
@@ -952,6 +994,7 @@ function NextSlide({ d, result, clientName }: { d: NonNullable<ReturnType<typeof
       <p className="mt-8 text-xs uppercase tracking-[0.14em] text-white/30">
         {clientName} · Workplace Program · NELSON Worldwide
       </p>
+      </div>
     </div>
   )
 }
@@ -964,7 +1007,7 @@ function JourneyTimeline() {
     { name: "Design development", note: "materials · details", w: 14 },
     { name: "Construction docs", note: "the technical set", w: 14 },
     { name: "Construction", note: "build-out", w: 22 },
-    { name: "Move-in", note: "day one", w: 10 },
+    { name: "Move-in", note: "day one — welcome home", w: 10, celebrate: true },
   ]
   // The involvement curve: high through pre-design/SD, tapering, a lift at move-in.
   const curve = "M0,34 C80,6 160,4 240,14 C320,24 380,34 470,40 C560,46 620,47 700,47 C760,47 790,40 800,34"
@@ -980,12 +1023,17 @@ function JourneyTimeline() {
             key={p.name}
             style={{ width: `${p.w}%` }}
             className={`rounded-lg border px-3 py-2.5 ${
-              p.here ? "border-[#00badc] bg-[#00badc]/15" : "border-white/12 bg-white/[0.04]"
+              p.here
+                ? "border-[#00badc] bg-[#00badc]/15"
+                : p.celebrate
+                  ? "border-amber-300/50 bg-gradient-to-br from-amber-400/15 to-[#00badc]/10"
+                  : "border-white/12 bg-white/[0.04]"
             }`}
           >
             <p className="flex items-center gap-1.5 text-[11px] font-bold leading-tight text-white sm:text-xs">
               {p.here && <span className="relative flex h-2 w-2 shrink-0"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00badc] opacity-75 motion-reduce:hidden" /><span className="relative inline-flex h-2 w-2 rounded-full bg-[#00badc]" /></span>}
               {p.name}
+              {p.celebrate && <PartyPopper className="h-3 w-3 shrink-0 text-amber-300" />}
             </p>
             <p className="mt-0.5 hidden text-[10px] leading-tight text-white/45 lg:block">{p.note}</p>
             {p.here && <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#00badc]">you are here</p>}

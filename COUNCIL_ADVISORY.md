@@ -522,3 +522,146 @@ iteration; unit-size overrides persist to the engagement as before. Once the
 session-edit shape settles in real use, the whole working state becomes a
 "session-edit" submission on the engagement (the submissions list built for
 exactly this). Ship the workflow first, then bottle it.
+
+---
+---
+
+# Advisory #7 — The Full-Concept Audit
+*(2026-07-13, convened at the founder's request: "We've been building a lot.
+Let's do an audit. Where are we at? Where are the holes? What is the roadmap?
+What have we accomplished?" — with the lens fixed on the end-user's onboarding
+flow paired with the designer's power to reach the client's square-foot goals.)*
+
+Companion documents produced with this advisory: **[CONCEPT.md](./CONCEPT.md)**
+(the current concept statement) and **[ROADMAP.md](./ROADMAP.md)** (the
+sequenced plan; supersedes the phase lists in Advisories #1–#2).
+
+## The seats
+
+| Seat | Lens |
+|---|---|
+| **The Client** *(new seat — the founder's stated focus)* | A 60-person company's office manager holding our link. Is every step obvious, fast, and worth it? |
+| **The Strategist** (Marta) | Does the tool run a great validation session and land the program? |
+| **The Designer** (Felix) | Is every surface presentation-grade? Does the visual language cohere? |
+| **The Engineer** (Priya) | Data contract integrity, persistence, what breaks with two concurrent clients. |
+| **The Broker** (Victor) | What closes the deal; what a client forwards to their board. |
+| **The Operator** | Handoff quality to fit planning; assumptions honest and adjustable. |
+
+## 1. Where we are — the accomplished record
+
+Seventeen commits on `claude/client-experience` built a complete, verified
+engagement pipeline. What exists and works (70 tests green, clean build,
+every surface E2E-verified with the browser during development):
+
+**The client side**
+- `/s/<token>` — the cinematic engagement home page: hero carousel, stat
+  band, aggregation scene, animated three-step story, and the **three
+  doors** (survey · workbook+guide · live session), plus the workbook
+  return drop-zone and a thank-you that acknowledges receipt.
+- `/survey` — the interactive intake: department spine, named rosters with
+  crowned leaders, seat hierarchy with bulk assign/release, custom sizes +
+  today's size-mix inventory, drill-down galleries for all 26 space types,
+  skip-anything with deferred-question capture, demo scenarios, autosave —
+  **fully mobile-optimized** through two founder-review rounds.
+- Workbook round-trip: styled Excel out, drag-and-drop import back in,
+  guide page for circulation.
+
+**The spine**
+- Engagement backend: Postgres with file fallback; tokens, status, live
+  progress pings (landing/survey-step/workbook), submissions log with
+  source tagging, share flag, unit-SF overrides. NELSON passcode gate.
+- `/engagements` — the console: create, watch live status, copy links,
+  flip the deliverable share.
+
+**The NELSON side**
+- `/review` — validation review with verdict hero, program map, print report.
+- `/d/<token>` — the share-gated 8-slide deliverable deck; the print pass
+  IS the PDF; NELSON-editable key decisions.
+- `/studio` — Studio v2 through two briefs: dimension-bilingual cards,
+  ratio · survey · today on every line, duplicate/add/delete with a
+  **derived** decision log, the gaps room with noted resolutions, the
+  survey drawer (people / answers / existing — everything from intake),
+  category color language with a validated palette, space-allocation
+  chart, named seat assignments, the program map, display toggles,
+  Workbench/Focus/Briefing views.
+- The Fit-Planning Package: 7-sheet styled Excel including session
+  Decisions and Gaps.
+
+The founder's thesis (Advisory #6) is now structurally true on the NELSON
+side: nothing the survey asks is invisible in the Studio.
+
+## 2. The council's verdict on the full concept
+
+**Unanimous:** the concept is right and the shape is now proven end-to-end.
+One link in, one record, many doors, human-judged reveal, designer-grade
+cockpit, clean handoff. No seat argued for a change in direction.
+
+**Also unanimous:** the build is at its "last mile" moment. Three of the six
+seats independently converged on the same top finding — and it is not a
+feature idea, it is a loop that doesn't close.
+
+## 3. The holes, ranked
+
+**H1 · The Studio's work evaporates — and never reaches the client.**
+*(Engineer, Strategist, Broker — the audit's headline.)* Counts, added
+lines, notes, and gap resolutions are session-local by deliberate deferral
+(Advisory #6.11); only unit-SF overrides persist. Worse: `/d/<token>`
+rebuilds from intake + overrides only, so a program shaped live in the
+Studio is **not** the program the client's deck shows. A refresh mid-session
+loses the meeting. The strongest tool in the app currently produces the
+least durable output. → Roadmap A1–A2.
+
+**H2 · There is no square-foot target anywhere in the product.**
+*(The Client, the Operator.)* The founder's mission statement — "help them
+reach their square-foot goals" — names a number the data model never asks
+for. No lease size, no shortlisted building, no budget footprint; the app
+computes *a* number but never navigates to *their* number. The gap-to-target
+delta is the natural spine of the live session and the deliverable's verdict.
+→ Roadmap A3, with the planning dials (A4) as its honest levers.
+
+**H3 · Onboarding breaks across devices.** *(The Client.)* Survey autosave
+is localStorage; start on the phone from the email link, and the laptop
+knows nothing. Advisory #4 promised resume-from-any-device; the engagement
+record is sitting there ready to hold it. → Roadmap B5.
+
+**H4 · Nothing notifies anyone.** *(The Client, Strategist.)* Links travel
+by copy-paste; a finished survey pings no one; a stalled client is only
+discovered by checking the console; the deliverable share flag sends no
+email. The funnel has no voice. → Roadmap B6.
+
+**H5 · The mid-size client's real path (Door 2) is still unbuilt.**
+*(Strategist, Broker.)* Distributed department mini-links + completion board
+— specified since Advisory #1, repeatedly deferred for good reasons. The
+workbook covers this case, but a forwarded Excel is a colder onboarding than
+ten 3-minute scoped links. → Roadmap B7.
+
+**H6 · Baked-in planning math.** *(Operator.)* Circulation 45/45/45/35% and
+load ×1.22 are constants. Markets, buildings, and negotiation postures vary;
+the designer needs these dials — logged as decisions, not silently edited.
+→ Roadmap A4.
+
+**H7 · Smaller, real, listed for the record:** per-person seat picks don't
+survive into `SurveyResult` (Studio derives them by convention — honest but
+approximate); shared-passcode auth and unrevokable tokens; `TODO` imagery
+and stats on client-visible pages; deliverable v2 leftovers (presenter
+notes, page-break polish, override deltas); no scenario A/B; no
+what-changed diff between submissions; legacy canvas retirement pending.
+→ Roadmap B8, C9–C12, D13–D15.
+
+## 4. What the council explicitly declines to add
+
+- **No new intake questions.** The survey's length is at its ceiling; every
+  proposed addition must displace something or become a Door-2 slice. (The
+  target question, H2, earns its slot by being the engagement's premise.)
+- **No client-facing Studio.** The access model (Advisory #2) stands.
+- **No floor-plate/test-fit features.** That is the fit-planning team's
+  craft; the product's job is to hand them a validated program, and it does.
+
+## 5. The one-sentence strategy, restated for this stage
+
+Advisory #1 said: *make the single-player loop airtight before multiplying
+it.* The 2026-07 version: **the loop is built — now make it hold water.**
+Persist the session, aim it at a target, let the deck tell the client what
+the session decided, and only then multiply the doors (email, mini-links)
+— because every new client we onboard flows into whatever loop exists on
+that day.

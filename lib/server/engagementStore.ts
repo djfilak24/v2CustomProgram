@@ -31,6 +31,10 @@ export interface EngagementSession {
   additions?: { key: string; label: string; category: string; unitSF: number; proposedCount: number; ratio?: string }[]
   notes?: Record<string, string>
   resolvedGaps?: Record<string, boolean>
+  /** Planning dials (circulation %, load factor) when the session moved them. */
+  factors?: Record<string, number>
+  /** Deliverable beat composer — slide id → included (absent = included). */
+  beats?: Record<string, boolean>
   updatedAt: string
 }
 
@@ -58,6 +62,12 @@ export interface Engagement {
   session?: EngagementSession
   /** Event log — the engagement's journey, newest last. */
   events?: EngagementEvent[]
+  /**
+   * In-progress survey draft — "resume is sacred" graduates from
+   * localStorage to the engagement, so a client can start on their phone
+   * and finish on a laptop. Opaque to the server; cleared on submit.
+   */
+  draft?: Record<string, unknown> | null
   createdAt: string
   updatedAt: string
 }
@@ -72,6 +82,7 @@ export interface EngagementStore {
   setOverrides(token: string, overrides: Record<string, number>): Promise<void>
   setSession(token: string, session: EngagementSession): Promise<void>
   addEvent(token: string, event: EngagementEvent): Promise<void>
+  setDraft(token: string, draft: Record<string, unknown> | null): Promise<void>
 }
 
 const newToken = () => {
@@ -99,6 +110,7 @@ function postgresStore(): EngagementStore {
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS submissions JSONB`
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS session JSONB`
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS events JSONB`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS draft JSONB`
     return sql
   })()
 
@@ -111,6 +123,7 @@ function postgresStore(): EngagementStore {
     ...(r.submissions ? { submissions: r.submissions as SubmissionMeta[] } : {}),
     ...(r.session ? { session: r.session as EngagementSession } : {}),
     ...(r.events ? { events: r.events as EngagementEvent[] } : {}),
+    ...(r.draft ? { draft: r.draft as Record<string, unknown> } : {}),
     createdAt: new Date(r.created_at).toISOString(), updatedAt: new Date(r.updated_at).toISOString(),
   })
 
@@ -172,6 +185,12 @@ function postgresStore(): EngagementStore {
         UPDATE engagements SET
           events = COALESCE(events, '[]'::jsonb) || ${JSON.stringify([event])}::jsonb,
           updated_at = now()
+        WHERE token = ${token}`
+    },
+    async setDraft(token, draft) {
+      const sql = await ready
+      await sql`
+        UPDATE engagements SET draft = ${draft ? JSON.stringify(draft) : null}::jsonb, updated_at = now()
         WHERE token = ${token}`
     },
   }
@@ -242,6 +261,15 @@ function fileStore(): EngagementStore {
       const e = all.find((x) => x.token === token)
       if (!e) return
       e.events = [...(e.events ?? []), event]; e.updatedAt = new Date().toISOString()
+      await save(all)
+    },
+    async setDraft(token, draft) {
+      const all = await load()
+      const e = all.find((x) => x.token === token)
+      if (!e) return
+      if (draft) e.draft = draft
+      else delete e.draft
+      e.updatedAt = new Date().toISOString()
       await save(all)
     },
   }

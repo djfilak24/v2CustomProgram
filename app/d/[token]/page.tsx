@@ -4,6 +4,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
   ArrowLeft, ArrowRight, Printer, Share2, Undo2, Lock, Users, CalendarDays, TrendingUp, Target, ClipboardList,
+  Layers, Check,
 } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { ProgramMapView } from "@/components/survey/program-map"
@@ -27,6 +28,17 @@ interface DeckSession {
   additions?: DeliverableAddition[]
   notes?: Record<string, string>
   resolvedGaps?: Record<string, boolean>
+  factors?: Record<string, number>
+  /** The beat composer: slide id → included (absent = included). */
+  beats?: Record<string, boolean>
+}
+
+/** Slides the composer may drop; cover stays, always. */
+const COMPOSABLE = ["who", "profile", "map", "compare", "program", "next"] as const
+const SLIDE_NAMES: Record<string, string> = {
+  cover: "Cover", who: "Who you are", profile: "Workplace Profile", map: "Program map",
+  verdict: "The verdict", target: "Your number", decided: "What we decided",
+  compare: "Existing vs proposed", program: "The program", next: "What's next",
 }
 
 export default function DeliverablePage({ params }: { params: Promise<{ token: string }> }) {
@@ -63,7 +75,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
   }, [token])
 
   const d = useMemo(
-    () => (result ? buildDeliverable(result, overrides, session?.counts ?? {}, session?.additions ?? []) : null),
+    () => (result ? buildDeliverable(result, overrides, session?.counts ?? {}, session?.additions ?? [], session?.factors ?? {}) : null),
     [result, overrides, session],
   )
 
@@ -124,7 +136,22 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
     if (result?.goals?.targetSF) out.push("target")
     if (decisions.length > 0) out.push("decided")
     out.push("compare", "program", "next")
-    return out
+    // The composer: the designer curates which beats this engagement gets.
+    return out.filter((s) => s === "cover" || session?.beats?.[s] !== false)
+  }
+
+  // The beat composer — NELSON curates the deck; the choice persists on the session.
+  const [composer, setComposer] = useState(false)
+  const toggleBeat = (s: string) => {
+    const next = { ...(session?.beats ?? {}), [s]: session?.beats?.[s] === false }
+    const nextSession = { ...(session ?? {}), beats: next }
+    setSession(nextSession)
+    setIdx(0)
+    fetch(`/api/engagements/${token}`, {
+      method: "PATCH",
+      headers: { "x-nelson-code": nelsonCode() ?? "" },
+      body: JSON.stringify({ session: nextSession }),
+    }).catch(() => {})
   }
 
   // Keyboard navigation
@@ -182,6 +209,30 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
               <Undo2 className="h-3.5 w-3.5" /> Reset edits
             </button>
           )}
+          <div className="relative">
+            <button onClick={() => setComposer((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${composer ? "bg-white/25" : "bg-white/10 hover:bg-white/20"}`}>
+              <Layers className="h-3.5 w-3.5" /> Slides · {slides.length}
+            </button>
+            {composer && (
+              <div className="absolute left-1/2 top-full z-50 mt-2 w-56 -translate-x-1/2 rounded-xl border border-white/15 bg-[#0e1a2e] p-2 shadow-xl">
+                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wide text-white/40">Compose this deck</p>
+                {COMPOSABLE.map((s) => {
+                  const on = session?.beats?.[s] !== false
+                  return (
+                    <button key={s} onClick={() => toggleBeat(s)}
+                      className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10">
+                      {SLIDE_NAMES[s]}
+                      <span className={`flex h-4 w-4 items-center justify-center rounded ${on ? "bg-[#00badc] text-slate-900" : "bg-white/15"}`}>
+                        {on && <Check className="h-3 w-3" />}
+                      </span>
+                    </button>
+                  )
+                })}
+                <p className="px-2 pt-1 text-[10px] leading-relaxed text-white/35">Verdict, target & decisions always ride; cover too.</p>
+              </div>
+            )}
+          </div>
           <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-full bg-[#00badc] px-2.5 py-1 font-semibold text-slate-900 hover:bg-[#2fd0ee]">
             <Printer className="h-3.5 w-3.5" /> PDF
           </button>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
   ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info, Wand2, Target,
@@ -12,7 +12,7 @@ import {
   type Lane, type LaneMap, type StepId, type SurveyState, type DayValue, type PeopleMode,
 } from "@/lib/survey/sections"
 import { DEMO_SCENARIOS, demoState } from "@/lib/survey/demo-scenarios"
-import { saveSurveyDraft, loadSurveyDraft, clearSurveyDraft, draftAge, type SurveyDraft } from "@/lib/survey/draftStorage"
+import { saveSurveyDraft, loadSurveyDraft, clearSurveyDraft, draftAge, DRAFT_VERSION, type SurveyDraft } from "@/lib/survey/draftStorage"
 import { saveSurveySeed } from "@/lib/survey/seedStorage"
 import { importIntakeWorkbook } from "@/lib/survey/workbookImport"
 import { isNelsonMode } from "@/lib/nelsonMode"
@@ -114,10 +114,24 @@ export default function SurveyPage() {
   }
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    setEngagement(params.get("e"))
+    const eng = params.get("e")
+    setEngagement(eng)
     const key = params.get("demo")
-    if (key && DEMO_SCENARIOS[key]) startDemo(key)
-    else setDraft(loadSurveyDraft()) // offer to resume a saved in-progress survey
+    if (key && DEMO_SCENARIOS[key]) { startDemo(key); return }
+    const local = loadSurveyDraft()
+    setDraft(local) // offer to resume a saved in-progress survey
+    // Cross-device resume: the engagement may hold a newer draft (started on
+    // another device). Whichever copy is newer wins the resume banner.
+    if (eng) {
+      fetch(`/api/engagements/${eng}`)
+        .then(async (r) => {
+          if (!r.ok) return
+          const remote = (await r.json()).draft as SurveyDraft | undefined
+          if (!remote?.state || remote.v !== DRAFT_VERSION) return
+          if (!local || new Date(remote.savedAt).getTime() > new Date(local.savedAt).getTime()) setDraft(remote)
+        })
+        .catch(() => {})
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -143,10 +157,23 @@ export default function SurveyPage() {
 
   // Autosave: every answer persists as it's given — closing the tab loses
   // nothing. Skipped while on the hero so an untouched visit never writes.
+  // On an engagement, the draft also syncs to the record (debounced) so any
+  // device with the link can resume — cross-device "resume is sacred".
+  const draftSync = useRef<number | null>(null)
   useEffect(() => {
     if (phase === "hero") return
     saveSurveyDraft({ stepIndex, state, lanes, deferred: [...deferred] })
-  }, [phase, stepIndex, state, lanes, deferred])
+    if (!engagement || demoKey) return
+    if (draftSync.current) window.clearTimeout(draftSync.current)
+    draftSync.current = window.setTimeout(() => {
+      fetch(`/api/engagements/${engagement}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          draft: { v: DRAFT_VERSION, savedAt: new Date().toISOString(), stepIndex, state, lanes, deferred: [...deferred] },
+        }),
+      }).catch(() => {})
+    }, 1500)
+  }, [phase, stepIndex, state, lanes, deferred, engagement, demoKey])
 
   const resumeDraft = () => {
     if (!draft) return

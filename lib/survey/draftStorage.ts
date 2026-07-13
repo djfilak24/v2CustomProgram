@@ -11,7 +11,9 @@
 import type { LaneMap, StepId, SurveyState } from "./sections"
 
 const KEY = "nelson:surveyDraft"
-const VERSION = 2 // v2: ExistingConditions gained custom sizes + size mix
+/** Bump when SurveyState's persisted shape changes. Shared with the engagement-draft sync. */
+export const DRAFT_VERSION = 2 // v2: ExistingConditions gained custom sizes + size mix
+const VERSION = DRAFT_VERSION
 
 export interface SurveyDraft {
   v: number

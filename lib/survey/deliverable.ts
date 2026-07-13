@@ -65,6 +65,29 @@ export interface DeliverableAddition {
   ratio?: string
 }
 
+/**
+ * The planning dials — the honest levers a designer pulls in session.
+ * Defaults match the engine's constants; deviations are decisions and are
+ * logged as such by the Studio.
+ */
+export interface DeliverableFactors {
+  /** Circulation on Workstations + Offices (default 0.45). */
+  circIndividual?: number
+  /** Circulation on Collaboration (default 0.45). */
+  circCollab?: number
+  /** Circulation on Support (default 0.35). */
+  circSupport?: number
+  /** Rentable load add-on (default 0.22 → ×1.22). */
+  rentable?: number
+}
+
+export const DEFAULT_FACTORS: Required<DeliverableFactors> = {
+  circIndividual: CIRC.Workstations,
+  circCollab: CIRC.Collaboration,
+  circSupport: CIRC.Support,
+  rentable: RENTABLE_FACTOR,
+}
+
 export function buildDeliverable(
   result: SurveyResult,
   overrides: DeliverableOverrides = {},
@@ -72,6 +95,8 @@ export function buildDeliverable(
   counts: Record<string, number> = {},
   /** Studio additions — duplicated/custom lines that participate fully in totals. */
   additions: DeliverableAddition[] = [],
+  /** Planning dials — circulation + load factor, session-adjustable. */
+  factors: DeliverableFactors = {},
 ): Deliverable {
   const comp = buildComparison(result)
   const lines: ComparisonLine[] = [
@@ -88,11 +113,19 @@ export function buildDeliverable(
     })),
   ]
 
+  const circFor = (name: keyof typeof CIRC): number =>
+    name === "Support"
+      ? factors.circSupport ?? CIRC.Support
+      : name === "Collaboration"
+        ? factors.circCollab ?? CIRC.Collaboration
+        : factors.circIndividual ?? CIRC[name]
+  const rentableFactor = factors.rentable ?? RENTABLE_FACTOR
+
   const cats = (["Workstations", "Offices", "Collaboration", "Support"] as const).map((name) => {
     const ls = lines.filter((l) => l.category === name)
     const existingSF = ls.reduce((s, l) => s + l.existingCount * l.unitSF, 0)
     const proposedNetSF = ls.reduce((s, l) => s + l.proposedCount * l.unitSF, 0)
-    const circulationSF = Math.round(proposedNetSF * CIRC[name])
+    const circulationSF = Math.round(proposedNetSF * circFor(name))
     return { name, lines: ls, existingSF, proposedNetSF, circulationSF, proposedTotalSF: proposedNetSF + circulationSF }
   })
 
@@ -100,7 +133,7 @@ export function buildDeliverable(
   const proposedNetSF = cats.reduce((s, c) => s + c.proposedNetSF, 0)
   const circulationSF = cats.reduce((s, c) => s + c.circulationSF, 0)
   const grossUsableSF = proposedNetSF + circulationSF
-  const rentableAddOnSF = Math.round(grossUsableSF * RENTABLE_FACTOR)
+  const rentableAddOnSF = Math.round(grossUsableSF * rentableFactor)
   const estimatedRentableSF = grossUsableSF + rentableAddOnSF
 
   return {
@@ -122,7 +155,7 @@ export function buildDeliverable(
       grossUsableSF,
       rentableAddOnSF,
       estimatedRentableSF,
-      rentableFactor: RENTABLE_FACTOR,
+      rentableFactor,
       sfPerPerson: comp.future > 0 ? Math.round(grossUsableSF / comp.future) : 0,
     },
     strategy: spaceStrategy(existingSF, proposedNetSF, result.goals),

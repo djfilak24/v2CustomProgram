@@ -19,6 +19,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { engagementStore, storeConfigured, nelsonCodeOk, type EngagementSession } from "@/lib/server/engagementStore"
+import { notifyNelson } from "@/lib/server/notify"
 import { surveyStateFromResult, computeProfile, SURVEY_STEPS } from "@/lib/survey/sections"
 import { buildComparison, lineGaps } from "@/lib/survey/comparison"
 import type { SurveyResult } from "@/lib/survey/types"
@@ -58,6 +59,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     status: e.status,
     shared: !!e.shared,
     ...(profile ? { profile } : {}),
+    // Their own in-progress draft rides back on their own token — this is
+    // what makes "start on the phone, finish on the laptop" real.
+    ...(e.draft ? { draft: e.draft } : {}),
     ...(e.result ? { prep: prepSummary(e.result) } : {}),
     // The deliverable gate: the full result leaves the building only after
     // NELSON has audited it and flipped share. The Studio session rides along
@@ -75,10 +79,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   if (!storeConfigured()) return unconfigured()
   const { token } = await params
-  const body = (await req.json().catch(() => null)) as
+  const raw = await req.text()
+  const body = (() => { try { return JSON.parse(raw) } catch { return null } })() as
     | {
         stage?: string; step?: number; total?: number
         shared?: boolean; overrides?: Record<string, number>; session?: EngagementSession
+        draft?: Record<string, unknown> | null
       }
     | null
   if (!body) return NextResponse.json({ error: "Body required" }, { status: 400 })
@@ -86,6 +92,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ to
   const store = engagementStore()
   const e = await store.get(token)
   if (!e) return NextResponse.json({ error: "Unknown engagement" }, { status: 404 })
+
+  // Public: the client's own in-progress draft (their token is the
+  // credential, exactly like submitting). Size-capped; null clears it.
+  if (body.draft !== undefined) {
+    if (raw.length > 400_000) return NextResponse.json({ error: "Draft too large" }, { status: 413 })
+    if (body.draft !== null && (typeof body.draft !== "object" || !("state" in body.draft))) {
+      return NextResponse.json({ error: "Not a survey draft" }, { status: 400 })
+    }
+    await store.setDraft(token, body.draft)
+    return NextResponse.json({ ok: true })
+  }
 
   // NELSON-gated mutations first — never reachable with the token alone.
   if (body.shared !== undefined || body.overrides !== undefined || body.session !== undefined) {
@@ -118,6 +135,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ to
   // First touch of each stage lands in the event log (the journey timeline).
   if (!e.progress || e.progress.stage !== body.stage) {
     await store.addEvent(token, { kind: "progress", at: new Date().toISOString(), detail: body.stage })
+    // A live-session request deserves a human's attention today, not at the
+    // next console check.
+    if (body.stage === "live") {
+      void notifyNelson(
+        `${e.clientName} wants to do it live`,
+        `${e.clientName} chose the live-session door. Command center: /command/${token}`,
+      )
+    }
   }
   await store.setProgress(token, {
     stage: body.stage as "landing" | "survey" | "workbook" | "live",
@@ -140,6 +165,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const e = await engagementStore().submit(token, result, source)
   if (!e) return NextResponse.json({ error: "Unknown engagement" }, { status: 404 })
   await engagementStore().addEvent(token, { kind: "submitted", at: new Date().toISOString(), detail: source })
+  await engagementStore().setDraft(token, null) // the draft's job is done
+  void notifyNelson(
+    `${e.clientName} returned their intake (${source})`,
+    `The ${source} came back for ${e.clientName}. Command center: /command/${token}`,
+  )
   const profile = computeProfile(surveyStateFromResult(result))
   return NextResponse.json({ ok: true, status: e.status, profile })
 }

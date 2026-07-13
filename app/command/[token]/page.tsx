@@ -154,12 +154,26 @@ export default function CommandPage({ params }: { params: Promise<{ token: strin
             <span className="text-slate-300">·</span>
             <span className="flex items-center gap-2 text-sm font-semibold"><MonitorPlay className="h-4 w-4 text-[#0089a3]" /> Command Center</span>
           </div>
-          <button
-            onClick={() => navigator.clipboard?.writeText(`${location.origin}/s/${token}`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300"
-          >
-            <Copy className="h-3.5 w-3.5" /> Copy client link
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigator.clipboard?.writeText(`${location.origin}/s/${token}`)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300"
+            >
+              <Copy className="h-3.5 w-3.5" /> Copy client link
+            </button>
+            <a
+              href={
+                e
+                  ? `mailto:?subject=${encodeURIComponent(`${e.clientName} — your workplace program with NELSON`)}&body=${encodeURIComponent(
+                      `Hi,\n\nHere's your home page for our work together — everything starts (and lives) here:\n\n${typeof location !== "undefined" ? location.origin : ""}/s/${token}\n\nPick whichever path suits your team: the interactive survey, the workbook, or we simply do it live together. Either way, the working session is where it all comes together.\n\nTalk soon,\nNELSON Workplace Strategy`,
+                    )}`
+                  : "#"
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300"
+            >
+              <Send className="h-3.5 w-3.5" /> Email the link
+            </a>
+          </div>
         </div>
       </header>
 
@@ -315,6 +329,9 @@ export default function CommandPage({ params }: { params: Promise<{ token: strin
                   <div className="mt-2 flex flex-wrap gap-2">
                     <a href={`/prep/${token}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#00badc]/50 hover:text-[#0089a3]">
                       <FileText className="h-3.5 w-3.5" /> Client prep sheet
+                    </a>
+                    <a href={`/brief/${token}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#00badc]/50 hover:text-[#0089a3]">
+                      <FileText className="h-3.5 w-3.5" /> Designer brief
                     </a>
                     <a href="/studio" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#00badc]/50 hover:text-[#0089a3]">
                       <FileSpreadsheet className="h-3.5 w-3.5" /> Fit-planning package (via Studio)

@@ -7,7 +7,7 @@ import {
   Crown, AlertTriangle, ClipboardList, Users, LayoutGrid, Table2, Presentation, CheckCircle2, X,
   Map as MapIcon, Settings2,
 } from "lucide-react"
-import { buildDeliverable, CATEGORY_COLORS, type DeliverableOverrides, type DeliverableAddition } from "@/lib/survey/deliverable"
+import { buildDeliverable, CATEGORY_COLORS, DEFAULT_FACTORS, type DeliverableOverrides, type DeliverableAddition, type DeliverableFactors } from "@/lib/survey/deliverable"
 import { ProgramMapView } from "@/components/survey/program-map"
 import { exportFitPlanningPackage } from "@/lib/survey/fitPlanning"
 import { lineGaps, type ComparisonLine } from "@/lib/survey/comparison"
@@ -43,6 +43,7 @@ export default function StudioPage() {
   const [additions, setAdditions] = useState<DeliverableAddition[]>([])
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [resolvedGaps, setResolvedGaps] = useState<Record<string, boolean>>({})
+  const [factors, setFactors] = useState<DeliverableFactors>({})
 
   const [view, setView] = useState<View>("workbench")
   const [drawer, setDrawer] = useState<Drawer>(null)
@@ -54,6 +55,7 @@ export default function StudioPage() {
   const menuRef = useRef<HTMLDivElement>(null)
   const sessionToken = useRef<string | null>(null)
   const saveTimer = useRef<number | null>(null)
+  const mapRef = useRef<HTMLDivElement>(null)
   // Display toggles (the old canvas's show/hide dials, reborn in settings)
   const [showDeptChips, setShowDeptChips] = useState(true)
   const [showRatios, setShowRatios] = useState(true)
@@ -82,7 +84,7 @@ export default function StudioPage() {
   useEffect(() => {
     if (!nelson) return
     sessionToken.current = null
-    setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({})
+    setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({})
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
       if (seed) { setResult(seed); setSource("seed"); return }
@@ -104,6 +106,7 @@ export default function StudioPage() {
           setAdditions(s?.additions ?? [])
           setNotes(s?.notes ?? {})
           setResolvedGaps(s?.resolvedGaps ?? {})
+          setFactors(s?.factors ?? {})
           sessionToken.current = source
         }
       })
@@ -120,13 +123,13 @@ export default function StudioPage() {
       fetch(`/api/engagements/${source}`, {
         method: "PATCH",
         headers: { "x-nelson-code": nelsonCode() ?? "" },
-        body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps } }),
+        body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps, factors } }),
       }).catch(() => {})
     }, 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overrides, counts, additions, notes, resolvedGaps])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors])
 
-  const d = useMemo(() => (result ? buildDeliverable(result, overrides, counts, additions) : null), [result, overrides, counts, additions])
+  const d = useMemo(() => (result ? buildDeliverable(result, overrides, counts, additions, factors) : null), [result, overrides, counts, additions, factors])
   const baseline = d?.comp.lines ?? []
   const baseOf = (key: string) => baseline.find((l) => l.key === key)
 
@@ -146,9 +149,25 @@ export default function StudioPage() {
       out.push({ id: `add:${a.key}`, text: `Added ${a.label} — ${a.proposedCount} × ${a.unitSF} SF (${a.category})` })
     for (const [gid, on] of Object.entries(resolvedGaps))
       if (on) out.push({ id: `gap:${gid}`, text: `Gap closed — ${gid.split("::")[1] ?? gid}` })
+    // Planning-dial deviations ARE decisions — the honest levers, on the record.
+    const dialLabel: Record<string, string> = {
+      circIndividual: "Circulation — individual", circCollab: "Circulation — collaboration",
+      circSupport: "Circulation — support", rentable: "Load factor",
+    }
+    for (const [k, v] of Object.entries(factors)) {
+      const def = DEFAULT_FACTORS[k as keyof typeof DEFAULT_FACTORS]
+      if (v !== undefined && v !== def) {
+        out.push({
+          id: `dial:${k}`,
+          text: k === "rentable"
+            ? `${dialLabel[k]} ×${(1 + def).toFixed(2)} → ×${(1 + v).toFixed(2)}`
+            : `${dialLabel[k]} ${Math.round(def * 100)}% → ${Math.round(v * 100)}%`,
+        })
+      }
+    }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d, overrides, counts, additions, resolvedGaps])
+  }, [d, overrides, counts, additions, resolvedGaps, factors])
 
   // ── Derived: gaps (intake holes + deferred questions) ──────────────────────
   const gaps = useMemo(() => {
@@ -289,6 +308,15 @@ export default function StudioPage() {
                       <p className="px-2 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Display</p>
                       <MenuToggle on={showDeptChips} onClick={() => setShowDeptChips((v) => !v)}>Department chips</MenuToggle>
                       <MenuToggle on={showRatios} onClick={() => setShowRatios((v) => !v)}>Ratio · survey · today</MenuToggle>
+                      <p className="mt-2 border-t border-slate-100 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Planning dials — logged as decisions</p>
+                      <Dial label="Circulation · individual" pct value={factors.circIndividual ?? DEFAULT_FACTORS.circIndividual}
+                        onChange={(v) => setFactors((p) => ({ ...p, circIndividual: v }))} />
+                      <Dial label="Circulation · collaboration" pct value={factors.circCollab ?? DEFAULT_FACTORS.circCollab}
+                        onChange={(v) => setFactors((p) => ({ ...p, circCollab: v }))} />
+                      <Dial label="Circulation · support" pct value={factors.circSupport ?? DEFAULT_FACTORS.circSupport}
+                        onChange={(v) => setFactors((p) => ({ ...p, circSupport: v }))} />
+                      <Dial label="Load factor (rentable ×)" value={factors.rentable ?? DEFAULT_FACTORS.rentable}
+                        onChange={(v) => setFactors((p) => ({ ...p, rentable: v }))} />
                       <p className="mt-2 border-t border-slate-100 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Open elsewhere</p>
                       <MenuLink href="/review">Program review</MenuLink>
                       {source !== "seed" && source !== "demo" && <MenuLink href={`/d/${source}`}>Client deliverable</MenuLink>}
@@ -296,7 +324,7 @@ export default function StudioPage() {
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
                           <button
-                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setMenuOpen(false) }}
+                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setMenuOpen(false) }}
                             className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                           >
                             <Undo2 className="h-3 w-3" /> Reset program edits
@@ -398,11 +426,22 @@ export default function StudioPage() {
             <section>
               {showMap && (
                 <div className="mb-8">
-                  <div className="mb-3 flex items-baseline justify-between gap-4">
+                  <div className="mb-3 flex items-center justify-between gap-4">
                     <h2 className="text-xl font-bold tracking-tight">Program map</h2>
-                    <p className="text-xs text-slate-400">Live from intake + session edits — teams, adjacencies, shared program.</p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-slate-400">Live from intake + session edits.</p>
+                      <button
+                        onClick={() => mapRef.current?.requestFullscreen?.().catch(() => {})}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#00badc]/50 hover:text-[#0089a3]"
+                        title="Full-screen for the room / Zoom share"
+                      >
+                        <Presentation className="h-3.5 w-3.5" /> Present
+                      </button>
+                    </div>
                   </div>
-                  <ProgramMapView map={d.map} />
+                  <div ref={mapRef} className="bg-white">
+                    <ProgramMapView map={d.map} />
+                  </div>
                 </div>
               )}
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -989,6 +1028,31 @@ function DrawerBtn({ active, onClick, icon, children }: { active: boolean; onCli
       }`}>
       {icon} {children}
     </button>
+  )
+}
+
+/** A planning dial: % inputs for circulation, plain factor for load. */
+function Dial({ label, value, pct, onChange }: { label: string; value: number; pct?: boolean; onChange: (v: number) => void }) {
+  return (
+    <label className="flex items-center justify-between gap-3 rounded-lg px-2 py-1 text-xs font-medium text-slate-600">
+      {label}
+      <span className="flex items-center gap-1 tabular-nums">
+        <input
+          type="number"
+          step={pct ? 1 : 0.01}
+          min={0}
+          max={pct ? 100 : 2}
+          value={pct ? Math.round(value * 100) : value.toFixed(2)}
+          onChange={(e) => {
+            const n = Number(e.target.value)
+            if (!Number.isFinite(n)) return
+            onChange(pct ? Math.min(1, Math.max(0, n / 100)) : Math.min(1, Math.max(0, n)))
+          }}
+          className="w-16 rounded-md border border-slate-200 px-1.5 py-1 text-right focus:border-[#00badc] focus:outline-none"
+        />
+        {pct ? "%" : `×${(1 + value).toFixed(2)}`}
+      </span>
+    </label>
   )
 }
 

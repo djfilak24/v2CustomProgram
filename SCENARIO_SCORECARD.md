@@ -117,3 +117,29 @@ proved.
    program in the session and keep it via the pushed deliverable.
 5. **Dashboard rework brief accepted** (CC-4 above), including invented-but-
    labeled effort benchmarks until real averages exist.
+
+---
+
+# Iteration 1 — re-score (2026-07-13, overnight run)
+
+The founder's signal: proceed through the loop and onward into the roadmap.
+Built and verified this iteration (all E2E-tested, 73 tests green):
+**the target end-to-end** (survey question → Studio target line → deck "Your
+number" slide), **persisted Studio sessions + the deck rendering them** (H1
+closed — including the new "What we decided together" slide carrying the
+session's notes), **the prep experience** (survey-complete reframing with
+above-average encouragement + the printable /prep/<token> client debrief),
+and the **engagement event log** (CC-1's data layer).
+
+| Scenario | Was | Now | What moved |
+|---|---|---|---|
+| S1 Solo survey, detailed | 8.6 | **8.9** | Completion screen honors effort, frames gaps as the agenda, hands off to prep. Still docked: cross-device resume (B5). |
+| S2 Quick lane | 7.7 | **8.4** | The quick lane's many gaps now read as "that's what the session is for" + prep sheet. |
+| S3 Workbook round-trip | 7.5 | **7.6** | Prep sheet works for workbook returns too. Still silent (B6). |
+| S4 "Do it live" | 5.5 | **5.5** | Untouched — next iteration's target (CC-6 + CC-1). |
+| S5 Designer loop | 6.7 | **7.6** | Sessions persist and reach the client's deck; target instrument live in Studio + deck; journey events recorded. Still docked: no unified command surface (CC-1 UI), no designer brief (CC-2b), map Zoom mode (G10). |
+| S6 Fit-planning handoff | 8.9 | **9.2** | The Excel now exports persisted truth, not session-only memory. |
+
+**Next iteration:** CC-1 (the Command Center as a real surface, consuming the
+event log) + CC-6 (a real do-it-live lane) re-scores S4 and S5; then B5/B6
+(resume + email) re-scores S1–S3. The loop continues until S5 scores with S1.

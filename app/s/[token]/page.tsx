@@ -31,6 +31,7 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
   const [submitted, setSubmitted] = useState<ProfileScores | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [liveRequested, setLiveRequested] = useState(false)
 
   useEffect(() => {
     fetch(`/api/engagements/${token}`)
@@ -337,9 +338,21 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
               title="Do it live with us"
               blurb="No homework required. Bring what you know and we'll capture everything together, live in your working session."
             >
-              <p className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                Nothing to click — your NELSON contact will schedule the session.
-              </p>
+              {liveRequested ? (
+                <p className="mt-5 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                  Got it — your NELSON contact will reach out to schedule the session. Nothing to prepare.
+                </p>
+              ) : (
+                <button
+                  onClick={() => {
+                    setLiveRequested(true)
+                    fetch(`/api/engagements/${token}`, { method: "PATCH", body: JSON.stringify({ stage: "live" }) }).catch(() => {})
+                  }}
+                  className="group mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-all hover:-translate-y-0.5 hover:border-slate-400 hover:text-slate-900 hover:shadow-md active:translate-y-0"
+                >
+                  <MessagesSquare className="h-4 w-4" /> This is us — let&apos;s do it live
+                </button>
+              )}
             </PathCard>
           </div>
 

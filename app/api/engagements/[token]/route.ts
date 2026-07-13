@@ -108,10 +108,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ to
     return NextResponse.json({ ok: true })
   }
 
-  if (!["landing", "survey", "workbook"].includes(body.stage ?? "")) {
-    return NextResponse.json({ error: "stage must be landing | survey | workbook" }, { status: 400 })
+  if (!["landing", "survey", "workbook", "live"].includes(body.stage ?? "")) {
+    return NextResponse.json({ error: "stage must be landing | survey | workbook | live" }, { status: 400 })
   }
-  // A landing revisit never downgrades a deeper stage (survey/workbook).
+  // A landing revisit never downgrades a deeper stage (survey/workbook/live).
   if (body.stage === "landing" && e.progress && e.progress.stage !== "landing") {
     return NextResponse.json({ ok: true, kept: e.progress.stage })
   }
@@ -120,7 +120,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ to
     await store.addEvent(token, { kind: "progress", at: new Date().toISOString(), detail: body.stage })
   }
   await store.setProgress(token, {
-    stage: body.stage as "landing" | "survey" | "workbook",
+    stage: body.stage as "landing" | "survey" | "workbook" | "live",
     ...(typeof body.step === "number" ? { step: body.step } : {}),
     ...(typeof body.total === "number" ? { total: body.total } : {}),
     updatedAt: new Date().toISOString(),

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import {
-  ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info, Wand2,
+  ArrowLeft, ArrowRight, ArrowDown, Sparkles, MessageCircle, Info, Wand2, Target,
 } from "lucide-react"
 import {
   SURVEY_STEPS, computeProfile, emptyState, emptyLanes, allLanes, deptAllocated, buildSurveyResult,
@@ -466,41 +466,58 @@ function StepBody({
               })}
             </div>
           </div>
-          <div>
-            <p className="mb-1 text-sm font-medium text-slate-600">Do you already have a number in mind?</p>
-            <p className="mb-3 text-xs text-slate-400">
-              A lease you hold, a building you&apos;re eyeing, a budget footprint. Totally optional — if you have one,
-              we&apos;ll bring the math that shows what it takes to get there.
-            </p>
-            <div className="flex flex-wrap items-center gap-2.5">
-              {([["lease", "Our current lease"], ["building", "A building we're considering"], ["budget", "A budget footprint"]] as const).map(([id, label]) => {
-                const on = state.targetSource === id
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => patch(on ? { targetSource: null, targetSF: null } : { targetSource: id })}
-                    className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1] text-slate-900" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-              {state.targetSource && (
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="12,000"
-                    value={state.targetSF ?? ""}
-                    onChange={(e) => patch({ targetSF: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
-                    className="w-28 rounded-xl border border-[#00badc]/40 bg-white px-3 py-2.5 text-right font-semibold tabular-nums focus:border-[#00badc] focus:outline-none"
-                  />
-                  usable SF
-                </label>
-              )}
+          {/* Their number — the question the whole engagement aims at, so it
+              gets the room's attention: an isolated dark moment, not a footnote. */}
+          <div className="relative overflow-hidden rounded-2xl bg-[#0e1a2e] p-6 text-white sm:p-7">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-60"
+              style={{ background: "radial-gradient(500px 220px at 85% -20%, rgba(0,186,220,0.25), transparent)" }}
+            />
+            <div className="relative">
+              <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#00badc]">
+                <Target className="h-4 w-4" /> The one number worth telling us
+              </p>
+              <p className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">Do you already have a number in mind?</p>
+              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-white/60">
+                A lease you hold, a building you&apos;re eyeing, a budget footprint. Optional — but if you have one,
+                the working session becomes <span className="font-semibold text-white/85">how we get you there</span>,
+                not just what the math says.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                {([["lease", "Our current lease"], ["building", "A building we're considering"], ["budget", "A budget footprint"]] as const).map(([id, label]) => {
+                  const on = state.targetSource === id
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => patch(on ? { targetSource: null, targetSF: null } : { targetSource: id })}
+                      className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                        on
+                          ? "border-[#00badc] bg-[#00badc]/20 text-white"
+                          : "border-white/20 bg-white/[0.06] text-white/80 hover:border-white/40 hover:text-white"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+                {state.targetSource ? (
+                  <label className="flex items-center gap-2 text-sm text-white/70">
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="12,000"
+                      autoFocus
+                      value={state.targetSF ?? ""}
+                      onChange={(e) => patch({ targetSF: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
+                      className="w-32 rounded-xl border border-[#00badc]/60 bg-white/95 px-3 py-2.5 text-right text-base font-bold tabular-nums text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
+                    />
+                    usable SF
+                  </label>
+                ) : (
+                  <span className="text-xs text-white/40">no number yet? skip it — we&apos;ll find it together</span>
+                )}
+              </div>
             </div>
           </div>
         </div>

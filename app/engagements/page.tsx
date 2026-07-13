@@ -12,7 +12,7 @@ interface Row {
   status: "sent" | "submitted"
   hasResult: boolean
   shared?: boolean
-  progress?: { stage: "landing" | "survey" | "workbook"; step?: number; total?: number; updatedAt: string }
+  progress?: { stage: "landing" | "survey" | "workbook" | "live"; step?: number; total?: number; updatedAt: string }
   updatedAt: string
 }
 
@@ -22,6 +22,7 @@ function rowStatus(r: Row): { label: string; tone: "done" | "active" | "idle" } 
   if (r.progress?.stage === "survey")
     return { label: `Survey · step ${r.progress.step ?? "?"} of ${r.progress.total ?? "?"}`, tone: "active" }
   if (r.progress?.stage === "workbook") return { label: "Workbook downloaded", tone: "active" }
+  if (r.progress?.stage === "live") return { label: "Wants it live — schedule the session", tone: "active" }
   if (r.progress?.stage === "landing") return { label: "Link opened", tone: "active" }
   return { label: "Sent", tone: "idle" }
 }
@@ -182,7 +183,15 @@ export default function EngagementsPage() {
                   const st = rowStatus(r)
                   return (
                   <tr key={r.token}>
-                    <td className="px-5 py-3 font-medium text-slate-900">{r.clientName}</td>
+                    <td className="px-5 py-3">
+                      <a
+                        href={`/command/${r.token}`}
+                        title="Open the Command Center"
+                        className="font-medium text-slate-900 underline-offset-2 hover:text-[#0089a3] hover:underline"
+                      >
+                        {r.clientName}
+                      </a>
+                    </td>
                     <td className="px-3 py-3">
                       <span
                         title={r.progress ? `Last activity ${new Date(r.progress.updatedAt).toLocaleString()}` : undefined}

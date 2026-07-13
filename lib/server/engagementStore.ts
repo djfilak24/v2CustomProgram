@@ -9,7 +9,7 @@ import type { SurveyResult } from "@/lib/survey/types"
 
 /** Where the client last was in the journey — the console's live pulse. */
 export interface EngagementProgress {
-  stage: "landing" | "survey" | "workbook"
+  stage: "landing" | "survey" | "workbook" | "live"
   step?: number
   total?: number
   updatedAt: string

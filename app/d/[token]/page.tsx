@@ -32,6 +32,8 @@ interface DeckSession {
   notes?: Record<string, string>
   resolvedGaps?: Record<string, boolean>
   factors?: Record<string, number>
+  /** Seating moves from the Studio's Department Manager. */
+  people?: { officeEmployeeIds?: string[]; deskEmployeeIds?: string[] }
   /** The beat composer: slide id → included (absent = included). */
   beats?: Record<string, boolean>
 }
@@ -79,7 +81,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
   }, [token])
 
   const d = useMemo(
-    () => (result ? buildDeliverable(result, overrides, session?.counts ?? {}, session?.additions ?? [], session?.factors ?? {}) : null),
+    () => (result ? buildDeliverable(result, overrides, session?.counts ?? {}, session?.additions ?? [], session?.factors ?? {}, session?.people) : null),
     [result, overrides, session],
   )
 

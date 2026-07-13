@@ -28,6 +28,7 @@ interface Eng {
     notes?: Record<string, string>
     resolvedGaps?: Record<string, boolean>
     factors?: Record<string, number>
+    people?: { officeEmployeeIds?: string[]; deskEmployeeIds?: string[] }
   }
 }
 
@@ -52,7 +53,7 @@ export default function BriefPage({ params }: { params: Promise<{ token: string 
   const d = useMemo(
     () =>
       e?.result
-        ? buildDeliverable(e.result, e.session?.overrides ?? e.overrides ?? {}, e.session?.counts ?? {}, e.session?.additions ?? [], e.session?.factors ?? {})
+        ? buildDeliverable(e.result, e.session?.overrides ?? e.overrides ?? {}, e.session?.counts ?? {}, e.session?.additions ?? [], e.session?.factors ?? {}, e.session?.people)
         : null,
     [e],
   )

@@ -33,6 +33,12 @@ export interface EngagementSession {
   resolvedGaps?: Record<string, boolean>
   /** Planning dials (circulation %, load factor) when the session moved them. */
   factors?: Record<string, number>
+  /**
+   * Seating moves from the Studio's Department Manager — office/desk picks
+   * that override the intake's own picks without touching it. Absent means
+   * "the intake's answer still stands."
+   */
+  people?: { officeEmployeeIds?: string[]; deskEmployeeIds?: string[] }
   /** Deliverable beat composer — slide id → included (absent = included). */
   beats?: Record<string, boolean>
   updatedAt: string

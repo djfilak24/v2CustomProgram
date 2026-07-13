@@ -14,6 +14,7 @@ import { lineGaps, type ComparisonLine } from "@/lib/survey/comparison"
 import { COLLAB_CATALOG, SUPPORT_CATALOG, type CatalogSpace } from "@/lib/survey/catalog"
 import { SpaceDetailModal } from "@/components/survey/space-detail-modal"
 import { WORKSTATION_SIZES, OFFICE_SIZES, SURVEY_STEPS, GOAL_MOTIVATORS, SPACE_POSTURES } from "@/lib/survey/sections"
+import { resolveSeating, type SeatPlacement, type SeatingPatch, type ResolvedSeating } from "@/lib/survey/seating"
 import { isNelsonMode, nelsonCode } from "@/lib/nelsonMode"
 import { loadSurveySeed } from "@/lib/survey/seedStorage"
 import { demoResult } from "@/lib/survey/demo-scenarios"
@@ -21,7 +22,7 @@ import type { SurveyResult } from "@/lib/survey/types"
 
 interface EngRow { token: string; clientName: string; status: string; hasResult: boolean }
 interface SeatGroup { dept: string; names: string[]; extra: number }
-type View = "workbench" | "focus" | "briefing"
+type View = "workbench" | "focus" | "briefing" | "people"
 type Drawer = "gaps" | "decisions" | "survey" | null
 
 /**
@@ -44,6 +45,8 @@ export default function StudioPage() {
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [resolvedGaps, setResolvedGaps] = useState<Record<string, boolean>>({})
   const [factors, setFactors] = useState<DeliverableFactors>({})
+  /** Department Manager moves — office/desk picks that override the intake. */
+  const [peoplePatch, setPeoplePatch] = useState<SeatingPatch>({})
 
   const [view, setView] = useState<View>("workbench")
   const [drawer, setDrawer] = useState<Drawer>(null)
@@ -68,24 +71,26 @@ export default function StudioPage() {
   type Snap = {
     overrides: DeliverableOverrides; counts: Record<string, number>; additions: DeliverableAddition[]
     notes: Record<string, string>; resolvedGaps: Record<string, boolean>; factors: DeliverableFactors
+    peoplePatch: SeatingPatch
   }
   const history = useRef<{ past: Snap[]; future: Snap[]; skip: boolean }>({ past: [], future: [], skip: false })
   const [histVer, setHistVer] = useState(0) // re-render hook for disabled states
   useEffect(() => {
     const h = history.current
     if (h.skip) { h.skip = false; return }
-    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors }
+    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch }
     const last = h.past[h.past.length - 1]
     if (last && JSON.stringify(last) === JSON.stringify(snap)) return
     h.past.push(snap)
     if (h.past.length > 60) h.past.shift()
     h.future = []
     setHistVer((v) => v + 1)
-  }, [overrides, counts, additions, notes, resolvedGaps, factors])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch])
   const applySnap = (s: Snap) => {
     history.current.skip = true
     setOverrides(s.overrides); setCounts(s.counts); setAdditions(s.additions)
     setNotes(s.notes); setResolvedGaps(s.resolvedGaps); setFactors(s.factors)
+    setPeoplePatch(s.peoplePatch ?? {})
     setHistVer((v) => v + 1)
   }
   const undo = () => {
@@ -128,7 +133,7 @@ export default function StudioPage() {
     if (!nelson) return
     sessionToken.current = null
     history.current = { past: [], future: [], skip: false }
-    setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({})
+    setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({}); setPeoplePatch({})
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
       if (seed) { setResult(seed); setSource("seed"); return }
@@ -151,6 +156,7 @@ export default function StudioPage() {
           setNotes(s?.notes ?? {})
           setResolvedGaps(s?.resolvedGaps ?? {})
           setFactors(s?.factors ?? {})
+          setPeoplePatch(s?.people ?? {})
           sessionToken.current = source
         }
       })
@@ -169,17 +175,65 @@ export default function StudioPage() {
       fetch(`/api/engagements/${source}`, {
         method: "PATCH",
         headers: { "x-nelson-code": nelsonCode() ?? "" },
-        body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps, factors } }),
+        body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch } }),
       })
         .then(() => setSaveState("saved"))
         .catch(() => setSaveState("idle"))
     }, 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overrides, counts, additions, notes, resolvedGaps, factors])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch])
 
-  const d = useMemo(() => (result ? buildDeliverable(result, overrides, counts, additions, factors) : null), [result, overrides, counts, additions, factors])
+  const d = useMemo(
+    () => (result ? buildDeliverable(result, overrides, counts, additions, factors, peoplePatch) : null),
+    [result, overrides, counts, additions, factors, peoplePatch],
+  )
   const baseline = d?.comp.lines ?? []
   const baseOf = (key: string) => baseline.find((l) => l.key === key)
+
+  // ── Derived: who gets the seats — the one seating resolver (lib/survey/seating),
+  // also used by the program map, so the Department Manager's moves and the
+  // whiteboard never drift apart.
+  const resolved = useMemo(
+    () => (result ? resolveSeating(result, peoplePatch) : { byId: {}, byDept: {} }),
+    [result, peoplePatch],
+  )
+  const seats = useMemo(() => {
+    const offices: SeatGroup[] = []
+    const desks: SeatGroup[] = []
+    if (!result) return { byId: resolved.byId, offices, desks }
+    for (const dep of result.people.departments) {
+      const rows = resolved.byDept[dep.id] ?? []
+      const nOff = result.spaces.privateOfficesByDept[dep.id] ?? 0
+      const nDesk = result.work.dedicatedByDept?.[dep.id] ?? 0
+      const offNames = rows.filter((r) => r.placement === "office")
+      const deskNames = rows.filter((r) => r.placement === "desk")
+      if (nOff > 0 || offNames.length > 0)
+        offices.push({ dept: dep.name, names: offNames.map((e) => e.name), extra: Math.max(0, nOff - offNames.length) })
+      if (nDesk > 0 || deskNames.length > 0)
+        desks.push({ dept: dep.name, names: deskNames.map((e) => e.name), extra: Math.max(0, nDesk - deskNames.length) })
+    }
+    return { byId: resolved.byId, offices, desks }
+  }, [result, resolved])
+
+  // Move a person office ↔ desk ↔ flex. Snapshots everyone's CURRENT resolved
+  // placement as the new explicit baseline before applying the one move — so
+  // the first move ever made never silently un-seats everyone else who was
+  // still riding the leaders-first convention.
+  const moveSeat = (id: string, next: SeatPlacement) => {
+    if (!result) return
+    const officeIds = new Set<string>()
+    const deskIds = new Set<string>()
+    for (const dep of result.people.departments) {
+      for (const row of resolved.byDept[dep.id] ?? []) {
+        if (row.id === id) continue
+        if (row.placement === "office") officeIds.add(row.id)
+        else if (row.placement === "desk") deskIds.add(row.id)
+      }
+    }
+    if (next === "office") officeIds.add(id)
+    else if (next === "desk") deskIds.add(id)
+    setPeoplePatch({ officeEmployeeIds: [...officeIds], deskEmployeeIds: [...deskIds] })
+  }
 
   // ── Derived: the decision log (deviations ARE the log — Advisory #6.6) ─────
   const decisions = useMemo(() => {
@@ -213,9 +267,20 @@ export default function StudioPage() {
         })
       }
     }
+    // Department Manager seat moves — the session's placement vs the intake's own.
+    if (result && Object.keys(peoplePatch).length > 0) {
+      const before = resolveSeating(result)
+      for (const dep of result.people.departments) {
+        for (const row of resolved.byDept[dep.id] ?? []) {
+          const was = before.byId[row.id] ?? "flex"
+          if (was !== row.placement)
+            out.push({ id: `seat:${row.id}`, text: `${row.name} (${dep.name}) — ${was} → ${row.placement}` })
+        }
+      }
+    }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d, overrides, counts, additions, resolvedGaps, factors])
+  }, [d, overrides, counts, additions, resolvedGaps, factors, peoplePatch, resolved, result])
 
   // ── Derived: gaps (intake holes + deferred questions) ──────────────────────
   const gaps = useMemo(() => {
@@ -232,38 +297,6 @@ export default function StudioPage() {
   const openGaps = gaps.filter((g) => !resolvedGaps[g.id]).length
 
   const editedCount = decisions.length
-
-  // ── Derived: who gets the seats. When the survey carried the client's
-  // literal per-person picks (officeEmployeeIds/deskEmployeeIds), those ARE
-  // the answer. Otherwise fall back to the seating-hierarchy convention:
-  // offices to the first names (leaders first), dedicated desks next.
-  const seats = useMemo(() => {
-    const byId: Record<string, "office" | "desk"> = {}
-    const offices: SeatGroup[] = []
-    const desks: SeatGroup[] = []
-    if (!result) return { byId, offices, desks }
-    const pickedOffice = new Set(result.spaces.officeEmployeeIds ?? [])
-    const pickedDesk = new Set(result.work.deskEmployeeIds ?? [])
-    const explicit = pickedOffice.size > 0 || pickedDesk.size > 0
-    for (const dep of result.people.departments) {
-      const roster = [...(dep.employees ?? [])].sort((a, b) => (b.isLeader ? 1 : 0) - (a.isLeader ? 1 : 0))
-      const nOff = result.spaces.privateOfficesByDept[dep.id] ?? 0
-      const nDesk = result.work.dedicatedByDept?.[dep.id] ?? 0
-      const offNames = explicit
-        ? roster.filter((e) => pickedOffice.has(e.id))
-        : roster.slice(0, Math.min(nOff, roster.length))
-      const deskNames = explicit
-        ? roster.filter((e) => pickedDesk.has(e.id))
-        : roster.slice(offNames.length, Math.min(offNames.length + nDesk, roster.length))
-      for (const e of offNames) byId[e.id] = "office"
-      for (const e of deskNames) byId[e.id] = "desk"
-      if (nOff > 0 || offNames.length > 0)
-        offices.push({ dept: dep.name, names: offNames.map((e) => e.name || "Unnamed"), extra: Math.max(0, nOff - offNames.length) })
-      if (nDesk > 0 || deskNames.length > 0)
-        desks.push({ dept: dep.name, names: deskNames.map((e) => e.name || "Unnamed"), extra: Math.max(0, nDesk - deskNames.length) })
-    }
-    return { byId, offices, desks }
-  }, [result])
 
   if (nelson === false) {
     return (
@@ -297,7 +330,7 @@ export default function StudioPage() {
               <span className="text-sm font-medium text-slate-700">Studio</span>
               {/* View presets — Advisory #6.10 */}
               <div className="ml-3 flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-                {([["workbench", LayoutGrid, "Workbench"], ["focus", Table2, "Focus"], ["briefing", Presentation, "Briefing"]] as const).map(([id, Icon, label]) => (
+                {([["workbench", LayoutGrid, "Workbench"], ["focus", Table2, "Focus"], ["people", Users, "People"], ["briefing", Presentation, "Briefing"]] as const).map(([id, Icon, label]) => (
                   <button
                     key={id}
                     onClick={() => { setView(id); if (id === "briefing") setDrawer(null) }}
@@ -413,7 +446,7 @@ export default function StudioPage() {
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
                           <button
-                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setMenuOpen(false) }}
+                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setMenuOpen(false) }}
                             className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                           >
                             <Undo2 className="h-3 w-3" /> Reset program edits
@@ -552,6 +585,24 @@ export default function StudioPage() {
                   </div>
                 </div>
               )}
+              {view === "people" ? (
+                <>
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <h2 className="text-xl font-bold tracking-tight">People</h2>
+                    <p className="text-xs text-slate-400">
+                      Click a placement to move someone — offices and desks recompute live, and the move joins the decision log.
+                    </p>
+                  </div>
+                  {result && (
+                    <DepartmentManager
+                      result={result} seating={resolved}
+                      officesByDept={result.spaces.privateOfficesByDept} desksByDept={result.work.dedicatedByDept ?? {}}
+                      onMove={moveSeat}
+                    />
+                  )}
+                </>
+              ) : (
+              <>
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h2 className={briefing ? "text-2xl font-bold tracking-tight" : "text-xl font-bold tracking-tight"}>
                   {briefing ? "Your program" : "Spaces"}
@@ -634,6 +685,8 @@ export default function StudioPage() {
                     </div>
                   )
                 })
+              )}
+              </>
               )}
             </section>
 
@@ -759,6 +812,98 @@ export default function StudioPage() {
         : ["Leadership and door-required roles", "Doubles as a 2–3 person meeting point"],
     }
   }
+}
+
+/* ── Department Manager: every person, where they sit, one click to move ── */
+
+function DepartmentManager({
+  result, seating, officesByDept, desksByDept, onMove,
+}: {
+  result: SurveyResult
+  seating: ResolvedSeating
+  officesByDept: Record<string, number>
+  desksByDept: Record<string, number>
+  onMove: (id: string, next: SeatPlacement) => void
+}) {
+  return (
+    <div className="space-y-5">
+      {result.people.departments.map((dep) => {
+        const rows = seating.byDept[dep.id] ?? []
+        const nOff = officesByDept[dep.id] ?? 0
+        const nDesk = desksByDept[dep.id] ?? 0
+        const offCount = rows.filter((r) => r.placement === "office").length
+        const deskCount = rows.filter((r) => r.placement === "desk").length
+        const flexCount = rows.filter((r) => r.placement === "flex").length
+        const growth = dep.futureHeadcount !== undefined && dep.futureHeadcount !== dep.headcount
+        const overOffice = offCount > nOff
+        const overDesk = deskCount > nDesk
+        return (
+          <div key={dep.id} className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">{dep.name}</h3>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  {dep.headcount} people today
+                  {growth && (
+                    <> · <span className={dep.futureHeadcount! > dep.headcount ? "text-emerald-600" : "text-amber-600"}>
+                      → {dep.futureHeadcount} at plan
+                    </span></>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-medium">
+                <span className={`rounded-full px-2.5 py-1 ${overOffice ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-600"}`} title="Offices assigned vs planned">
+                  {offCount} / {nOff} offices
+                </span>
+                <span className={`rounded-full px-2.5 py-1 ${overDesk ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-600"}`} title="Dedicated desks assigned vs planned">
+                  {deskCount} / {nDesk} desks
+                </span>
+                {flexCount > 0 && (
+                  <span className="rounded-full bg-slate-50 px-2.5 py-1 text-slate-500">{flexCount} shared</span>
+                )}
+              </div>
+            </div>
+            {rows.length === 0 ? (
+              <p className="mt-3 text-xs text-slate-400">
+                No roster captured for this department — allocation is headcount-only ({nOff} offices, {nDesk} dedicated desks planned).
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                {rows.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-slate-800">
+                      {r.isLeader && <Crown className="h-3 w-3 shrink-0 text-amber-500" />}
+                      <span className="truncate">{r.name}</span>
+                    </span>
+                    <span className="flex shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white text-[10px] font-semibold">
+                      {(["office", "desk", "flex"] as const).map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => onMove(r.id, p)}
+                          title={`Move to ${p === "flex" ? "shared — no dedicated seat" : p}`}
+                          className={`px-2 py-1 capitalize transition-colors ${
+                            r.placement === p
+                              ? p === "office"
+                                ? "bg-[#2563eb]/12 text-[#1d4ed8]"
+                                : p === "desk"
+                                  ? "bg-[#00badc]/15 text-[#0089a3]"
+                                  : "bg-slate-200 text-slate-600"
+                              : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 /* ── Dimension language: SF ⇄ footprint ─────────────────────────────────── */
@@ -1030,7 +1175,7 @@ function FocusRows({
 
 /* ── Survey drawer: everything from intake ─────────────────────────────── */
 
-function SurveyDrawer({ result, tab, seatOf }: { result: SurveyResult; tab: "people" | "answers" | "existing"; seatOf: Record<string, "office" | "desk"> }) {
+function SurveyDrawer({ result, tab, seatOf }: { result: SurveyResult; tab: "people" | "answers" | "existing"; seatOf: Record<string, SeatPlacement> }) {
   if (tab === "people") {
     return (
       <div className="space-y-3">
@@ -1048,7 +1193,7 @@ function SurveyDrawer({ result, tab, seatOf }: { result: SurveyResult; tab: "peo
                 {dep.employees!.map((e) => (
                   <span key={e.id} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${e.isLeader ? "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-300" : "bg-slate-100 text-slate-600"}`}>
                     {e.isLeader && <Crown className="h-2.5 w-2.5" />}{e.name || "Unnamed"}
-                    {seatOf[e.id] && (
+                    {(seatOf[e.id] === "office" || seatOf[e.id] === "desk") && (
                       <span className="font-semibold" style={{ color: seatOf[e.id] === "office" ? CATEGORY_COLORS.Offices.text : CATEGORY_COLORS.Workstations.text }}>
                         · {seatOf[e.id]}
                       </span>

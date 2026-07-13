@@ -10,6 +10,7 @@
  */
 import type { SurveyResult } from "./types"
 import type { ComparisonLine } from "./comparison"
+import { resolveSeating, officeHoldersFor, type SeatingPatch } from "./seating"
 
 // Hex palette mirrors the canvas dept colors (index-aligned with DEPT_COLOR_CLASSES).
 export const MAP_DEPT_COLORS = [
@@ -113,16 +114,11 @@ export function packCircles(items: { r: number }[]): { x: number; y: number }[] 
 const contentRadius = (bubbles: MapBubble[]): number =>
   Math.max(30, ...bubbles.map((b) => Math.hypot(b.x, b.y) + b.r)) + 18
 
-/** Office-holders come from the roster the same way the survey assigns them: leaders first. */
-function officeHolders(dept: SurveyResult["people"]["departments"][number], officeCount: number) {
-  const roster = [...(dept.employees ?? [])].sort((a, b) => Number(!!b.isLeader) - Number(!!a.isLeader))
-  return roster.slice(0, officeCount)
-}
-
-export function buildProgramMap(result: SurveyResult, lines: ComparisonLine[]): ProgramMap {
+export function buildProgramMap(result: SurveyResult, lines: ComparisonLine[], seatingPatch?: SeatingPatch): ProgramMap {
   const ex = result.existing ?? {}
   const wsSF = ex.workstationSF ?? 48
   const offSF = ex.officeSF ?? 120
+  const seating = resolveSeating(result, seatingPatch)
 
   // ── Department clusters ─────────────────────────────────────────────────────
   const clusters: MapCluster[] = result.people.departments.map((d, i) => {
@@ -131,8 +127,9 @@ export function buildProgramMap(result: SurveyResult, lines: ComparisonLine[]): 
     const dedicated = result.work.dedicatedByDept?.[d.id] ?? 0
     const flex = Math.max(0, d.headcount - offices - dedicated)
 
-    // Private offices — one bubble per office, named from the roster (leaders first).
-    const holders = officeHolders(d, offices)
+    // Private offices — one bubble per office, named through the one seating
+    // resolver (explicit picks, session moves, or leaders-first convention).
+    const holders = officeHoldersFor(result, d.id, offices, seating)
     for (let k = 0; k < offices; k++) {
       const person = holders[k]
       bubbles.push({

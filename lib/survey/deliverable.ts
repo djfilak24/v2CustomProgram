@@ -12,6 +12,7 @@
 import type { SurveyResult } from "./types"
 import { buildComparison, spaceStrategy, type Comparison, type ComparisonLine, type CompCategory, type SpaceStrategy } from "./comparison"
 import { buildProgramMap, type ProgramMap } from "./programMap"
+import type { SeatingPatch } from "./seating"
 import { computeProfile, surveyStateFromResult, type ProfileScores } from "./sections"
 
 /** Presentation edits: comparison line key → unit SF. */
@@ -97,6 +98,8 @@ export function buildDeliverable(
   additions: DeliverableAddition[] = [],
   /** Planning dials — circulation + load factor, session-adjustable. */
   factors: DeliverableFactors = {},
+  /** The Studio's seating moves (Department Manager) — office/desk overrides. */
+  people?: SeatingPatch,
 ): Deliverable {
   const comp = buildComparison(result)
   const lines: ComparisonLine[] = [
@@ -142,7 +145,7 @@ export function buildDeliverable(
     future: comp.future,
     daysInOffice: comp.daysInOffice,
     profile: computeProfile(surveyStateFromResult(result)),
-    map: buildProgramMap(result, lines),
+    map: buildProgramMap(result, lines, people),
     comp,
     lines: [...lines].sort(
       (a, b) => Math.abs((b.proposedCount - b.existingCount) * b.unitSF) - Math.abs((a.proposedCount - a.existingCount) * a.unitSF),

@@ -43,9 +43,25 @@ throwaway comps welcome, breadth over polish, decisions recorded.
     engine's own levers. This is design work first; A3 builds what 0.4
     settles.
 
+0.5 **The Command Center** *(added from the founder's lab review)* — the
+    designer's fetch-one-engagement home page: what they said · what the
+    system recommends · doors & completeness · deliverable review → push ·
+    session prep (agenda from gaps, prep pack, screen kit). Prototyped at
+    `/lab/command`.
+
+0.6 **Client dashboard rework brief** — tame the bar charts, keep the
+    radar, add effort-vs-typical encouragement (illustrative benchmarks
+    until real ones exist) and a "Prep for the live session" debrief CTA.
+
 *Exit criteria: founder-approved comps for Studio, deliverable, and the
 target conversation; a decided shape for scenarios/segmentation. Then the
 hardening phases below proceed with confidence.*
+
+*Status 2026-07-13: 0.1 decided — **Direction A, the Delta Cockpit** wins
+(the Ledger's session-record timeline migrates into A's feed). 0.2–0.5
+comps approved in principle; scenario scorecard run — see
+[SCENARIO_SCORECARD.md](./SCENARIO_SCORECARD.md) for scores, gaps CC-1…CC-6,
+and the loop plan (S4 and S5 are the journeys to re-score).*
 
 ## Phase A — Close the loop *(the program you build is the program they get)*
 

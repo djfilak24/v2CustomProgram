@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { KeyRound, Target, LayoutGrid, GitCompareArrows, Presentation, ArrowRight, FlaskConical } from "lucide-react"
+import { KeyRound, Target, LayoutGrid, GitCompareArrows, Presentation, ArrowRight, FlaskConical, MonitorPlay } from "lucide-react"
 import { isNelsonMode } from "@/lib/nelsonMode"
 
 /**
@@ -48,6 +48,15 @@ const EXPLORATIONS = [
     question:
       "The deck as a designed presentation: pacing storyboard, the new verdict-vs-target beat, the decisions & compromises slide, dark/light rhythm, print parity.",
     accent: "#10b981",
+  },
+  {
+    href: "/lab/command",
+    icon: MonitorPlay,
+    tag: "0.5 · founder brief",
+    title: "The Command Center",
+    question:
+      "Fetching an engagement from the designer's chair: what they said · what the system recommends · which door, how completely · the deliverable's review → push state · and the live-session prep kit.",
+    accent: "#8b5cf6",
   },
 ]
 

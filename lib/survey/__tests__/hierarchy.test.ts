@@ -125,3 +125,38 @@ describe("rosterForMode", () => {
     expect(out[0].headcount).toBe(5) // bumped up to the named count
   })
 })
+
+describe("per-person seat picks in the contract (C12)", () => {
+  it("round-trips the literal picks through SurveyResult", async () => {
+    const { buildSurveyResult, surveyStateFromResult } = await import("../sections")
+    const s = emptyState()
+    s.departments = [
+      { id: "d1", name: "Partners", headcount: 3, employees: [makeEmployee("Ada", true), makeEmployee("Ben"), makeEmployee("Cy")] },
+    ]
+    const [ada, ben, cy] = s.departments[0].employees!
+    s.officesByDept = { d1: 1 }
+    s.dedicatedByDept = { d1: 1 }
+    s.officeByEmployee = { [ada.id]: true }
+    s.deskByEmployee = { [ben.id]: true }
+    const r = buildSurveyResult(s, emptyLanes(), new Set(), { clientName: "Acme", completedBy: "Dana" })
+    expect(r.spaces.officeEmployeeIds).toEqual([ada.id])
+    expect(r.work.deskEmployeeIds).toEqual([ben.id])
+    expect(r.work.deskEmployeeIds).not.toContain(cy.id)
+
+    const back = surveyStateFromResult(r)
+    expect(back.officeByEmployee[ada.id]).toBe(true)
+    expect(back.deskByEmployee[ben.id]).toBe(true)
+  })
+
+  it("a desk pick shadowed by an office pick never leaks (XOR holds)", async () => {
+    const { buildSurveyResult } = await import("../sections")
+    const s = emptyState()
+    s.departments = [{ id: "d1", name: "Ops", headcount: 1, employees: [makeEmployee("Ada", true)] }]
+    const ada = s.departments[0].employees![0]
+    s.officeByEmployee = { [ada.id]: true }
+    s.deskByEmployee = { [ada.id]: true } // stale double-assignment
+    const r = buildSurveyResult(s, emptyLanes(), new Set(), { clientName: "Acme", completedBy: "Dana" })
+    expect(r.spaces.officeEmployeeIds).toEqual([ada.id])
+    expect(r.work.deskEmployeeIds).toBeUndefined()
+  })
+})

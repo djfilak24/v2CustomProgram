@@ -185,25 +185,34 @@ export default function StudioPage() {
 
   const editedCount = decisions.length
 
-  // ── Derived: who gets the seats. Per-person picks live in the survey UI;
-  // what survives is the per-dept counts + the ordered roster, so we apply the
-  // same hierarchy convention as assignSeatHierarchy: offices go to the first
-  // names (leaders first), dedicated desks to the next names.
+  // ── Derived: who gets the seats. When the survey carried the client's
+  // literal per-person picks (officeEmployeeIds/deskEmployeeIds), those ARE
+  // the answer. Otherwise fall back to the seating-hierarchy convention:
+  // offices to the first names (leaders first), dedicated desks next.
   const seats = useMemo(() => {
     const byId: Record<string, "office" | "desk"> = {}
     const offices: SeatGroup[] = []
     const desks: SeatGroup[] = []
     if (!result) return { byId, offices, desks }
+    const pickedOffice = new Set(result.spaces.officeEmployeeIds ?? [])
+    const pickedDesk = new Set(result.work.deskEmployeeIds ?? [])
+    const explicit = pickedOffice.size > 0 || pickedDesk.size > 0
     for (const dep of result.people.departments) {
       const roster = [...(dep.employees ?? [])].sort((a, b) => (b.isLeader ? 1 : 0) - (a.isLeader ? 1 : 0))
       const nOff = result.spaces.privateOfficesByDept[dep.id] ?? 0
       const nDesk = result.work.dedicatedByDept?.[dep.id] ?? 0
-      const offNames = roster.slice(0, Math.min(nOff, roster.length))
-      const deskNames = roster.slice(offNames.length, Math.min(offNames.length + nDesk, roster.length))
+      const offNames = explicit
+        ? roster.filter((e) => pickedOffice.has(e.id))
+        : roster.slice(0, Math.min(nOff, roster.length))
+      const deskNames = explicit
+        ? roster.filter((e) => pickedDesk.has(e.id))
+        : roster.slice(offNames.length, Math.min(offNames.length + nDesk, roster.length))
       for (const e of offNames) byId[e.id] = "office"
       for (const e of deskNames) byId[e.id] = "desk"
-      if (nOff > 0) offices.push({ dept: dep.name, names: offNames.map((e) => e.name || "Unnamed"), extra: nOff - offNames.length })
-      if (nDesk > 0) desks.push({ dept: dep.name, names: deskNames.map((e) => e.name || "Unnamed"), extra: nDesk - deskNames.length })
+      if (nOff > 0 || offNames.length > 0)
+        offices.push({ dept: dep.name, names: offNames.map((e) => e.name || "Unnamed"), extra: Math.max(0, nOff - offNames.length) })
+      if (nDesk > 0 || deskNames.length > 0)
+        desks.push({ dept: dep.name, names: deskNames.map((e) => e.name || "Unnamed"), extra: Math.max(0, nDesk - deskNames.length) })
     }
     return { byId, offices, desks }
   }, [result])

@@ -83,6 +83,8 @@ export interface SurveyResult {
     fullyRemote: number
     /** Per-dept count of people needing a dedicated/assigned seat (Detailed). */
     dedicatedByDept?: Record<string, number>
+    /** The literal per-person desk picks (employee ids) — real answers, not convention. */
+    deskEmployeeIds?: string[]
     /** Cross-functional adjacency hints → handoff notes. */
     adjacencyNotes?: string
     /**
@@ -97,6 +99,8 @@ export interface SurveyResult {
   spaces: {
     /** Private offices per department (the ± steppers). Keyed by department id. */
     privateOfficesByDept: Record<string, number>
+    /** The literal per-person office picks (employee ids) — real answers, not convention. */
+    officeEmployeeIds?: string[]
     /** Where private offices sit relative to the window line. */
     officePlacement?: "exterior" | "interior" | "mixed" | "unsure"
     /** Collaboration spaces: per-type counts, optionally split by department. */

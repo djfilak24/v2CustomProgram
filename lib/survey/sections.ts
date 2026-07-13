@@ -648,6 +648,8 @@ export function surveyStateFromResult(r: import("./types").SurveyResult): Survey
 
   s.officesByDept = { ...(r.spaces.privateOfficesByDept ?? {}) }
   s.officePlacement = r.spaces.officePlacement ?? null
+  for (const id of r.spaces.officeEmployeeIds ?? []) s.officeByEmployee[id] = true
+  for (const id of r.work.deskEmployeeIds ?? []) s.deskByEmployee[id] = true
   s.collabConfig = { ...(r.spaces.collabConfig ?? {}) }
   s.collabTypes = r.spaces.collaboration.map((c) => c.type)
   for (const c of r.spaces.collaboration) if (Object.keys(c.byDept).length) s.collabByDept[c.type] = { ...c.byDept }
@@ -840,6 +842,16 @@ export function buildSurveyResult(
     if (ded > 0) dedicatedByDept[d.id] = ded
   }
 
+  // The client's literal per-person picks carry through — the thesis says
+  // downstream surfaces get their real answer, not a derived convention.
+  const rosterIds = new Set(s.departments.flatMap((d) => (d.employees ?? []).map((e) => e.id)))
+  const officeEmployeeIds = Object.entries(s.officeByEmployee)
+    .filter(([id, v]) => v && rosterIds.has(id))
+    .map(([id]) => id)
+  const deskEmployeeIds = Object.entries(s.deskByEmployee)
+    .filter(([id, v]) => v && rosterIds.has(id) && !s.officeByEmployee[id])
+    .map(([id]) => id)
+
   return {
     meta: { clientName: meta.clientName, completedBy: meta.completedBy, completedAt: new Date().toISOString() },
     ...(s.goalMotivators.length || s.spacePosture || (s.targetSF && s.targetSF > 0)
@@ -868,11 +880,13 @@ export function buildSurveyResult(
       ...(daysUnsure.length ? { daysUnsureDepts: daysUnsure } : {}),
       fullyRemote: 0,
       ...(lanes.seating === "detailed" && Object.keys(dedicatedByDept).length ? { dedicatedByDept } : {}),
+      ...(deskEmployeeIds.length ? { deskEmployeeIds } : {}),
       ...(adjacencyNotes ? { adjacencyNotes } : {}),
       ...(adjacencyPairs.length ? { adjacencyPairs } : {}),
     },
     spaces: {
       privateOfficesByDept: lanes.offices === "detailed" ? officesByDept : {},
+      ...(officeEmployeeIds.length ? { officeEmployeeIds } : {}),
       ...(s.officePlacement && s.officePlacement !== "unsure"
         ? { officePlacement: s.officePlacement as "exterior" | "interior" | "mixed" }
         : {}),

@@ -116,15 +116,19 @@ export default function StudioPage() {
 
   // Every session edit persists (debounced) — a refresh never loses a meeting,
   // and the client's deck renders exactly what the session decided (A1/A2).
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
   useEffect(() => {
     if (!sessionToken.current || sessionToken.current !== source) return
+    setSaveState("saving")
     if (saveTimer.current) window.clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(() => {
       fetch(`/api/engagements/${source}`, {
         method: "PATCH",
         headers: { "x-nelson-code": nelsonCode() ?? "" },
         body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps, factors } }),
-      }).catch(() => {})
+      })
+        .then(() => setSaveState("saved"))
+        .catch(() => setSaveState("idle"))
     }, 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overrides, counts, additions, notes, resolvedGaps, factors])
@@ -280,6 +284,15 @@ export default function StudioPage() {
                   <span className="mx-1 h-5 w-px bg-slate-200" />
                 </>
               )}
+              {sessionToken.current === source && source && (
+                <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${saveState === "saved" ? "text-emerald-600" : "text-slate-400"}`}>
+                  {saveState === "saving" ? (
+                    <><RefreshCw className="h-3 w-3 animate-spin" /> saving…</>
+                  ) : (
+                    <><CheckCircle2 className="h-3 w-3" /> session saved</>
+                  )}
+                </span>
+              )}
               <select
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
@@ -327,8 +340,14 @@ export default function StudioPage() {
                       <Dial label="Load factor (rentable ×)" value={factors.rentable ?? DEFAULT_FACTORS.rentable}
                         onChange={(v) => setFactors((p) => ({ ...p, rentable: v }))} />
                       <p className="mt-2 border-t border-slate-100 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Open elsewhere</p>
+                      {source !== "seed" && source !== "demo" && (
+                        <>
+                          <MenuLink href={`/command/${source}`}>Command Center</MenuLink>
+                          <MenuLink href={`/d/${source}`}>Client deliverable</MenuLink>
+                          <MenuLink href={`/brief/${source}`}>Designer brief</MenuLink>
+                        </>
+                      )}
                       <MenuLink href="/review">Program review</MenuLink>
-                      {source !== "seed" && source !== "demo" && <MenuLink href={`/d/${source}`}>Client deliverable</MenuLink>}
                       <MenuLink href="/">Legacy canvas (frozen)</MenuLink>
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
@@ -383,6 +402,9 @@ export default function StudioPage() {
                   <Row k="Circulation" v={`${d.totals.circulationSF.toLocaleString()}`} />
                   <Row k={`Load ×${(1 + d.totals.rentableFactor).toFixed(2)} → rentable`} v={`${d.totals.estimatedRentableSF.toLocaleString()}`} />
                   <Row k="SF / person" v={`${d.totals.sfPerPerson}`} />
+                  {Object.keys(factors).length > 0 && (
+                    <p className="pt-1 text-[11px] font-medium text-[#0089a3]">planning dials tuned — on the decision log</p>
+                  )}
                 </div>
               </div>
               {/* Space allocation — the category color key IS the chart */}

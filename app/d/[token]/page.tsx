@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { ProgramMapView } from "@/components/survey/program-map"
+import { MAP_DEPT_COLORS } from "@/lib/survey/programMap"
 import { buildDeliverable, KEY_DECISION_KEYS, CATEGORY_COLORS, type DeliverableOverrides, type DeliverableAddition } from "@/lib/survey/deliverable"
 import { WORKSTATION_SIZES, OFFICE_SIZES } from "@/lib/survey/sections"
 import { isNelsonMode, nelsonCode } from "@/lib/nelsonMode"
@@ -34,9 +35,10 @@ interface DeckSession {
 }
 
 /** Slides the composer may drop; cover stays, always. */
-const COMPOSABLE = ["who", "profile", "map", "compare", "program", "next"] as const
+const COMPOSABLE = ["who", "growth", "howwork", "profile", "map", "compare", "program", "next"] as const
 const SLIDE_NAMES: Record<string, string> = {
-  cover: "Cover", who: "Who you are", profile: "Workplace Profile", map: "Program map",
+  cover: "Cover", who: "Who you are", growth: "Where you're headed", howwork: "How you work",
+  profile: "Workplace Profile", map: "Program map",
   verdict: "The verdict", target: "Your number", decided: "What we decided",
   compare: "Existing vs proposed", program: "The program", next: "What's next",
 }
@@ -130,9 +132,14 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
     }).catch(() => {})
   }
 
+  // Situational beats — slides that exist only when the story calls for them.
+  const hasGrowthStory = !!result && result.people.departments.some((x) => (x.futureHeadcount ?? x.headcount) !== x.headcount)
+
   const slides = d ? buildSlides() : []
   function buildSlides(): string[] {
-    const out: string[] = ["cover", "who", "profile", "map", "verdict"]
+    const out: string[] = ["cover", "who"]
+    if (hasGrowthStory) out.push("growth")
+    out.push("howwork", "profile", "map", "verdict")
     if (result?.goals?.targetSF) out.push("target")
     if (decisions.length > 0) out.push("decided")
     out.push("compare", "program", "next")
@@ -245,8 +252,10 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
           key={s}
           className={`slide relative ${i === idx ? "flex slide-in" : "hidden"} min-h-screen flex-col print:flex print:min-h-0 print:h-[7.25in] print:overflow-hidden`}
         >
-          {s === "cover" && <CoverSlide clientName={meta.clientName} />}
+          {s === "cover" && <CoverSlide clientName={meta.clientName} d={d} result={result!} />}
           {s === "who" && <WhoSlide d={d} result={result!} />}
+          {s === "growth" && <GrowthSlide result={result!} />}
+          {s === "howwork" && <HowWorkSlide d={d} result={result!} />}
           {s === "profile" && (
             <LightSlide eyebrow="Your Workplace Profile" title="How your organization wants to work">
               <div className="mx-auto grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[1.2fr_1fr]">
@@ -314,7 +323,14 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
 
 /* ── Slides ────────────────────────────────────────────────────────────────── */
 
-function CoverSlide({ clientName }: { clientName: string }) {
+function CoverSlide({ clientName, d, result }: { clientName: string; d: NonNullable<ReturnType<typeof buildDeliverable>>; result: SurveyResult }) {
+  // The cover alone summarizes the engagement (Advisory #5).
+  const oneLiner = [
+    `${d.current} → ${d.future} people`,
+    `~${(Math.round(d.totals.grossUsableSF / 100) * 100).toLocaleString()} SF usable`,
+    `${d.daysInOffice} day${d.daysInOffice === 1 ? "" : "s"}/wk`,
+    ...(result.goals?.targetSF ? [`target ${result.goals.targetSF.toLocaleString()} SF`] : []),
+  ].join(" · ")
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden bg-[#0e1a2e] text-white">
       <Image src="/office-1.jpg" alt="" fill className="object-cover opacity-25" priority />
@@ -324,11 +340,103 @@ function CoverSlide({ clientName }: { clientName: string }) {
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#00badc]">Workplace Program</p>
           <h1 className="mt-4 max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl">{clientName}</h1>
-          <p className="mt-5 text-white/60">
+          <p className="mt-4 text-lg font-medium text-white/80">{oneLiner}</p>
+          <p className="mt-3 text-white/50">
             {new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })} · Prepared by NELSON Worldwide
           </p>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Situational: the growth story — only when headcounts actually move. */
+function GrowthSlide({ result }: { result: SurveyResult }) {
+  const depts = result.people.departments
+  const totalNow = depts.reduce((s, x) => s + x.headcount, 0)
+  const totalFut = depts.reduce((s, x) => s + (x.futureHeadcount ?? x.headcount), 0)
+  const max = Math.max(1, ...depts.map((x) => Math.max(x.headcount, x.futureHeadcount ?? x.headcount)))
+  return (
+    <LightSlide eyebrow="Where you're headed" title={`${totalNow} people today — planning for ${totalFut}`}>
+      <div className="mx-auto w-full max-w-4xl space-y-4">
+        {depts.map((x, i) => {
+          const fut = x.futureHeadcount ?? x.headcount
+          const delta = fut - x.headcount
+          const color = MAP_DEPT_COLORS[i % MAP_DEPT_COLORS.length]
+          return (
+            <div key={x.id} className="flex items-center gap-4">
+              <span className="flex w-40 shrink-0 items-center gap-2 font-semibold text-slate-900">
+                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+                {x.name}
+              </span>
+              <div className="relative h-4 flex-1 rounded-full bg-slate-100">
+                <div className="absolute inset-y-0 left-0 rounded-full opacity-30" style={{ width: `${(x.headcount / max) * 100}%`, backgroundColor: color }} />
+                <div className="absolute inset-y-1 left-0 rounded-full" style={{ width: `${(fut / max) * 100}%`, backgroundColor: color }} />
+              </div>
+              <span className="w-28 shrink-0 text-right text-lg tabular-nums">
+                <span className="text-slate-400">{x.headcount}</span>
+                <span className="mx-1.5 text-slate-300">→</span>
+                <b className="text-slate-900">{fut}</b>
+              </span>
+              <span className={`w-14 shrink-0 text-right text-sm font-bold tabular-nums ${delta > 0 ? "text-emerald-600" : delta < 0 ? "text-amber-600" : "text-slate-300"}`}>
+                {delta === 0 ? "—" : `${delta > 0 ? "+" : ""}${delta}`}
+              </span>
+            </div>
+          )
+        })}
+        <p className="pt-2 text-sm text-slate-500">
+          Every number in this program is sized to the <b className="text-slate-800">{totalFut}-person</b> horizon —
+          the pale band is today, the solid band is what we&apos;re designing for.
+        </p>
+      </div>
+    </LightSlide>
+  )
+}
+
+/** The engine, made visible — why the policy drives the program. */
+function HowWorkSlide({ d, result }: { d: NonNullable<ReturnType<typeof buildDeliverable>>; result: SurveyResult }) {
+  const ws = d.lines.find((l) => l.key === "workstations")
+  const off = d.lines.find((l) => l.key === "offices")
+  const seats = (ws?.proposedCount ?? 0) + (off?.proposedCount ?? 0)
+  const people = d.future
+  const days = d.daysInOffice
+  const sharing = seats < people - result.work.fullyRemote
+  return (
+    <div className="flex flex-1 flex-col justify-center bg-[#0e1a2e] p-10 text-white sm:p-16">
+      <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#00badc]">How you work</p>
+      <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight">
+        {days >= 5 ? "An office-forward team — and a program that honors it."
+          : days >= 4 ? "Four days in — the office is still the center of gravity."
+          : "Hybrid by design — and the math follows the policy."}
+      </h2>
+      <div className="mt-10 grid max-w-3xl gap-6 sm:grid-cols-3">
+        <DarkStat value={`${days}`} label="days/week in office" />
+        <DarkStat value={`${people}`} label={`people at the planning horizon${result.work.fullyRemote ? ` · ${result.work.fullyRemote} fully remote` : ""}`} />
+        <DarkStat value={`${seats}`} label={sharing ? "individual seats — shared by policy" : "individual seats — one per person"} />
+      </div>
+      <div className="mt-10 max-w-2xl rounded-2xl border border-white/15 bg-white/[0.05] p-6">
+        <p className="text-sm leading-relaxed text-white/75">
+          {sharing ? (
+            <>Seat sharing only works when the space gives something back: our planning ratios add{" "}
+            <b className="text-white">more focus booths and huddle space</b> as desk sharing rises (1 booth per 10
+            workstations at ≤3 days, vs 1 per 15 at five) — the program breathes where the desks tighten.</>
+          ) : (
+            <>With everyone anchored in the office, the program plans a seat per person and spends its
+            flexibility on <b className="text-white">meeting variety</b> — the ratios ease on focus booths
+            (1 per {days >= 5 ? 15 : 12} workstations) and invest in conference and collaboration instead.</>
+          )}
+        </p>
+        <p className="mt-3 text-xs text-white/40">The engine behind every number — NELSON planning ratios, tuned by your policy.</p>
+      </div>
+    </div>
+  )
+}
+
+function DarkStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <p className="text-6xl font-bold tabular-nums tracking-tight text-white">{value}</p>
+      <p className="mt-1.5 text-sm leading-snug text-white/55">{label}</p>
     </div>
   )
 }
@@ -342,8 +450,9 @@ function WhoSlide({ d, result }: { d: NonNullable<ReturnType<typeof buildDeliver
         <Stat icon={<TrendingUp className="h-5 w-5" />} value={`${result.people.departments.length}`} label="departments" />
       </div>
       <div className="mx-auto mt-8 flex w-full max-w-5xl flex-wrap gap-2">
-        {result.people.departments.map((dept) => (
-          <span key={dept.id} className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm text-slate-700">
+        {result.people.departments.map((dept, i) => (
+          <span key={dept.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm text-slate-700">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: MAP_DEPT_COLORS[i % MAP_DEPT_COLORS.length] }} />
             {dept.name} · {dept.headcount}{dept.futureHeadcount && dept.futureHeadcount !== dept.headcount ? ` → ${dept.futureHeadcount}` : ""}
           </span>
         ))}
@@ -459,31 +568,48 @@ function DecidedSlide({ decisions }: { decisions: { text: string; note?: string 
 
 function CompareSlide({ d }: { d: NonNullable<ReturnType<typeof buildDeliverable>> }) {
   const max = Math.max(1, ...d.categories.map((c) => Math.max(c.existingSF, c.proposedTotalSF)))
+  const gross = d.totals.grossUsableSF || 1
   return (
     <LightSlide eyebrow="Existing vs proposed" title="Where the space shifts">
-      <div className="mx-auto w-full max-w-5xl space-y-6">
-        {d.categories.map((c) => (
-          <div key={c.name}>
-            <div className="mb-1.5 flex items-baseline justify-between">
-              <span className="font-semibold text-slate-900">{c.name}</span>
-              <span className="text-sm tabular-nums text-slate-500">
-                {c.existingSF.toLocaleString()} SF today → <b className="text-slate-900">{c.proposedTotalSF.toLocaleString()} SF</b> proposed
-              </span>
-            </div>
-            <div className="space-y-1">
-              <div className="h-3 rounded-full bg-slate-100">
-                <div className="h-3 rounded-full bg-slate-300" style={{ width: `${(c.existingSF / max) * 100}%` }} />
-              </div>
-              <div className="h-3 rounded-full bg-slate-100">
-                <div className="h-3 rounded-full bg-[#00badc]" style={{ width: `${(c.proposedTotalSF / max) * 100}%` }} />
-              </div>
-            </div>
-          </div>
-        ))}
-        <div className="flex gap-6 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-slate-300" /> Today</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#00badc]" /> Proposed (incl. circulation)</span>
+      <div className="mx-auto w-full max-w-5xl">
+        {/* the whole program in one band, by use type */}
+        <div className="flex h-5 gap-[2px] overflow-hidden rounded-full">
+          {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
+            <span key={c.name} style={{ width: `${(c.proposedTotalSF / gross) * 100}%`, backgroundColor: CATEGORY_COLORS[c.name].accent }} />
+          ))}
         </div>
+        <div className="mt-8 space-y-5">
+          {d.categories.map((c) => {
+            const delta = c.proposedTotalSF - c.existingSF
+            const cc = CATEGORY_COLORS[c.name]
+            return (
+              <div key={c.name} className="flex items-center gap-5">
+                <span className="flex w-44 shrink-0 items-center gap-2.5 text-lg font-semibold" style={{ color: cc.text }}>
+                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cc.accent }} />
+                  {c.name}
+                </span>
+                <div className="relative h-4 flex-1 rounded-full bg-slate-100">
+                  <div className="h-4 rounded-full" style={{ width: `${(c.proposedTotalSF / max) * 100}%`, backgroundColor: cc.accent }} />
+                  {c.existingSF > 0 && (
+                    <span className="absolute -inset-y-1 w-[3px] rounded-full bg-slate-800" style={{ left: `${Math.min(99.5, (c.existingSF / max) * 100)}%` }} />
+                  )}
+                </div>
+                <span className="w-44 shrink-0 text-right tabular-nums text-slate-500">
+                  {c.existingSF.toLocaleString()} → <b className="text-lg text-slate-900">{c.proposedTotalSF.toLocaleString()}</b>
+                </span>
+                <span className={`w-24 shrink-0 rounded-full px-2.5 py-1 text-center text-sm font-bold tabular-nums ${
+                  delta > 0 ? "bg-emerald-50 text-emerald-700" : delta < 0 ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-400"
+                }`}>
+                  {delta === 0 ? "—" : `${delta > 0 ? "+" : ""}${delta.toLocaleString()}`}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        <p className="mt-8 flex gap-6 text-sm text-slate-500">
+          <span className="flex items-center gap-1.5"><span className="h-4 w-[3px] rounded bg-slate-800" /> today</span>
+          <span>colored bar = proposed, incl. circulation · SF</span>
+        </p>
       </div>
     </LightSlide>
   )
@@ -562,8 +688,11 @@ function CategoryRows({
   if (visible.length === 0) return null
   return (
     <>
-      <tr className="bg-[#00badc]/[0.06]">
-        <td className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#0089a3]" colSpan={5}>{cat.name}</td>
+      <tr style={{ backgroundColor: CATEGORY_COLORS[cat.name].tint }}>
+        <td className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide" style={{ color: CATEGORY_COLORS[cat.name].text }} colSpan={5}>
+          <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: CATEGORY_COLORS[cat.name].accent }} />
+          {cat.name}
+        </td>
       </tr>
       {visible.map((l) => (
         <tr key={l.key}>

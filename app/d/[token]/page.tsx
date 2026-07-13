@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
   ArrowLeft, ArrowRight, Printer, Share2, Undo2, Lock, Users, CalendarDays, TrendingUp, TrendingDown, Target,
-  ClipboardList, Layers, Check, PartyPopper, Maximize2, Minimize2,
+  ClipboardList, Layers, Check, PartyPopper, Maximize2, Minimize2, Home,
 } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { ProgramMapView } from "@/components/survey/program-map"
@@ -360,7 +360,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
           {s === "program" && (
             <ProgramSlide d={d} nelson={nelson} keyed={KEYED} overrides={overrides} onOverride={setOverride} targetSF={result?.goals?.targetSF} />
           )}
-          {s === "next" && <NextSlide d={d} result={result!} clientName={meta.clientName} />}
+          {s === "next" && <NextSlide d={d} result={result!} clientName={meta.clientName} token={token} nelson={nelson} />}
           {/* Print footer — quiet, consistent, the only mark on the page */}
           <div className="absolute bottom-3 left-0 right-0 hidden px-10 print:block">
             <div className="flex items-baseline justify-between text-[8px] uppercase tracking-[0.14em] text-slate-400">
@@ -1001,7 +1001,15 @@ function SizeChips({
   )
 }
 
-function NextSlide({ d, result, clientName }: { d: NonNullable<ReturnType<typeof buildDeliverable>>; result: SurveyResult; clientName: string }) {
+function NextSlide({
+  d, result, clientName, token, nelson,
+}: {
+  d: NonNullable<ReturnType<typeof buildDeliverable>>
+  result: SurveyResult
+  clientName: string
+  token: string
+  nelson: boolean
+}) {
   const completed = [
     { q: "How much space do we need?", a: `${d.totals.grossUsableSF.toLocaleString()} SF usable — every line of it argued from how you actually work.` },
     { q: "How will our business look and feel?", a: "Your teams as neighborhoods, your rhythm in the ratios — the program map is your business, drawn." },
@@ -1012,74 +1020,98 @@ function NextSlide({ d, result, clientName }: { d: NonNullable<ReturnType<typeof
     { title: "We detail every space", desc: "Materials, finishes, the technical set — the program holds; the craft gets added." },
     { title: "You move in", desc: "Day one, ready for you — the whole reason we started.", celebrate: true },
   ]
+  // The command center is home base — NELSON's internal one when presenting,
+  // the client's own when they're walking this alone.
+  const homeHref = nelson ? `/command/${token}` : `/s/${token}`
   return (
-    <div className="relative flex flex-1 flex-col justify-center overflow-hidden bg-[#0e1a2e] p-10 text-white sm:p-16">
+    <div className="relative flex flex-1 flex-col overflow-hidden bg-[#0e1a2e] text-white">
       <Feather src="/office-1.jpg" />
-      <div className="relative z-10 max-w-[64%]">
-      <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#00badc]">Get ready for design</p>
-      <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight">
-        The hard work is done. Now comes the fun part.
-      </h2>
+      <div className="relative z-10 flex flex-1 flex-col justify-center p-10 pb-6 sm:p-16 sm:pb-8">
+        <div className="max-w-[64%]">
+        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#00badc]">Get ready for design</p>
+        <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight">
+          The hard work is done. Now comes the fun part.
+        </h2>
 
-      {/* What's done, greyed to recede; what's next, lit up to foreshadow. */}
-      <div className="mt-8 grid gap-6 sm:grid-cols-2">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/35">What you&apos;ve completed</p>
-          <div className="mt-3 space-y-2.5">
-            {completed.map((c, i) => (
-              <div key={c.q} className="flex gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-                <span className="text-3xl font-black leading-none tabular-nums text-white/15">{i + 1}</span>
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-semibold text-white">
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] text-white/50">✓</span>
-                    {c.q}
-                  </p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-white/60">{c.a}</p>
+        {/* What's done, greyed to recede; what's next, lit up to foreshadow. */}
+        <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/35">What you&apos;ve completed</p>
+            <div className="mt-3 space-y-2.5">
+              {completed.map((c, i) => (
+                <div key={c.q} className="flex gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+                  <span className="text-3xl font-black leading-none tabular-nums text-white/15">{i + 1}</span>
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] text-white/50">✓</span>
+                      {c.q}
+                    </p>
+                    <p className="mt-1.5 text-xs leading-relaxed text-white/60">{c.a}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#00badc]">What&apos;s next</p>
+            <div className="mt-3 space-y-2.5">
+              {upNext.map((n, i) => (
+                <div
+                  key={n.title}
+                  className={`flex gap-3 rounded-2xl border p-4 ${
+                    n.celebrate ? "border-amber-300/40 bg-gradient-to-br from-amber-400/10 to-[#00badc]/10" : "border-[#00badc]/25 bg-[#00badc]/[0.07]"
+                  }`}
+                >
+                  <span className={`text-3xl font-black leading-none tabular-nums ${n.celebrate ? "text-amber-300" : "text-[#00badc]"}`}>
+                    {completed.length + i + 1}
+                  </span>
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                      {n.title}
+                      {n.celebrate && <PartyPopper className="h-4 w-4 shrink-0 text-amber-300" />}
+                    </p>
+                    <p className="mt-1.5 text-xs leading-relaxed text-white/70">{n.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#00badc]">What&apos;s next</p>
-          <div className="mt-3 space-y-2.5">
-            {upNext.map((n, i) => (
-              <div
-                key={n.title}
-                className={`flex gap-3 rounded-2xl border p-4 ${
-                  n.celebrate ? "border-amber-300/40 bg-gradient-to-br from-amber-400/10 to-[#00badc]/10" : "border-[#00badc]/25 bg-[#00badc]/[0.07]"
-                }`}
-              >
-                <span className={`text-3xl font-black leading-none tabular-nums ${n.celebrate ? "text-amber-300" : "text-[#00badc]"}`}>
-                  {completed.length + i + 1}
-                </span>
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-semibold text-white">
-                    {n.title}
-                    {n.celebrate && <PartyPopper className="h-4 w-4 shrink-0 text-amber-300" />}
-                  </p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-white/70">{n.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
-      {/* The whole journey, drawn — you are HERE, and the fun part is next. */}
-      <div className="mt-8">
+      {/* The whole journey, full-bleed — breaks out of the column so the page
+          reads as finished, not trailing off; the way back home rides with it. */}
+      <div className="relative z-10 border-t border-white/10 bg-[#0b1526]/95 px-10 py-6 backdrop-blur-sm sm:px-16">
         <JourneyTimeline />
-        <p className="mt-3 text-xs text-white/40">
+        <p className="mt-3 max-w-4xl text-xs text-white/40">
           The curve is your involvement — highest right now and through design, tapering as construction
           takes over. You&apos;ve just finished the part everything else is built on.
           {result.deferred.length > 0 && (
             <span className="ml-2 text-amber-300/90">{result.deferred.length} deferred item{result.deferred.length === 1 ? "" : "s"} on the session agenda.</span>
           )}
         </p>
-      </div>
-      <p className="mt-8 text-xs uppercase tracking-[0.14em] text-white/30">
-        {clientName} · Workplace Program · NELSON Worldwide
-      </p>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/8 pt-5">
+          <p className="text-xs uppercase tracking-[0.14em] text-white/30">
+            {clientName} · Workplace Program · NELSON Worldwide
+          </p>
+          <div className="flex flex-wrap items-center gap-3 print:hidden">
+            <a
+              href={`/prep/${token}`}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-white/80 transition-colors hover:border-white/30 hover:text-white"
+            >
+              <ClipboardList className="h-4 w-4" /> Prep for the live session
+            </a>
+            <a
+              href={homeHref}
+              className="group inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-lg shadow-[#00badc]/20 transition-all hover:-translate-y-0.5 hover:bg-[#2fd0ee]"
+            >
+              <Home className="h-4 w-4" /> Back to your command center
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   )

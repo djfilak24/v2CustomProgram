@@ -36,7 +36,7 @@ const LAUNCHPAD: { label: string; href: string; note: string }[] = [
   { label: "Workbook guide", href: "/workbook-guide", note: "the send-along PDF" },
   { label: "Program review", href: "/review", note: "validation session view" },
   { label: "Studio", href: "/studio", note: "Canvas v2 preview — engagement workbench" },
-  { label: "Advanced Canvas", href: "/", note: "NELSON-only — Fast-Track inside" },
+  { label: "Advanced Canvas (frozen)", href: "/canvas", note: "NELSON-only — Fast-Track inside" },
 ]
 
 /**

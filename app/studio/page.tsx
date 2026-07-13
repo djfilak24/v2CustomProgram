@@ -348,7 +348,7 @@ export default function StudioPage() {
                         </>
                       )}
                       <MenuLink href="/review">Program review</MenuLink>
-                      <MenuLink href="/">Legacy canvas (frozen)</MenuLink>
+                      <MenuLink href="/canvas">Legacy canvas (frozen)</MenuLink>
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
                           <button

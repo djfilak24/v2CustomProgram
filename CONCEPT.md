@@ -1,132 +1,101 @@
-# Concept Statement
+# Concept Statement — Milestone: Command Center Demo
 
-*Current as of 2026-07-13 · branch `claude/client-experience` · maintained alongside [ROADMAP.md](./ROADMAP.md) and [COUNCIL_ADVISORY.md](./COUNCIL_ADVISORY.md)*
+*July 2026 · branch `milestone/command-center-demo` (working branch
+`claude/client-experience`) · companions: [ROADMAP.md](./ROADMAP.md) ·
+[SCENARIO_SCORECARD.md](./SCENARIO_SCORECARD.md) · [COUNCIL_ADVISORY.md](./COUNCIL_ADVISORY.md)*
 
 ---
 
-## The statement
+## What it is
 
 **A workplace-programming engagement in a link.**
 
-The client receives one URL — a cinematic home page made for them — and three
-low-friction doors to tell us about their organization: an interactive survey
-they can finish on a phone, a workbook they can circulate to department
-leaders, or a live working session with us. Every door feeds the same
-canonical engagement record.
+A client receives one URL — a cinematic home page made for them — and three
+low-friction doors to tell NELSON how their organization works: an
+interactive survey they can start on a phone and finish on a laptop, a
+workbook they can circulate offline, or simply "do it live with us."
+Every door feeds one canonical record.
 
-NELSON receives the other half: a console that watches the intake happen in
-real time, a Studio to review what came in, close the gaps live with the
-client, and shape the program with a designer's hands — and a deliverable
-that is *revealed, not dumped*: a keynote-quality deck and matching PDF that
-we share when the program has been through human judgment, plus a
-fit-planning package that hands the validated program to the floor-plate team.
+NELSON receives the other half: a **Command Center** that fetches any
+engagement in one screen, a **Studio** built for the live working session,
+and a **deliverable that is revealed, not dumped** — a composable 8–12-beat
+presentation pushed only when a designer says it's ready, mirrored by its
+own PDF, backed by a fit-planning Excel handoff.
 
-One promise in each direction. To the client: **telling us about your
-workplace will be the easiest part of your project.** To the designer:
-**every answer they give appears somewhere you can use it — organized so any
-screen is safe to put in front of the client — and it all converges on one
-number: the square footage that fits who they actually are.**
+Everything converges on one number: **the square footage that fits who they
+actually are** — measured, when they have one, against *their* number.
 
-## The engine — the foundation everything amplifies
+## How it works
 
-Underneath every surface is the calculation engine that started in Fast
-Track and powered the original Advanced Canvas
-(`lib/fast-track-calculations.ts`). It is the mastermind; the rest of the
-application exists to feed it better inputs and present its output better.
+1. **Intake, engineered for honesty.** The survey never blocks (skips
+   become the session's agenda, not failures), asks the one number worth
+   asking — *do you already have a footprint in mind?* — as a spotlight
+   moment, autosaves to the engagement so any device resumes, and finishes
+   into encouragement ("above average"), not a dead end. The workbook
+   round-trips through a styled Excel; the live door pings the team and
+   turns the survey into the session's instrument.
 
-What makes its math *workplace design* rather than arithmetic:
+2. **The engine does the math; the survey feeds it evidence.** The
+   calculation engine (born in Fast Track) runs seat-sharing formulas,
+   attendance-peak demand, and planning ratios that flex with the hybrid
+   policy — more focus booths as desks share, more meeting variety when
+   everyone's anchored. The survey replaces industry defaults with the
+   client's real departments, cadence, and named seat assignments.
 
-- **The hybrid policy is the hinge.** A days-per-week policy drives a
-  seat-demand model: an attendance distribution (peak-usage bands — who's
-  in 4–5 days, 3, 2, 1), adjusted for fully-remote headcount, multiplied
-  through the **seat-sharing formula** (desk-share ratios 1.0 / 0.6 / 0.4 /
-  0.2 / 0 by attendance band). Resident vs. unassigned seats fall out of
-  that — not out of headcount.
-- **Collaboration ratios flex with the policy.** Phone rooms run 1:15
-  workstations in a 5-day office but 1:10 at ≤3 days; huddles 1:25 vs 1:15
-  — a denser, shared-desk office needs *more* decompression space.
-- **The full stack is explicit:** category circulation multipliers, the
-  rentable load factor, per-space ratio overrides — and the engine already
-  computes the hybrid vs. full-occupancy delta in USF, RSF, and annual rent.
+3. **The designer applies judgment — visibly.** The Command Center answers
+   the six questions in one screen: what they said · what the system
+   recommends · which door and how completely · the deliverable's state ·
+   is it ready · push it back. The Studio runs the session: gaps flagged
+   and closed with notes, planning dials (circulation, load factor) turned
+   on the record, every deviation derived into a decision log, every
+   survey answer one keystroke away — and the whole session persists.
 
-The chain, stated once: **Fast Track is the engine with sliders. The survey
-is the engine with evidence** — real departments, real cadence, real seat
-assignments replacing industry defaults. **The Studio is the engine with
-judgment** — a designer segmenting, comparing engine ratios against survey
-findings, and auditing the implications live. **The deliverable is the
-engine with a narrative.** If a surface doesn't amplify the engine, it
-doesn't belong in the product.
+4. **The reveal carries the session.** The deck composes itself to the
+   engagement's story (growth slide only when headcounts move; "Your
+   number" only when a target exists; "What we decided together" only when
+   a session happened) and the designer curates from there. Push it, and
+   the client's home page becomes their program's home. Export it, and
+   fit planning gets the persisted truth.
 
-## The target conversation *(the destination — see ROADMAP Phase 0/A)*
+## Why it wins
 
-The engine's output becomes a client's answer only when it meets their
-number. Four questions, answered together:
+- **Telling us about your workplace becomes the easiest part of the
+  project** — three doors, zero blockers, visible payoff, and a prep sheet
+  instead of homework.
+- **Nothing captured goes dark.** The founder's thesis, enforced by
+  structure: there is no question in the intake that doesn't surface on a
+  designer's screen, organized well enough to show a client.
+- **The number has a story.** Not "here's what the math says" but "here's
+  what the ratios say you should be, here's your number, and here's the
+  honest path between them — with every compromise priced and its
+  condition named."
+- **Human-in-the-loop is the product, not a disclaimer.** Every reveal
+  passes through a designer; every session edit is on the record; the
+  deliverable is the meeting's memory, not a report generator's output.
 
-1. **What do you have today?** (existing conditions — captured)
-2. **How are you designing your business to work?** (policy, cadence,
-   culture — captured)
-3. **What *should* your square footage be?** (what the ratios say, given
-   how the team actually works — computed)
-4. **Can we achieve *your* target?** (lease, building, budget — **not yet
-   captured anywhere; the known hole**)
+## The operating principles (standing law)
 
-The product's job is the delta map between #3 and #4, with three honest
-verdicts: *room to spare* · *in line* · *below industry-recognized density
-without the hybrid policy to support it* — and in that last case, the
-compromises that would make it work, spelled out in the engine's own
-levers (days/week, seat sharing, attendance peaks, collab ratios,
-circulation), so the client decides with real data what they will and
-won't trade. Everyone's program depends on their business; our job is to
-make the big deltas visible.
-
-## What it does today, by actor
-
-**The client**
-- Lands on `/s/<token>` — their permanent home page for the engagement:
-  brand-forward, animated, and honest about what happens next.
-- Chooses a door: the survey (`/survey?e=<token>`, mobile-optimized,
-  skip-anything, autosaves), the intake workbook (Excel + guide, returnable
-  by drag-and-drop on the same page), or "do it live" with NELSON.
-- Is never blocked: every question is skippable; skipped questions become
-  gaps we close together, not failures.
-- Finishes to a thank-you that acknowledges receipt and points home. When
-  NELSON flips the share flag, their home page carries the deliverable:
-  an 8-slide program deck (`/d/<token>`) and its print-ready PDF.
-
-**The NELSON strategist**
-- `/engagements` — creates engagements, watches live status (link opened,
-  survey step N of M, workbook downloaded, returned), copies links, flips
-  the deliverable share flag.
-- `/review` — the validation review: verdict hero, detailed responses,
-  program map, printable report.
-- `/studio` — the live-session cockpit: every program line as a working
-  card (qty × unit SF, dimension-bilingual: 36 SF reads 6′ × 6′), category
-  color language, gaps room with resolutions, a decision log derived from
-  deviations rather than typed, every intake answer one keystroke away,
-  named seat assignments, the program map, and three preset views —
-  Workbench, Focus, Briefing (safe to project).
-
-**The fit-planning team**
-- One button in the Studio: the Fit-Planning Package — a styled Excel with
-  Program, Departments, Adjacencies, Existing & size-mix, client's words,
-  session Decisions, and Gaps sheets.
-
-## Operating principles (standing law)
-
-0. **The engine is the foundation.** Every surface exists to amplify it —
-   the survey feeds it evidence, the Studio applies judgment to it, the
-   deliverable narrates it. A feature that doesn't connect to the engine's
-   math is decoration.
-1. **One data contract, many doors.** `SurveyResult` is the product; every
-   intake mode is a door into it, every surface reads from it.
-2. **Nothing captured goes dark.** "There should never be a question asked
-   that doesn't appear somewhere downstream" — the founder's thesis,
-   Advisory #6.
-3. **Never blocked.** Skip anything; skips become gaps; gaps become the
-   agenda of the live session.
-4. **Human-in-the-loop reveal.** The deliverable ships when a designer says
-   so, never automatically on submit.
-5. **SF speaks designer.** Square footage always shows its footprint;
-   ratios always show their reasoning (ratio · survey · today).
-6. **The client never sees the toolbox** — but any panel we do show them is
+0. The engine is the foundation — every surface amplifies it.
+1. One data contract, many doors.
+2. Nothing captured goes dark.
+3. Never blocked — skips become the agenda.
+4. Human-in-the-loop reveal, always.
+5. SF speaks designer (36 SF reads 6′ × 6′; ratios show their reasoning).
+6. The client never sees the toolbox — but any panel we show them is
    presentation-grade.
+
+## The surfaces, at this milestone
+
+| Audience | Surface | Job |
+|---|---|---|
+| Client | `/s/<token>` | their home page — three doors, workbook return, deliverable once pushed |
+| Client | `/survey?e=` | the intake — target spotlight, cross-device resume, auto-submit |
+| Client | `/prep/<token>` | the session prep sheet — gaps with who-can-help |
+| Client | `/d/<token>` | the deliverable — 8–12 composable beats + print PDF, share-gated |
+| NELSON | `/` | **Mission Control** — the demo home; every surface one hop, one-click demo engagement |
+| NELSON | `/engagements` | the console — statuses, links, share |
+| NELSON | `/command/<token>` | the Command Center — one engagement, fetched |
+| NELSON | `/studio` | the Studio — the live-session cockpit |
+| NELSON | `/brief/<token>` | the designer brief — printable, armed |
+| NELSON | `/review` | validation dashboard + program map |
+| NELSON | `/lab` | Phase-0 explorations; `/canvas` — the frozen original |

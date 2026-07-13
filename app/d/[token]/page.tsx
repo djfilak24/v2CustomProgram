@@ -3,8 +3,8 @@
 import { use, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
-  ArrowLeft, ArrowRight, Printer, Share2, Undo2, Lock, Users, CalendarDays, TrendingUp, Target, ClipboardList,
-  Layers, Check, PartyPopper,
+  ArrowLeft, ArrowRight, Printer, Share2, Undo2, Lock, Users, CalendarDays, TrendingUp, TrendingDown, Target,
+  ClipboardList, Layers, Check, PartyPopper, Maximize2, Minimize2,
 } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { ProgramMapView } from "@/components/survey/program-map"
@@ -56,7 +56,20 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
   const [session, setSession] = useState<DeckSession | null>(null)
   const [state, setState] = useState<"loading" | "ready" | "gated" | "missing">("loading")
   const [idx, setIdx] = useState(0)
+  const [fullscreen, setFullscreen] = useState(false)
   const saveTimer = useRef<number | null>(null)
+
+  // Full-screen presenting — the deck the way it's meant to be walked, chrome
+  // stripped to just the browser's own full-screen frame.
+  useEffect(() => {
+    const onChange = () => setFullscreen(!!document.fullscreenElement)
+    document.addEventListener("fullscreenchange", onChange)
+    return () => document.removeEventListener("fullscreenchange", onChange)
+  }, [])
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    else document.documentElement.requestFullscreen?.().catch(() => {})
+  }
 
   useEffect(() => {
     const isN = isNelsonMode()
@@ -243,6 +256,24 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
         className="pointer-events-none fixed left-0 top-0 z-[60] -ml-4 -mt-4 h-8 w-8 rounded-full bg-[#00badc]/45 opacity-0 blur-md transition-opacity duration-300 print:hidden"
         style={{ willChange: "transform" }}
       />
+
+      {/* The deck's own header — the mark stays visible past the cover (which
+          carries its own larger lockup), for client and NELSON alike;
+          full-screen is one click from anywhere. */}
+      {slides[idx] !== "cover" && (
+        <div data-no-advance className="fixed left-4 top-4 z-40 print:hidden">
+          <Image src="/NELSON_whiteBlueFin.png" alt="NELSON" width={130} height={31} className="h-6 w-auto opacity-90" />
+        </div>
+      )}
+      <button
+        data-no-advance
+        onClick={toggleFullscreen}
+        title={fullscreen ? "Exit full screen" : "Present full screen"}
+        className="fixed right-4 top-4 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-[#0e1a2e]/90 text-white/70 shadow-lg backdrop-blur transition-colors hover:text-white print:hidden"
+      >
+        {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+      </button>
+
       {/* NELSON presenter toolbar */}
       {nelson && (
         <div data-no-advance className="fixed left-1/2 top-3 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-[#0e1a2e]/90 px-3 py-1.5 text-xs text-white/80 shadow-lg backdrop-blur print:hidden">
@@ -676,9 +707,35 @@ function DecidedSlide({ decisions }: { decisions: { text: string; note?: string 
 function CompareSlide({ d }: { d: NonNullable<ReturnType<typeof buildDeliverable>> }) {
   const max = Math.max(1, ...d.categories.map((c) => Math.max(c.existingSF, c.proposedTotalSF)))
   const gross = d.totals.grossUsableSF || 1
+  const totalDelta = d.totals.grossUsableSF - d.totals.existingSF
+  const growing = totalDelta >= 0
+  const pctDelta = d.totals.existingSF > 0 ? Math.round((totalDelta / d.totals.existingSF) * 100) : null
   return (
     <LightSlide eyebrow="Existing vs proposed" title="Where the space shifts">
       <div className="mx-auto w-full max-w-5xl">
+        {/* The headline delta — growing or optimizing, both read as a win: more
+            space to match more people, or the same team in a smarter footprint. */}
+        {d.totals.existingSF > 0 && (
+          <div className="mb-8 flex items-center gap-5 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+              {growing ? <TrendingUp className="h-7 w-7" /> : <TrendingDown className="h-7 w-7" />}
+            </span>
+            <div>
+              <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                <span className="text-3xl font-bold tabular-nums tracking-tight text-emerald-700">
+                  {totalDelta >= 0 ? "+" : ""}{totalDelta.toLocaleString()} SF
+                </span>
+                {pctDelta !== null && (
+                  <span className="text-sm font-semibold text-emerald-600">
+                    ({pctDelta >= 0 ? "+" : ""}{pctDelta}%)
+                  </span>
+                )}
+                <span className="text-lg font-bold text-slate-900">· {d.strategy.headline}</span>
+              </p>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">{d.strategy.note}</p>
+            </div>
+          </div>
+        )}
         {/* the whole program in one band, by use type */}
         <div className="flex h-5 gap-[2px] overflow-hidden rounded-full">
           {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
@@ -704,9 +761,10 @@ function CompareSlide({ d }: { d: NonNullable<ReturnType<typeof buildDeliverable
                 <span className="w-44 shrink-0 text-right tabular-nums text-slate-500">
                   {c.existingSF.toLocaleString()} → <b className="text-lg text-slate-900">{c.proposedTotalSF.toLocaleString()}</b>
                 </span>
-                <span className={`w-24 shrink-0 rounded-full px-2.5 py-1 text-center text-sm font-bold tabular-nums ${
-                  delta > 0 ? "bg-emerald-50 text-emerald-700" : delta < 0 ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-400"
+                <span className={`flex w-28 shrink-0 items-center justify-center gap-1 rounded-full px-2.5 py-1 text-center text-sm font-bold tabular-nums ${
+                  delta === 0 ? "bg-slate-100 text-slate-400" : "bg-emerald-50 text-emerald-700"
                 }`}>
+                  {delta !== 0 && (delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />)}
                   {delta === 0 ? "—" : `${delta > 0 ? "+" : ""}${delta.toLocaleString()}`}
                 </span>
               </div>

@@ -143,3 +143,20 @@ and the **engagement event log** (CC-1's data layer).
 **Next iteration:** CC-1 (the Command Center as a real surface, consuming the
 event log) + CC-6 (a real do-it-live lane) re-scores S4 and S5; then B5/B6
 (resume + email) re-scores S1–S3. The loop continues until S5 scores with S1.
+
+---
+
+# Iteration 2 — re-score (2026-07-13)
+
+Founder's note actioned (the target question is now an isolated dark
+spotlight card on the goals step), then the two failing journeys attacked:
+**the Command Center is a real surface** (`/command/<token>`, linked from
+every console row) and **"do it live" is a lane, not a dead end**.
+
+| Scenario | Was | Now | What moved |
+|---|---|---|---|
+| S4 "Do it live" | 5.5 | **7.2** | The door acts (pings + acknowledges), the console flags it ("Wants it live — schedule the session"), and the Command Center's empty state runs the play: survey-as-live-instrument + from-zero screen kit. Still docked: no scheduling itself, no notification (B6). |
+| S5 Designer loop | 7.6 | **8.3** | One fetch surface: journey timeline from the event log, session-aware program with edits-applied chip, target acknowledged, gap-drafted agenda, prep pack, screen kit, review → push gate. Still docked: designer-brief printable, program-map present mode (G10), beat composer (CC-3). |
+
+**Next:** B5/B6 (cross-device resume + the email loop) re-scores S1–S4's
+remaining docks; CC-3 (beat composer) and G10 (map present mode) finish S5.

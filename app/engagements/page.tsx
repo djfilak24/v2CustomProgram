@@ -91,6 +91,9 @@ export default function EngagementsPage() {
     const e = await res.json()
     if (!e.result) { setApiError("No result submitted yet"); return }
     saveSurveySeed(e.result)
+    // The review knows it's a client session — no demo chrome, direct paths
+    // into the Command Center and Studio.
+    try { localStorage.setItem("nelson:seedSource", token) } catch { /* fine */ }
     window.location.href = "/review"
   }
 

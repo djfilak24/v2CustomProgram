@@ -250,7 +250,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
       {slides.map((s, i) => (
         <section
           key={s}
-          className={`slide relative ${i === idx ? "flex slide-in" : "hidden"} min-h-screen flex-col print:flex print:min-h-0 print:h-[7.25in] print:overflow-hidden`}
+          className={`slide relative ${i === idx ? "flex slide-in" : "hidden"} min-h-screen flex-col print:flex print:min-h-0 print:h-[7.5in] print:w-[13.333in] print:overflow-hidden`}
         >
           {s === "cover" && <CoverSlide clientName={meta.clientName} d={d} result={result!} />}
           {s === "who" && <WhoSlide d={d} result={result!} />}
@@ -284,9 +284,12 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
             <ProgramSlide d={d} nelson={nelson} keyed={KEYED} overrides={overrides} onOverride={setOverride} />
           )}
           {s === "next" && <NextSlide d={d} result={result!} />}
-          {/* Print footer — the take-home is paginated like a document */}
-          <div className="absolute bottom-2 left-0 right-0 hidden text-center text-[9px] tracking-wide text-slate-400 print:block">
-            {meta.clientName} · Workplace Program · NELSON · {i + 1} / {slides.length}
+          {/* Print footer — quiet, consistent, the only mark on the page */}
+          <div className="absolute bottom-3 left-0 right-0 hidden px-10 print:block">
+            <div className="flex items-baseline justify-between text-[8px] uppercase tracking-[0.14em] text-slate-400">
+              <span>{meta.clientName} · Workplace Program</span>
+              <span>NELSON Worldwide · printed {new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · {i + 1} / {slides.length}</span>
+            </div>
           </div>
         </section>
       ))}
@@ -311,8 +314,14 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
       </div>
 
       <style>{`
-        @page { size: letter landscape; margin: 0.4in; }
-        @media print { .slide { break-after: page; } }
+        /* The take-home PDF is a true 16:9 deck — full bleed, zero browser
+           chrome (margin: 0 removes the default header/footer marks), each
+           slide exactly one page in the same fonts the screen uses. */
+        @page { size: 13.333in 7.5in; margin: 0; }
+        @media print {
+          html, body { margin: 0 !important; padding: 0 !important; }
+          .slide { break-after: page; break-inside: avoid; }
+        }
         .slide-in { animation: slideIn 260ms ease-out; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         @media (prefers-reduced-motion: reduce) { .slide-in { animation: none; } }
@@ -755,34 +764,38 @@ function SizeChips({
 
 function NextSlide({ d, result }: { d: NonNullable<ReturnType<typeof buildDeliverable>>; result: SurveyResult }) {
   return (
-    <LightSlide eyebrow="What's next" title="From program to plan">
-      <div className="mx-auto w-full max-w-4xl">
-        <ol className="space-y-5">
-          {[
-            ["Validate together", "Your working session — every number in this document walked live, every open question decided in the room."],
-            ["Refine the program", "Adjustments from the session flow straight back into this document."],
-            ["Hand off to fit planning", "The validated program goes to NELSON's fit-planning team to test on real floor plates."],
-          ].map(([t, b], i) => (
-            <li key={t} className="flex gap-4">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0e1a2e] font-bold text-white">{i + 1}</span>
-              <span>
-                <span className="block text-lg font-semibold text-slate-900">{t}</span>
-                <span className="text-slate-600">{b}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-        {result.deferred.length > 0 && (
-          <p className="mt-8 rounded-xl border border-amber-400/40 bg-amber-50 px-4 py-3 text-sm text-slate-600">
-            <b className="text-slate-900">{result.deferred.length} question{result.deferred.length === 1 ? "" : "s"}</b> you
-            deferred to the live session — they&apos;re on the agenda.
-          </p>
-        )}
-        <p className="mt-10 text-sm text-slate-400">
-          {d.clientName} · Workplace Program · NELSON Worldwide
-        </p>
+    <div className="flex flex-1 flex-col justify-center bg-[#0e1a2e] p-10 text-white sm:p-16">
+      <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#00badc]">Get ready for design</p>
+      <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight">
+        The hard work is done. Now comes the fun part.
+      </h2>
+      {/* Their three questions — answered, checked off */}
+      <div className="mt-8 grid max-w-4xl gap-4 sm:grid-cols-3">
+        {[
+          ["How much space do we need?", `${d.totals.grossUsableSF.toLocaleString()} SF usable — every line of it argued from how you actually work.`],
+          ["How will our business look and feel?", "Your teams as neighborhoods, your rhythm in the ratios — the program map is your business, drawn."],
+          ["What will we experience differently?", "More of what you asked for, by name — it's all in the program, sized and counted."],
+        ].map(([q, a]) => (
+          <div key={q} className="rounded-2xl border border-white/12 bg-white/[0.05] p-5">
+            <p className="flex items-start gap-2 font-semibold text-white">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300">✓</span>
+              {q}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-white/60">{a}</p>
+          </div>
+        ))}
       </div>
-    </LightSlide>
+      <div className="mt-8 flex max-w-4xl flex-wrap items-center gap-x-8 gap-y-2 text-sm text-white/60">
+        <span><b className="text-white">Next:</b> fit planning tests this program on real floor plates</span>
+        <span>then design begins — on a foundation you built</span>
+        {result.deferred.length > 0 && (
+          <span className="text-amber-300/90">{result.deferred.length} deferred item{result.deferred.length === 1 ? "" : "s"} on the session agenda</span>
+        )}
+      </div>
+      <p className="mt-10 text-xs uppercase tracking-[0.14em] text-white/30">
+        {d.clientName} · Workplace Program · NELSON Worldwide
+      </p>
+    </div>
   )
 }
 

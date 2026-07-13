@@ -293,6 +293,7 @@ export function Summary({
                 // draft is done its job — clear it so the next visit starts clean.
                 saveSurveySeed(buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" }))
                 clearSurveyDraft()
+                try { localStorage.removeItem("nelson:seedSource") } catch { /* fine */ }
                 window.location.href = "/review"
               }}
               className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"

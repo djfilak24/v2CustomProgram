@@ -8,6 +8,7 @@
 import * as XLSX from "xlsx-js-style"
 import type { SurveyResult } from "./types"
 import type { Deliverable } from "./deliverable"
+import { GOAL_MOTIVATORS, SPACE_POSTURES } from "./sections"
 
 const NAVY = "0E1A2E"
 const CYAN_DARK = "0089A3"
@@ -46,6 +47,42 @@ export interface FitPlanningExtras {
 export function buildFitPlanningWorkbook(result: SurveyResult, d: Deliverable, extras?: FitPlanningExtras): XLSX.WorkBook {
   const wb = XLSX.utils.book_new()
   const deptName = (id: string) => result.people.departments.find((x) => x.id === id)?.name ?? id
+
+  // ── Engagement — the full circle, first ────────────────────────────────────
+  // The fit-planning team reads this before any numbers: who the client is,
+  // what they care about, what the session decided, how to fit-plan them.
+  const optLabel = (opts: { id: string; label: string }[], id?: string | null) =>
+    id ? opts.find((o) => o.id === id)?.label ?? id : undefined
+  const words = result.qualitative
+  const target = result.goals?.targetSF
+  const engRows: Cell[][] = [
+    [title(`The engagement — ${d.clientName}`)],
+    [],
+    [section("Who this client is")],
+    [cell("People"), cell(`${d.current} today → ${d.future} at the planning horizon`)],
+    [cell("Rhythm"), cell(`${d.daysInOffice} days/week in office · ${result.work.fullyRemote} fully remote`)],
+    [cell("Drivers"), cell((result.goals?.motivators ?? []).map((m) => optLabel(GOAL_MOTIVATORS, m)).join(" · ") || "—")],
+    [cell("Space posture"), cell(optLabel(SPACE_POSTURES, result.goals?.posture) ?? "—")],
+    [cell("Their number"), cell(target
+      ? `${target.toLocaleString()} SF (${result.goals?.targetSource ?? "target"}) — program runs ${d.totals.grossUsableSF - target >= 0 ? "+" : ""}${(d.totals.grossUsableSF - target).toLocaleString()} SF against it`
+      : "no target captured — worth asking")],
+    [],
+    [section("What they care about — their words")],
+    ...([["What's working", words.loves], ["Pain points", words.painPoints], ["Imbalances", words.imbalances], ["Wishlist", result.special.wishlist]] as const)
+      .filter(([, v]) => !!v)
+      .map(([k, v]) => [cell(k), cell(v as string)]),
+    [],
+    [section("The session so far")],
+    [cell("Decisions on the record"), cell(extras?.decisions?.length ?? 0)],
+    [cell("Gaps"), cell(`${(extras?.gaps ?? []).filter((g) => g.resolved).length} closed · ${(extras?.gaps ?? []).filter((g) => !g.resolved).length} open`)],
+    [cell("Load factor in effect"), cell(`×${(1 + d.totals.rentableFactor).toFixed(2)} (circulation per category on the Program sheet)`)],
+    [],
+    [section("How to fit-plan them")],
+    [cell("Adjacencies"), cell((result.work.adjacencyPairs ?? []).map((p, i) => `${i + 1}. ${deptName(p.a)} ↔ ${deptName(p.b)}`).join("   ") || "none ranked — ask")],
+    [cell("Office placement"), cell(result.spaces.officePlacement ?? "not specified — ask")],
+    [cell("The one-liner"), cell(`${d.future} people · ${d.totals.grossUsableSF.toLocaleString()} SF usable · ${d.totals.sfPerPerson} SF/person${target ? ` · hold the line at ${target.toLocaleString()} SF` : ""}`)],
+  ]
+  XLSX.utils.book_append_sheet(wb, sheet(engRows, [24, 96]), "Engagement")
 
   // ── Program ────────────────────────────────────────────────────────────────
   const prog: Cell[][] = [

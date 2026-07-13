@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
-  Monitor, KeyRound, FileSpreadsheet, RefreshCw, Undo2, Search, ExternalLink, Eye, Copy, Trash2,
+  Monitor, KeyRound, FileSpreadsheet, RefreshCw, Undo2, Redo2, Search, ExternalLink, Eye, Copy, Trash2,
   Crown, AlertTriangle, ClipboardList, Users, LayoutGrid, Table2, Presentation, CheckCircle2, X,
   Map as MapIcon, Settings2,
 } from "lucide-react"
@@ -59,6 +59,49 @@ export default function StudioPage() {
   // Display toggles (the old canvas's show/hide dials, reborn in settings)
   const [showDeptChips, setShowDeptChips] = useState(true)
   const [showRatios, setShowRatios] = useState(true)
+  /** Workbench detail layers: full = every connected data point; compact = the numbers. */
+  const [compactCards, setCompactCards] = useState(false)
+  /** Per-category card ↔ table pivot in the Workbench. */
+  const [tableCats, setTableCats] = useState<Record<string, boolean>>({})
+
+  // ── Undo / redo — the session's working state, time-travelable ────────────
+  type Snap = {
+    overrides: DeliverableOverrides; counts: Record<string, number>; additions: DeliverableAddition[]
+    notes: Record<string, string>; resolvedGaps: Record<string, boolean>; factors: DeliverableFactors
+  }
+  const history = useRef<{ past: Snap[]; future: Snap[]; skip: boolean }>({ past: [], future: [], skip: false })
+  const [histVer, setHistVer] = useState(0) // re-render hook for disabled states
+  useEffect(() => {
+    const h = history.current
+    if (h.skip) { h.skip = false; return }
+    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors }
+    const last = h.past[h.past.length - 1]
+    if (last && JSON.stringify(last) === JSON.stringify(snap)) return
+    h.past.push(snap)
+    if (h.past.length > 60) h.past.shift()
+    h.future = []
+    setHistVer((v) => v + 1)
+  }, [overrides, counts, additions, notes, resolvedGaps, factors])
+  const applySnap = (s: Snap) => {
+    history.current.skip = true
+    setOverrides(s.overrides); setCounts(s.counts); setAdditions(s.additions)
+    setNotes(s.notes); setResolvedGaps(s.resolvedGaps); setFactors(s.factors)
+    setHistVer((v) => v + 1)
+  }
+  const undo = () => {
+    const h = history.current
+    if (h.past.length < 2) return
+    h.future.push(h.past.pop()!)
+    applySnap(h.past[h.past.length - 1])
+  }
+  const redo = () => {
+    const h = history.current
+    const nxt = h.future.pop()
+    if (!nxt) return
+    h.past.push(nxt)
+    applySnap(nxt)
+  }
+  void histVer
 
   useEffect(() => { setNelson(isNelsonMode()) }, [])
 
@@ -84,6 +127,7 @@ export default function StudioPage() {
   useEffect(() => {
     if (!nelson) return
     sessionToken.current = null
+    history.current = { past: [], future: [], skip: false }
     setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({})
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
@@ -267,6 +311,22 @@ export default function StudioPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {!briefing && (
+                <span className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                  <button
+                    onClick={undo} disabled={history.current.past.length < 2} title="Undo (session edit)"
+                    className="flex h-6 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-slate-900 disabled:opacity-30"
+                  >
+                    <Undo2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={redo} disabled={history.current.future.length === 0} title="Redo"
+                    className="flex h-6 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-slate-900 disabled:opacity-30"
+                  >
+                    <Redo2 className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              )}
               <DrawerBtn active={showMap} onClick={() => setShowMap(!showMap)} icon={<MapIcon className="h-3.5 w-3.5" />}>
                 Map
               </DrawerBtn>
@@ -330,6 +390,7 @@ export default function StudioPage() {
                       <p className="px-2 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Display</p>
                       <MenuToggle on={showDeptChips} onClick={() => setShowDeptChips((v) => !v)}>Department chips</MenuToggle>
                       <MenuToggle on={showRatios} onClick={() => setShowRatios((v) => !v)}>Ratio · survey · today</MenuToggle>
+                      <MenuToggle on={compactCards} onClick={() => setCompactCards((v) => !v)}>Compact cards</MenuToggle>
                       <p className="mt-2 border-t border-slate-100 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Planning dials — logged as decisions</p>
                       <Dial label="Circulation · individual" pct value={factors.circIndividual ?? DEFAULT_FACTORS.circIndividual}
                         onChange={(v) => setFactors((p) => ({ ...p, circIndividual: v }))} />
@@ -369,7 +430,9 @@ export default function StudioPage() {
         {!d || !result ? (
           <p className="p-16 text-center text-slate-400"><RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />Loading program…</p>
         ) : (
-          <main className={`mx-auto grid max-w-[1900px] gap-6 px-6 py-6 ${drawer && !briefing ? "grid-cols-[280px_minmax(0,1fr)_360px]" : "grid-cols-[280px_minmax(0,1fr)]"}`}>
+          <main className={`mx-auto grid max-w-[1900px] gap-6 px-6 py-6 ${
+            briefing ? "grid-cols-[360px_minmax(0,1fr)]" : drawer ? "grid-cols-[280px_minmax(0,1fr)_360px]" : "grid-cols-[280px_minmax(0,1fr)]"
+          }`}>
             {/* ── Left rail: ONE hero number, everything else subordinate ───── */}
             <aside className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -407,6 +470,20 @@ export default function StudioPage() {
                   )}
                 </div>
               </div>
+              {/* Briefing: the session's story rides the summary column */}
+              {briefing && decisions.length > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Decided together, today</h3>
+                  <div className="mt-3 space-y-2">
+                    {decisions.slice(0, 5).map((x) => (
+                      <p key={x.id} className="flex gap-2 text-[13px] leading-snug text-slate-700">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" /> {x.text}
+                      </p>
+                    ))}
+                    {decisions.length > 5 && <p className="text-xs text-slate-400">+ {decisions.length - 5} more on the record</p>}
+                  </div>
+                </div>
+              )}
               {/* Space allocation — the category color key IS the chart */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Space allocation</h3>
@@ -476,7 +553,9 @@ export default function StudioPage() {
                 </div>
               )}
               <div className="mb-4 flex items-center justify-between gap-4">
-                <h2 className="text-xl font-bold tracking-tight">Spaces</h2>
+                <h2 className={briefing ? "text-2xl font-bold tracking-tight" : "text-xl font-bold tracking-tight"}>
+                  {briefing ? "Your program" : "Spaces"}
+                </h2>
                 {!briefing && (
                   <div className="flex items-center gap-4">
                     <span className="flex items-center gap-3 text-[11px] text-slate-400">
@@ -504,6 +583,7 @@ export default function StudioPage() {
                   )
                   if (!visible.length) return null
                   const cc = CATEGORY_COLORS[cat.name]
+                  const asTable = !briefing && !!tableCats[cat.name]
                   return (
                     <div key={cat.name} className="mb-8">
                       <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: cc.text }}>
@@ -512,12 +592,34 @@ export default function StudioPage() {
                         <span className="ml-1 font-medium normal-case tracking-normal text-slate-400">
                           {cat.proposedTotalSF.toLocaleString()} SF incl. circulation
                         </span>
+                        {!briefing && (
+                          <button
+                            onClick={() => setTableCats((p) => ({ ...p, [cat.name]: !asTable }))}
+                            title={asTable ? "Back to cards" : "Pivot this category to a table"}
+                            className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          >
+                            {asTable ? <LayoutGrid className="h-3.5 w-3.5" /> : <Table2 className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
                       </h3>
+                      {asTable ? (
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                          <table className="w-full text-sm">
+                            <tbody className="divide-y divide-slate-100 tabular-nums">
+                              <FocusRows
+                                name={cat.name} colors={cc} circ={cat.circulationSF} lines={visible}
+                                baseOf={baseOf} onSf={(k, n) => setSf(k, n)} onQty={(k, n) => setQty(k, n)} showRatios={showRatios}
+                              />
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
                       <div className={`grid gap-3.5 ${briefing ? "xl:grid-cols-2 2xl:grid-cols-3" : "xl:grid-cols-2 2xl:grid-cols-3"}`}>
                         {visible.map((l) => (
                           <SpaceCard
                             key={l.key} line={l} base={baseOf(l.key)} result={result} briefing={briefing}
-                            colors={cc} showChips={showDeptChips} showRatios={showRatios}
+                            colors={cc} showChips={showDeptChips && !compactCards} showRatios={showRatios && !compactCards}
+                            compact={compactCards}
                             people={l.key === "offices" ? seats.offices : l.key === "workstations" ? seats.desks : undefined}
                             onQty={(n) => setQty(l.key, n)}
                             onSf={(n) => setSf(l.key, n)}
@@ -528,6 +630,7 @@ export default function StudioPage() {
                           />
                         ))}
                       </div>
+                      )}
                     </div>
                   )
                 })
@@ -672,7 +775,7 @@ function dims(sf: number): string | null {
 /* ── The card ──────────────────────────────────────────────────────────── */
 
 function SpaceCard({
-  line, base, result, briefing, colors, showChips, showRatios, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename,
+  line, base, result, briefing, colors, showChips, showRatios, compact, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename,
 }: {
   line: ComparisonLine
   base?: ComparisonLine
@@ -681,6 +784,8 @@ function SpaceCard({
   colors: { accent: string; text: string; tint: string }
   showChips: boolean
   showRatios: boolean
+  /** Compact layer: just the name and the numbers — the fast read. */
+  compact?: boolean
   /** Named seat assignments (offices/workstations only) — who actually sits here. */
   people?: SeatGroup[]
   onQty: (n: number) => void
@@ -788,7 +893,7 @@ function SpaceCard({
                 />
               </span>
             </label>
-            {dims(line.unitSF) && <span className="text-[11px] font-medium text-[#0089a3]">{dims(line.unitSF)}</span>}
+            {!compact && dims(line.unitSF) && <span className="text-[11px] font-medium text-[#0089a3]">{dims(line.unitSF)}</span>}
           </>
         )}
         <span className="ml-auto text-sm font-bold tabular-nums text-slate-900">
@@ -807,7 +912,7 @@ function SpaceCard({
       )}
 
       {/* Who gets these seats — names by the survey's seating hierarchy */}
-      {who && !briefing && hasPeople && (
+      {who && !briefing && !compact && hasPeople && (
         <div className="space-y-1 border-t border-slate-100 px-4 py-2.5">
           {people!.map((p) => (
             <p key={p.dept} className="text-[11px] leading-relaxed text-slate-600">

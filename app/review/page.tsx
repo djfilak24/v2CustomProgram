@@ -11,7 +11,7 @@ import {
   buildComparison, defaultCompInputs, lineSF, lineGaps, spaceStrategy,
   type Comparison, type CompCategory, type CompInputs,
 } from "@/lib/survey/comparison"
-import { CATEGORY_COLORS } from "@/lib/survey/deliverable"
+import { CATEGORY_COLORS, DEFAULT_FACTORS } from "@/lib/survey/deliverable"
 import { DEMO_SCENARIOS, demoResult } from "@/lib/survey/demo-scenarios"
 import {
   surveyStateFromResult, computeProfile, SURVEY_STEPS,
@@ -48,14 +48,28 @@ export default function ReviewPage() {
   const [showGaps, setShowGaps] = useState(true)
   // Presenter chrome (demo chips, canvas wrench) is NELSON-only.
   const [nelson, setNelson] = useState(false)
+  // A real client session (opened from the console/command center) shows NO
+  // demo chrome — a designer mid-engagement never sees override buttons.
+  const [seedToken, setSeedToken] = useState<string | null>(null)
   useEffect(() => { setNelson(isNelsonMode()) }, [])
 
-  const load = (r: SurveyResult) => { setResult(r); setInputs(defaultCompInputs(r)); setCounts({}); setSizes({}) }
+  const load = (r: SurveyResult) => {
+    setResult(r); setInputs(defaultCompInputs(r)); setCounts({}); setSizes({})
+    // Switching to a demo leaves client-session mode explicitly.
+    try { localStorage.removeItem("nelson:seedSource") } catch { /* fine */ }
+    setSeedToken(null)
+  }
 
   useEffect(() => {
     const key = new URLSearchParams(window.location.search).get("demo")
-    if (key && DEMO_SCENARIOS[key]) load(demoResult(key) ?? DEMO_SCENARIOS[key].result)
-    else load(loadSurveySeed() ?? demoResult("tech") ?? DEMO_SCENARIOS.tech.result)
+    if (key && DEMO_SCENARIOS[key]) { load(demoResult(key) ?? DEMO_SCENARIOS[key].result); return }
+    const seed = loadSurveySeed()
+    if (seed) {
+      setResult(seed); setInputs(defaultCompInputs(seed)); setCounts({}); setSizes({})
+      try { setSeedToken(localStorage.getItem("nelson:seedSource")) } catch { /* fine */ }
+      return
+    }
+    load(demoResult("tech") ?? DEMO_SCENARIOS.tech.result)
   }, [])
 
   const comp = useMemo<Comparison | null>(
@@ -83,20 +97,25 @@ export default function ReviewPage() {
     (a, b) => Math.abs((b.proposedCount - b.existingCount) * b.unitSF) - Math.abs((a.proposedCount - a.existingCount) * a.unitSF),
   )
   const existingTotal = comp.lines.reduce((s, l) => s + lineSF(l, l.existingCount), 0)
-  const proposedTotal = comp.lines.reduce((s, l) => s + propCount(l.key, l.proposedCount) * unitSF(l.key, l.unitSF), 0)
-  const strategy = spaceStrategy(existingTotal, proposedTotal, result.goals)
-  const gapCount = comp.lines.reduce((s, l) => s + lineGaps(l).length, 0)
-
+  // ONE math, everywhere: the review speaks the same number as the deck and
+  // the Studio — gross usable (net + category circulation). A net figure here
+  // once read 5,700 SF apart from the deliverable for the same program.
+  const circFor = (cat: CompCategory) =>
+    cat === "Support" ? DEFAULT_FACTORS.circSupport : cat === "Collaboration" ? DEFAULT_FACTORS.circCollab : DEFAULT_FACTORS.circIndividual
   const catTotals = CATS.map((cat) => {
     const ls = comp.lines.filter((l) => l.category === cat)
+    const net = ls.reduce((s, l) => s + propCount(l.key, l.proposedCount) * unitSF(l.key, l.unitSF), 0)
     return {
       cat,
       existing: ls.reduce((s, l) => s + lineSF(l, l.existingCount), 0),
-      proposed: ls.reduce((s, l) => s + propCount(l.key, l.proposedCount) * unitSF(l.key, l.unitSF), 0),
+      proposed: net + Math.round(net * circFor(cat)),
     }
   })
+  const proposedTotal = catTotals.reduce((s, c) => s + c.proposed, 0)
+  const strategy = spaceStrategy(existingTotal, proposedTotal, result.goals)
+  const gapCount = comp.lines.reduce((s, l) => s + lineGaps(l).length, 0)
 
-  const openCanvas = () => { if (result) saveSurveySeed(result); window.location.href = "/" }
+  const openCanvas = () => { if (result) saveSurveySeed(result); window.location.href = "/canvas" }
 
   const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -120,7 +139,8 @@ export default function ReviewPage() {
             <span className="hidden text-sm font-medium text-slate-600 sm:inline">{comp.clientName}</span>
           </div>
           <div className="flex items-center gap-2">
-            {nelson && (<>
+            {/* Demo chrome only when this is NOT a real client session. */}
+            {nelson && !seedToken && (<>
             <span className="mr-1 text-[11px] uppercase tracking-wide text-slate-400">Demo</span>
             {Object.entries(DEMO_SCENARIOS).map(([key, s]) => (
               <button key={key} type="button" onClick={() => load(demoResult(key) ?? s.result)} title={s.blurb}
@@ -129,29 +149,52 @@ export default function ReviewPage() {
               </button>
             ))}
             </>)}
-            {/* The leave-behinds — branded print report + the two workbooks */}
+            {seedToken && (
+              <>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  Client session
+                </span>
+                <a
+                  href={`/command/${seedToken}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-400"
+                >
+                  Command Center
+                </a>
+              </>
+            )}
+            {nelson && (
+              <a
+                href="/studio"
+                title="The Studio — where the live session happens"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0e1a2e] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
+              >
+                Studio
+              </a>
+            )}
+            {/* The leave-behinds — named for what they are */}
             <button
               type="button"
               onClick={() => window.print()}
+              title="A branded, paginated report of this review — print or save as PDF"
               className="ml-2 inline-flex items-center gap-1.5 rounded-lg border border-[#00badc]/45 bg-[#00badc]/10 px-3 py-1.5 text-xs font-semibold text-slate-900 transition-colors hover:bg-[#00badc]/20"
             >
-              <FileDown className="h-3.5 w-3.5 text-[#0089a3]" /> PDF
+              <FileDown className="h-3.5 w-3.5 text-[#0089a3]" /> Print report
             </button>
             <button
               type="button"
               onClick={() => exportProgramXlsx(result, comp, lines, { existing: existingTotal, proposed: proposedTotal })}
-              title="The program as a spreadsheet — every space, existing vs proposed"
+              title="The PROGRAM as a spreadsheet — every space sized, existing vs proposed. Send after the session."
               className="inline-flex items-center gap-1.5 rounded-lg border border-[#00badc]/45 bg-[#00badc]/10 px-3 py-1.5 text-xs font-semibold text-slate-900 transition-colors hover:bg-[#00badc]/20"
             >
-              <FileDown className="h-3.5 w-3.5 text-[#0089a3]" /> Excel
+              <FileDown className="h-3.5 w-3.5 text-[#0089a3]" /> Program (Excel)
             </button>
             <button
               type="button"
               onClick={() => exportIntakeWorkbook(result)}
-              title="The intake workbook — every question pre-filled, ready to circulate and return"
+              title="The INTAKE workbook — every question pre-filled with their answers, ready to circulate for corrections and return"
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
             >
-              <FileDown className="h-3.5 w-3.5" /> Workbook
+              <FileDown className="h-3.5 w-3.5" /> Intake workbook
             </button>
             <a
               href={`/workbook-guide${comp.clientName ? `?client=${encodeURIComponent(comp.clientName)}` : ""}`}
@@ -162,12 +205,12 @@ export default function ReviewPage() {
             >
               Guide
             </a>
-            {/* NELSON-only: the Advanced Canvas is our tool, never a client affordance. */}
-            {nelson && (
+            {/* NELSON-only: the legacy canvas is our tool, never a client affordance. */}
+            {nelson && !seedToken && (
             <button
               type="button"
               onClick={openCanvas}
-              title="NELSON only — open this program in the Advanced Canvas"
+              title="NELSON only — open this program in the legacy Advanced Canvas"
               className="ml-2 flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-600"
             >
               <Wrench className="h-3.5 w-3.5" />
@@ -286,7 +329,7 @@ function DashboardTab({
           <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-2">
             <span className="text-6xl font-bold tabular-nums leading-none tracking-tight">
               {Math.round(proposedTotal).toLocaleString()}
-              <span className="ml-2 text-2xl font-medium text-slate-500">SF</span>
+              <span className="ml-2 text-2xl font-medium text-slate-500">SF usable</span>
             </span>
             <span className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold tabular-nums ${
               up ? "bg-emerald-100 text-emerald-700" : delta < 0 ? "bg-amber-100 text-amber-500" : "bg-slate-100 text-slate-600"

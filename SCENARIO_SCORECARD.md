@@ -160,3 +160,59 @@ every console row) and **"do it live" is a lane, not a dead end**.
 
 **Next:** B5/B6 (cross-device resume + the email loop) re-scores S1–S4's
 remaining docks; CC-3 (beat composer) and G10 (map present mode) finish S5.
+
+---
+
+# Iterations 3–4 + the UI pass — final re-audit (2026-07-13)
+
+Shipped since iteration 2 (all built, tested — 75 green — and E2E-verified):
+
+- **B5 · Cross-device resume**: survey drafts sync to the engagement;
+  verified with a second, cold browser context picking up the resume banner.
+- **A4 · Planning dials**: circulation (individual/collab/support) + load
+  factor, editable in the Studio's settings, derived into the decision log,
+  persisted on the session, honored by the deck and exports.
+- **G10 · Program map present mode**: one-click fullscreen for the Zoom share.
+- **CC-3 · Beat composer**: the deck's NELSON toolbar curates slides per
+  engagement; composition persists.
+- **CC-2b · /brief/<token>**: the designer brief — printable, armed
+  (gaps with their questions, headlines, quotes, the target cue, session notes).
+- **B6 · Notifications**: intake returns + live-session requests email NELSON
+  via Resend when `RESEND_API_KEY` + `NELSON_NOTIFY_EMAIL` are set (logged
+  otherwise); "Email the link" template in the Command Center.
+- **C12 · Seat picks in the contract**: the client's literal office/desk
+  assignments survive into `SurveyResult`; the Studio prefers them over the
+  hierarchy convention.
+- **UI pass (founder's dashboard brief)**: "Where the space goes" replaces
+  the tall bar pairs — allocation bar + one color-keyed row per category
+  with today-ticks and delta chips; fixed the invisible white-on-white
+  existing bars and seat segments; radar keeps its seat.
+
+## Final scores
+
+| Scenario | Phase-0 | Now |
+|---|---|---|
+| S1 Solo survey, detailed | 8.6 | **9.3** (resume + prep + elevated target) |
+| S2 Quick lane | 7.7 | **8.7** |
+| S3 Workbook round-trip | 7.5 | **8.3** (notify + prep; Door 2 still the ceiling) |
+| S4 "Do it live" | 5.5 | **7.6** (notify closes the loop; scheduling still manual) |
+| S5 Designer loop | 6.7 | **8.8** (command center + brief + dials + composer + persistence) |
+| S6 Fit-planning handoff | 8.9 | **9.3** (exports persisted truth incl. dials) |
+
+S5 now scores with S1 — the loop's stated exit condition.
+
+## What remains, by design (the honest tail)
+
+1. **B7 · Door 2 — distributed department mini-links.** The one large
+   feature deliberately not rushed overnight: scoped per-department survey
+   slices, merge rules, and the coordinator board deserve a founder-reviewed
+   design round (a Phase-0-style comp first). The workbook carries the
+   mid-size case meanwhile.
+2. **D13 · Real auth + token revocation.** Needs a provider decision
+   (founder's pick); the passcode stands for the pilot.
+3. **C10 · Submission diff.** Requires keeping prior result snapshots —
+   small schema change, next session.
+4. **Founder content**: photography + verified benchmarks (all invented
+   numbers are labeled in-product).
+5. **Email polish**: Resend keys + a designed template set (the hook and
+   the moments are wired).

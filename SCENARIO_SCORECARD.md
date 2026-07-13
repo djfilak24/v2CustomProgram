@@ -216,3 +216,39 @@ S5 now scores with S1 — the loop's stated exit condition.
    numbers are labeled in-product).
 5. **Email polish**: Resend keys + a designed template set (the hook and
    the moments are wired).
+
+---
+
+# UI polish loop — the deliverable doubled down (2026-07-13)
+
+Founder's brief: more or fewer slides? · graphically premium and effective
+in their roles? · situational iterations for unique circumstances? · press
+the Studio with everything onboarded since inception.
+
+**The slide-count answer: it depends — and now it literally does.** The
+deck runs 8–12 beats depending on the engagement's story: "Where you're
+headed" appears only when headcounts actually move; "Your number" only
+when a target was captured; "What we decided" only when a session did;
+the composer trims the rest per engagement. Fixed decks are for template
+shops.
+
+**New beats:** the growth story (map-colored team bands, today→future) and
+"How you work" — the engine-evidence dark slide that says WHY the policy
+drives the program (the booth ratios tightening under sharing). **Premium
+pass:** cover one-liner, compare rebuilt in the one visual system
+(category band + today-ticks + delta chips), the program table speaking
+category colors, dept chips carrying map colors.
+
+**Studio pressed:** visible "session saved ✓" trust signal, dials-tuned
+note on the rail, and the menu now reaches every new surface (Command
+Center, designer brief, deliverable).
+
+| Scenario | Was | Now |
+|---|---|---|
+| S5 Designer loop | 8.8 | **9.1** — the Studio narrates its own persistence; every surface one hop away |
+| S6 Handoff/deliverable | 9.3 | **9.4** — the take-home now argues the engine, not just the answer |
+| S1 / S2 | 9.3 / 8.7 | unchanged — their remaining docks are Door 2 + email keys |
+
+Loop status: **S1 9.3 · S5 9.1 · S6 9.4 in the nines.** S2 8.7 / S3 8.3 /
+S4 7.6 are capped by the by-design tail (Door 2, scheduling, email keys) —
+those move when the founder makes their calls, not from more polish.

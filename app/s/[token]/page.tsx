@@ -25,7 +25,7 @@ import type { ProfileScores } from "@/lib/survey/sections"
  */
 export default function ClientLanding({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
-  const [meta, setMeta] = useState<{ clientName: string; status: string; profile?: ProfileScores } | null>(null)
+  const [meta, setMeta] = useState<{ clientName: string; status: string; shared?: boolean; profile?: ProfileScores } | null>(null)
   const [missing, setMissing] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState<ProfileScores | null>(null)
@@ -107,8 +107,36 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
                 A program document your whole organization can react to.
               </NextStep>
             </ol>
-            <p className="mt-6 text-sm text-slate-500">
-              Your NELSON contact will reach out to schedule the session.
+            {/* The home page acts like one: the next step is always a button. */}
+            <div className="mt-7 flex flex-wrap gap-3">
+              {meta?.shared ? (
+                <a
+                  href={`/d/${token}`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-[#00badc]/25 transition-all hover:-translate-y-0.5 hover:bg-[#2fd0ee]"
+                >
+                  View your program presentation <ArrowRight className="h-4 w-4" />
+                </a>
+              ) : (
+                <a
+                  href={`/prep/${token}`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#0e1a2e] px-6 py-3 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-slate-700"
+                >
+                  Prep for the live session <ArrowRight className="h-4 w-4" />
+                </a>
+              )}
+              {meta?.shared && (
+                <a
+                  href={`/prep/${token}`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-all hover:-translate-y-0.5 hover:border-slate-400"
+                >
+                  Session prep sheet
+                </a>
+              )}
+            </div>
+            <p className="mt-4 text-sm text-slate-500">
+              {meta?.shared
+                ? "Your program is ready — walk it any time, and bring questions to the session."
+                : "Your NELSON contact will reach out to schedule the session."}
             </p>
             <p className="mt-3 text-xs text-slate-400">
               Bookmark this page — it stays your home for the whole process, and we&apos;ll point you

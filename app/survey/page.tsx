@@ -502,48 +502,57 @@ function StepBody({
             />
             <div className="relative">
               <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#00badc]">
-                <Target className="h-4 w-4" /> The one number worth telling us
+                <Target className="h-4 w-4" /> Optional — but powerful
               </p>
-              <p className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">Do you already have a number in mind?</p>
+              <p className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">Do you have a target square footage?</p>
               <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-white/60">
-                A lease you hold, a building you&apos;re eyeing, a budget footprint. Optional — but if you have one,
-                the working session becomes <span className="font-semibold text-white/85">how we get you there</span>,
-                not just what the math says.
+                If you have a target, the working session becomes{" "}
+                <span className="font-semibold text-white/85">how we get you there</span> — not just what the
+                math says. And don&apos;t worry: we&apos;ll tell you if the sacrifices start to outweigh the
+                workplace strategy, and vice versa.
               </p>
-              <div className="mt-4 flex flex-wrap items-center gap-2.5">
-                {([["lease", "Our current lease"], ["building", "A building we're considering"], ["budget", "A budget footprint"]] as const).map(([id, label]) => {
-                  const on = state.targetSource === id
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => patch(on ? { targetSource: null, targetSF: null } : { targetSource: id })}
-                      className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                        on
-                          ? "border-[#00badc] bg-[#00badc]/20 text-white"
-                          : "border-white/20 bg-white/[0.06] text-white/80 hover:border-white/40 hover:text-white"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
-                {state.targetSource ? (
-                  <label className="flex items-center gap-2 text-sm text-white/70">
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="12,000"
-                      autoFocus
-                      value={state.targetSF ?? ""}
-                      onChange={(e) => patch({ targetSF: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
-                      className="w-32 rounded-xl border border-[#00badc]/60 bg-white/95 px-3 py-2.5 text-right text-base font-bold tabular-nums text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
-                    />
-                    usable SF
-                  </label>
-                ) : (
-                  <span className="text-xs text-white/40">no number yet? skip it — we&apos;ll find it together</span>
-                )}
+              <div className="mt-5 flex flex-wrap items-center gap-5">
+                <span className="min-w-[9rem] text-4xl font-bold tabular-nums tracking-tight">
+                  {state.targetSF ? (
+                    <>{state.targetSF.toLocaleString()}<span className="ml-1.5 text-base font-medium text-white/50">SF</span></>
+                  ) : (
+                    <span className="text-lg font-medium text-white/35">no target — skip ahead</span>
+                  )}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={60000}
+                  step={250}
+                  value={state.targetSF ?? 0}
+                  onChange={(e) => {
+                    const n = Number(e.target.value)
+                    patch({ targetSF: n > 0 ? n : null })
+                  }}
+                  className="h-1.5 min-w-[16rem] flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-[#00badc]"
+                  aria-label="Target usable square footage"
+                />
+                <label className="flex items-center gap-2 text-sm text-white/60">
+                  exactly
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="12,000"
+                    value={state.targetSF ?? ""}
+                    onChange={(e) => patch({ targetSF: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
+                    className="w-32 rounded-xl border border-[#00badc]/50 bg-white/95 px-3 py-2 text-right text-base font-bold tabular-nums text-slate-900 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
+                  />
+                  usable SF
+                </label>
+                {state.targetSF ? (
+                  <button
+                    type="button"
+                    onClick={() => patch({ targetSF: null, targetSource: null })}
+                    className="text-xs font-medium text-white/40 underline-offset-2 hover:text-white/70 hover:underline"
+                  >
+                    clear
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>

@@ -26,22 +26,25 @@ export function ExistingConditionsStep({
 
   return (
     <div className="space-y-8">
-      {/* Furniture posture */}
-      <div>
-        <p className="mb-3 text-sm font-medium text-slate-600">Are you reusing existing furniture, or starting fresh?</p>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {REUSE_POSTURES.map((o) => (
-            <ChoiceCard
-              key={o.id}
-              icon={o.icon}
-              label={o.label}
-              description={o.description}
-              selected={value.furniture === o.id}
-              onClick={() => set({ furniture: o.id as ExistingConditions["furniture"] })}
+      {/* The anchor question first — today's counts set the whole baseline. */}
+      {lane === "detailed" && (
+        <div className="rounded-xl border border-[#00badc]/25 bg-[#00badc]/[0.05] p-5">
+          <p className="text-base font-semibold text-slate-900">How many workstations and private offices do you have today?</p>
+          <p className="mt-0.5 text-xs text-slate-500">Your before-and-after starts from these two numbers.</p>
+          <div className="mt-4 grid gap-5 sm:grid-cols-2">
+            <CountField
+              label="Workstations today"
+              value={value.existingWorkstations}
+              onChange={(n) => set({ existingWorkstations: n })}
             />
-          ))}
+            <CountField
+              label="Private offices today"
+              value={value.existingOffices}
+              onChange={(n) => set({ existingOffices: n })}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Sizes */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -63,6 +66,44 @@ export function ExistingConditionsStep({
           customSf={value.officeCustomSF}
           onCustomSf={(sf) => set({ officeCustomSF: sf })}
         />
+      </div>
+
+      {/* Detailed: today's size inventory — several sizes across departments is
+          normal; documenting each ties future furniture purchases to reality. */}
+      {lane === "detailed" && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SizeMixEditor
+            label="Workstation sizes in place today"
+            help="Running more than one desk size? Document each — size, how many, and where."
+            noun="workstations"
+            rows={value.workstationMix}
+            onChange={(rows) => set({ workstationMix: rows })}
+          />
+          <SizeMixEditor
+            label="Office sizes in place today"
+            help="Same for private offices — each size you have, counted."
+            noun="offices"
+            rows={value.officeMix}
+            onChange={(rows) => set({ officeMix: rows })}
+          />
+        </div>
+      )}
+
+      {/* Furniture posture — after the what, the what-happens-to-it */}
+      <div>
+        <p className="mb-3 text-sm font-medium text-slate-600">Are you reusing existing furniture, or starting fresh?</p>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {REUSE_POSTURES.map((o) => (
+            <ChoiceCard
+              key={o.id}
+              icon={o.icon}
+              label={o.label}
+              description={o.description}
+              selected={value.furniture === o.id}
+              onClick={() => set({ furniture: o.id as ExistingConditions["furniture"] })}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Conference tables reuse */}
@@ -88,46 +129,6 @@ export function ExistingConditionsStep({
           ))}
         </div>
       </div>
-
-      {/* Detailed: existing counts pulled forward */}
-      {lane === "detailed" && (
-        <div className="grid gap-5 rounded-xl border border-[#00badc]/20 bg-[#00badc]/[0.04] p-5 sm:grid-cols-2">
-          <CountField
-            label="Workstations today"
-            value={value.existingWorkstations}
-            onChange={(n) => set({ existingWorkstations: n })}
-          />
-          <CountField
-            label="Private offices today"
-            value={value.existingOffices}
-            onChange={(n) => set({ existingOffices: n })}
-          />
-          <p className="text-xs text-slate-500 sm:col-span-2">
-            We&apos;ll carry these current counts forward so later steps start from what you actually have.
-          </p>
-        </div>
-      )}
-
-      {/* Detailed: today's size inventory — several sizes across departments is
-          normal; documenting each ties future furniture purchases to reality. */}
-      {lane === "detailed" && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <SizeMixEditor
-            label="Workstation sizes in place today"
-            help="Running more than one desk size? Document each — size, how many, and where."
-            noun="workstations"
-            rows={value.workstationMix}
-            onChange={(rows) => set({ workstationMix: rows })}
-          />
-          <SizeMixEditor
-            label="Office sizes in place today"
-            help="Same for private offices — each size you have, counted."
-            noun="offices"
-            rows={value.officeMix}
-            onChange={(rows) => set({ officeMix: rows })}
-          />
-        </div>
-      )}
     </div>
   )
 }

@@ -12,7 +12,7 @@ import { adjacencyColor } from "@/lib/survey/sections"
  * center, and ranked adjacency links. Read-first: hover for detail, click a
  * cluster to spotlight it.
  */
-export function ProgramMapView({ map }: { map: ProgramMap }) {
+export function ProgramMapView({ map, heightClass = "h-[640px]", frameless }: { map: ProgramMap; heightClass?: string; frameless?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState(() => ({ x: 0, y: 0, w: map.width, h: map.height }))
@@ -77,7 +77,7 @@ export function ProgramMapView({ map }: { map: ProgramMap }) {
   const dim = (deptId?: string) => (selected && deptId !== selected ? 0.22 : 1)
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className={`relative overflow-hidden bg-white ${frameless ? "h-full" : "rounded-2xl border border-slate-200 shadow-sm"}`}>
       {/* dotted whiteboard grid */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
@@ -86,7 +86,7 @@ export function ProgramMapView({ map }: { map: ProgramMap }) {
       <svg
         ref={svgRef}
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
-        className="relative block h-[640px] w-full cursor-grab touch-none active:cursor-grabbing"
+        className={`relative block ${heightClass} w-full cursor-grab touch-none active:cursor-grabbing`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

@@ -165,13 +165,17 @@ export function ProgramMapView({ map, heightClass = "h-[640px]", frameless }: { 
         </button>
       </div>
 
-      {/* Legend + hints */}
-      <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-white/90 px-3 py-2 text-[11px] text-slate-500 ring-1 ring-slate-200 backdrop-blur-sm">
-        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full border border-slate-500 bg-transparent" /> office (named)</span>
+      {/* Legend + hints — capped short of center so it never fights a bottom
+          toolbar (the deck's presenter chrome docks bottom-center); the full
+          hint text only shows where there's room to spare. */}
+      <div className={`pointer-events-none absolute bottom-3 left-3 z-20 flex max-w-[min(46%,26rem)] flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-white/90 px-3 py-2 text-[11px] text-slate-500 ring-1 ring-slate-200 backdrop-blur-sm ${frameless ? "sm:max-w-[26rem]" : ""}`}>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full border border-slate-500 bg-transparent" /> office</span>
         <span className="flex items-center gap-1.5"><Crown className="h-3 w-3 text-amber-500" /> leader</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-300" /> ×N seats</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 rounded bg-cyan-600" /> adjacency (ranked)</span>
-        <span className="text-slate-400">⌘/Ctrl + scroll to zoom · drag to pan · click a team to spotlight · double-click to fit</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 rounded bg-cyan-600" /> adjacency</span>
+        {!frameless && (
+          <span className="text-slate-400">⌘/Ctrl + scroll to zoom · drag to pan · click a team to spotlight · double-click to fit</span>
+        )}
       </div>
     </div>
   )

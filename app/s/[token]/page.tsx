@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react"
 import Image from "next/image"
-import { ArrowDown, ArrowRight, FileDown, FileSpreadsheet, Upload, CheckCircle2, Sparkles, MousePointerClick, MessagesSquare } from "lucide-react"
+import { ArrowDown, ArrowRight, FileDown, FileSpreadsheet, Upload, CheckCircle2, Sparkles, MousePointerClick, MessagesSquare, Presentation, ClipboardList, Lock, CalendarDays, Check } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { HeroCarousel } from "@/components/landing/hero-carousel"
 import { Reveal, CountUp, Highlight } from "@/components/landing/motion"
@@ -78,77 +78,120 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
     )
   }
 
-  // ── Thank-you + radar: the minimum effective dose ─────────────────────────
+  // ── The client command center: submitted = this page becomes home base ────
   const profile = submitted ?? (meta?.status === "submitted" ? meta.profile : undefined)
   if (profile) {
+    const shared = !!meta?.shared
     return (
       <div className="min-h-screen bg-[#f3f7fa] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-slate-900">
-        <header className="px-8 py-6"><Logo /></header>
-        <main className="mx-auto grid max-w-5xl gap-10 px-6 py-10 lg:grid-cols-[1.1fr_1fr] lg:items-center">
-          <Reveal>
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-50 px-3.5 py-1.5 text-sm font-medium text-emerald-700">
-              <CheckCircle2 className="h-4 w-4" /> We got it{meta?.clientName ? `, ${meta.clientName}` : ""}.
-            </span>
-            <h1 className="mt-5 text-4xl font-bold tracking-tight">
-              Thank you — we&apos;ll take it from here.
-            </h1>
-            <p className="mt-4 max-w-lg text-lg leading-relaxed text-slate-600">
-              Your answers are already becoming a workplace program. Here&apos;s what happens next:
-            </p>
-            <ol className="mt-6 space-y-4">
-              <NextStep n={1} title="We build your starting program">
-                Every space type, sized against how your teams actually work.
-              </NextStep>
-              <NextStep n={2} title="We walk it together">
-                A working session — your teams on the whiteboard, the trade-offs live, every open
-                question resolved in the room.
-              </NextStep>
-              <NextStep n={3} title="You leave with the plan">
-                A program document your whole organization can react to.
-              </NextStep>
-            </ol>
-            {/* The home page acts like one: the next step is always a button. */}
-            <div className="mt-7 flex flex-wrap gap-3">
-              {meta?.shared ? (
+        <header className="flex items-center justify-between px-8 py-6">
+          <Logo />
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#00badc]/30 bg-[#00badc]/10 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-[#0089a3]">
+            <Sparkles className="h-3.5 w-3.5" /> Your command center
+          </span>
+        </header>
+        <main className="mx-auto max-w-6xl px-6 pb-16 pt-6">
+          {/* Hero — the thank-you, the journey, the profile payoff */}
+          <div className="grid gap-10 lg:grid-cols-[1.15fr_1fr] lg:items-center">
+            <Reveal>
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-50 px-3.5 py-1.5 text-sm font-medium text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" /> We got it{meta?.clientName ? `, ${meta.clientName}` : ""}.
+              </span>
+              <h1 className="mt-5 text-4xl font-bold tracking-tight">
+                Your program is in motion.
+              </h1>
+              <p className="mt-4 max-w-lg text-lg leading-relaxed text-slate-600">
+                Your answers are already becoming a workplace program. Everything that happens
+                next starts from this page — here&apos;s what&apos;s at your fingertips.
+              </p>
+              {/* The journey, at a glance — where you are and what's ahead */}
+              <JourneyStrip shared={shared} />
+              <p className="mt-5 text-xs text-slate-400">
+                Bookmark this page — it stays your home for the whole process, and lights up
+                whenever there&apos;s something new to see.
+              </p>
+            </Reveal>
+            <Reveal delay={150}>
+              <WorkplaceProfile scores={profile} />
+              <p className="mt-3 text-center text-xs text-slate-400">
+                A first read of your workplace&apos;s character — we&apos;ll unpack it together.
+              </p>
+            </Reveal>
+          </div>
+
+          {/* The options — every scenario, and what to expect inside each */}
+          <div className="mt-12 grid gap-5 lg:grid-cols-3">
+            <CommandCard
+              delay={0}
+              featured={shared}
+              locked={!shared}
+              icon={<Presentation className="h-5 w-5" />}
+              title="Your program presentation"
+              blurb={
+                shared
+                  ? "The full story of your workplace — who you are, what the math says, and the program we recommend — told slide by slide."
+                  : "Our team is reviewing what you shared and layering in the thinking that isn't math. This card lights up the moment it's ready."
+              }
+              expect={[
+                "A slide story built from your own answers",
+                "The verdict: room to spare, in line, or a squeeze",
+                "It stays live — session decisions land here too",
+              ]}
+            >
+              {shared ? (
                 <a
                   href={`/d/${token}`}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-[#00badc]/25 transition-all hover:-translate-y-0.5 hover:bg-[#2fd0ee]"
+                  className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#00badc] px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-[#00badc]/25 transition-all hover:-translate-y-0.5 hover:bg-[#2fd0ee]"
                 >
-                  View your program presentation <ArrowRight className="h-4 w-4" />
+                  Open the presentation <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </a>
               ) : (
-                <a
-                  href={`/prep/${token}`}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#0e1a2e] px-6 py-3 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-slate-700"
-                >
-                  Prep for the live session <ArrowRight className="h-4 w-4" />
-                </a>
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-medium text-slate-400">
+                  <Lock className="h-4 w-4" /> Unlocks after our review
+                </span>
               )}
-              {meta?.shared && (
-                <a
-                  href={`/prep/${token}`}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-all hover:-translate-y-0.5 hover:border-slate-400"
-                >
-                  Session prep sheet
-                </a>
-              )}
-            </div>
-            <p className="mt-4 text-sm text-slate-500">
-              {meta?.shared
-                ? "Your program is ready — walk it any time, and bring questions to the session."
-                : "Your NELSON contact will reach out to schedule the session."}
-            </p>
-            <p className="mt-3 text-xs text-slate-400">
-              Bookmark this page — it stays your home for the whole process, and we&apos;ll point you
-              back here whenever there&apos;s something new to see.
-            </p>
-          </Reveal>
-          <Reveal delay={150}>
-            <WorkplaceProfile scores={profile} />
-            <p className="mt-3 text-center text-xs text-slate-400">
-              A first read of your workplace&apos;s character — we&apos;ll unpack it together.
-            </p>
-          </Reveal>
+            </CommandCard>
+
+            <CommandCard
+              delay={130}
+              icon={<ClipboardList className="h-5 w-5" />}
+              title="Prep for the live session"
+              blurb="A five-minute read that makes the working session count double — what we'll ask, and what's worth thinking about before you're in the room."
+              expect={[
+                "The open questions we'll settle together",
+                "The decisions we'll put in front of you",
+                "Who's worth having at the table",
+              ]}
+            >
+              <a
+                href={`/prep/${token}`}
+                className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0e1a2e] px-5 py-3 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-slate-700"
+              >
+                Open your prep sheet <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </a>
+            </CommandCard>
+
+            <CommandCard
+              delay={260}
+              icon={<MessagesSquare className="h-5 w-5" />}
+              title="The working session"
+              blurb="Where it all lands: your teams on the whiteboard, trade-offs moving in real time, every open question decided in the room."
+              expect={[
+                "About 90 minutes, your leaders in the room",
+                "Compromises priced in real numbers, live",
+                "You leave with the plan",
+              ]}
+            >
+              <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-600">
+                <CalendarDays className="h-4 w-4 text-[#0089a3]" /> Your NELSON contact will reach out to schedule
+              </span>
+            </CommandCard>
+          </div>
+
+          <p className="mt-8 text-center text-xs text-slate-400">
+            Something changed since you submitted — headcount, a lease, a rethink? Email your
+            NELSON contact and we&apos;ll fold it in before the session.
+          </p>
         </main>
       </div>
     )
@@ -477,15 +520,78 @@ function Logo({ light }: { light?: boolean }) {
   )
 }
 
-function NextStep({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+/** The engagement at a glance: done · in motion · ahead. Shared advances it. */
+function JourneyStrip({ shared }: { shared: boolean }) {
+  const stages: { label: string; state: "done" | "now" | "ahead" }[] = [
+    { label: "Intake submitted", state: "done" },
+    { label: "We build your program", state: shared ? "done" : "now" },
+    { label: "The working session", state: shared ? "now" : "ahead" },
+    { label: "Your plan", state: "ahead" },
+  ]
   return (
-    <li className="flex gap-3.5">
-      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">{n}</span>
-      <span>
-        <span className="block font-semibold text-slate-900">{title}</span>
-        <span className="text-sm text-slate-600">{children}</span>
-      </span>
-    </li>
+    <ol className="mt-6 flex flex-wrap items-center gap-y-2">
+      {stages.map((s, i) => (
+        <li key={s.label} className="flex items-center">
+          {i > 0 && <span className={`mx-2 h-px w-5 sm:w-7 ${stages[i - 1].state === "done" ? "bg-[#00badc]" : "bg-slate-300"}`} />}
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+              s.state === "done"
+                ? "border-[#00badc]/40 bg-[#e9f7fb] text-[#0089a3]"
+                : s.state === "now"
+                  ? "border-[#0e1a2e] bg-[#0e1a2e] text-white"
+                  : "border-slate-200 bg-white text-slate-400"
+            }`}
+          >
+            {s.state === "done" && <Check className="h-3 w-3" />}
+            {s.state === "now" && <span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00badc] opacity-75 motion-reduce:hidden" /><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#00badc]" /></span>}
+            {s.label}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** One command-center option: what it is, what to expect inside, and the way in. */
+function CommandCard({ icon, title, blurb, expect, featured, locked, delay, children }: {
+  icon: React.ReactNode
+  title: string
+  blurb: string
+  expect: string[]
+  featured?: boolean
+  locked?: boolean
+  delay: number
+  children: React.ReactNode
+}) {
+  return (
+    <Reveal delay={delay} className="h-full">
+      <div className={`flex h-full flex-col rounded-3xl border p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+        featured
+          ? "border-[#00badc]/50 bg-[#e9f7fb]/60 shadow-lg shadow-[#00badc]/10 hover:shadow-[#00badc]/20"
+          : locked
+            ? "border-slate-200 bg-white/70 shadow-sm"
+            : "border-slate-200 bg-white shadow-sm hover:shadow-slate-200/60"
+      }`}>
+        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+          featured ? "bg-[#00badc] text-slate-900" : locked ? "bg-slate-100 text-slate-400" : "bg-[#00badc]/12 text-[#0089a3]"
+        }`}>
+          {icon}
+        </span>
+        <h3 className={`mt-4 text-lg font-semibold ${locked ? "text-slate-500" : ""}`}>{title}</h3>
+        <p className={`mt-1.5 text-sm leading-relaxed ${locked ? "text-slate-400" : "text-slate-600"}`}>{blurb}</p>
+        <div className="mt-4 flex-1">
+          <p className={`text-[10px] font-bold uppercase tracking-[0.18em] ${locked ? "text-slate-300" : "text-[#0089a3]"}`}>What to expect</p>
+          <ul className="mt-2 space-y-1.5">
+            {expect.map((x) => (
+              <li key={x} className={`flex items-start gap-2 text-[13px] leading-snug ${locked ? "text-slate-400" : "text-slate-600"}`}>
+                <Check className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${locked ? "text-slate-300" : "text-[#00badc]"}`} /> {x}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="mt-5">{children}</div>
+      </div>
+    </Reveal>
   )
 }
 

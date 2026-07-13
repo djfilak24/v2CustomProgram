@@ -174,6 +174,36 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
     return () => window.removeEventListener("keydown", onKey)
   }, [slides.length])
 
+  // Canva-style stage navigation: click the right half of the slide to advance,
+  // the left half to go back. Anything interactive — buttons, links, inputs,
+  // dialogs, the map (which pans and spotlights) — keeps its own clicks.
+  const stageClick = (e: React.MouseEvent) => {
+    const el = e.target as HTMLElement
+    if (el.closest("button, a, input, textarea, select, label, [role='dialog'], [data-no-advance]")) return
+    if (window.getSelection()?.toString()) return
+    if (e.clientX > window.innerWidth / 2) setIdx((i) => Math.min(i + 1, slides.length - 1))
+    else setIdx((i) => Math.max(i - 1, 0))
+  }
+
+  // The presenter's pointer, made visible: a soft NELSON-blue halo that trails
+  // the mouse so a room following along on screen never loses it.
+  const haloRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      const el = haloRef.current
+      if (!el) return
+      el.style.opacity = "1"
+      el.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`
+    }
+    const hide = () => { if (haloRef.current) haloRef.current.style.opacity = "0" }
+    window.addEventListener("mousemove", move)
+    document.documentElement.addEventListener("mouseleave", hide)
+    return () => {
+      window.removeEventListener("mousemove", move)
+      document.documentElement.removeEventListener("mouseleave", hide)
+    }
+  }, [])
+
   if (state === "loading") {
     return <Shell><p className="text-slate-400">Preparing your presentation…</p></Shell>
   }
@@ -203,10 +233,17 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
   const KEYED = new Set<string>(KEY_DECISION_KEYS)
 
   return (
-    <div className="min-h-screen bg-[#0e1a2e] text-slate-900">
+    <div className="min-h-screen bg-[#0e1a2e] text-slate-900" onClick={stageClick}>
+      {/* The presenter's pointer halo — pure chrome, never printed */}
+      <div
+        ref={haloRef}
+        aria-hidden
+        className="pointer-events-none fixed left-0 top-0 z-[60] -ml-4 -mt-4 h-8 w-8 rounded-full bg-[#00badc]/45 opacity-0 blur-md transition-opacity duration-300 print:hidden"
+        style={{ willChange: "transform" }}
+      />
       {/* NELSON presenter toolbar */}
       {nelson && (
-        <div className="fixed left-1/2 top-3 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-[#0e1a2e]/90 px-3 py-1.5 text-xs text-white/80 shadow-lg backdrop-blur print:hidden">
+        <div data-no-advance className="fixed left-1/2 top-3 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-[#0e1a2e]/90 px-3 py-1.5 text-xs text-white/80 shadow-lg backdrop-blur print:hidden">
           <span className="font-semibold text-white">{meta.clientName}</span>
           <span className="text-white/25">·</span>
           <button onClick={toggleShare} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium transition-colors ${meta.shared ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 hover:bg-white/20"}`}>
@@ -270,7 +307,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
             </LightSlide>
           )}
           {s === "map" && (
-            <div className="relative flex-1 overflow-hidden bg-white">
+            <div data-no-advance className="relative flex-1 overflow-hidden bg-white">
               {/* Immersive: the map IS the slide; the title floats on it */}
               <div className="absolute inset-0">
                 <ProgramMapView map={d.map} heightClass="h-full" frameless />
@@ -302,7 +339,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
       ))}
 
       {/* Deck chrome */}
-      <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/15 bg-[#0e1a2e]/90 px-3 py-2 text-white shadow-lg backdrop-blur print:hidden">
+      <div data-no-advance className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/15 bg-[#0e1a2e]/90 px-3 py-2 text-white shadow-lg backdrop-blur print:hidden">
         <button onClick={() => setIdx((i) => Math.max(i - 1, 0))} disabled={idx === 0} aria-label="Previous slide"
           className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20 disabled:opacity-30">
           <ArrowLeft className="h-4 w-4" />

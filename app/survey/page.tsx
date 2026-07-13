@@ -512,7 +512,9 @@ function StepBody({
                 workplace strategy, and vice versa.
               </p>
               <div className="mt-5 flex flex-wrap items-center gap-5">
-                <span className="min-w-[9rem] text-4xl font-bold tabular-nums tracking-tight">
+                {/* The number reads in light NELSON cyan — brand-lit against the
+                    navy, always the brightest thing on the card. */}
+                <span className="min-w-[9rem] text-4xl font-bold tabular-nums tracking-tight text-[#7fe3f5]">
                   {state.targetSF ? (
                     <>{state.targetSF.toLocaleString()}<span className="ml-1.5 text-base font-medium text-white/50">SF</span></>
                   ) : (

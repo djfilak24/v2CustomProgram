@@ -11,6 +11,7 @@ import {
   buildComparison, defaultCompInputs, lineSF, lineGaps, spaceStrategy,
   type Comparison, type CompCategory, type CompInputs,
 } from "@/lib/survey/comparison"
+import { CATEGORY_COLORS } from "@/lib/survey/deliverable"
 import { DEMO_SCENARIOS, demoResult } from "@/lib/survey/demo-scenarios"
 import {
   surveyStateFromResult, computeProfile, SURVEY_STEPS,
@@ -270,10 +271,10 @@ function DashboardTab({
   const seatRemote = comp.fullyRemote
   const seatFlex = Math.max(0, headcount - seatOffices - seatDedicated - seatRemote)
   const seatSegs = [
-    { label: "Private offices", n: seatOffices, cls: "bg-violet-400" },
+    { label: "Private offices", n: seatOffices, cls: "bg-[#2563eb]" },
     { label: "Dedicated desks", n: seatDedicated, cls: "bg-[#00badc]" },
-    { label: "Flexible / shared", n: seatFlex, cls: "bg-white/30" },
-    { label: "Fully remote", n: seatRemote, cls: "bg-white/[0.12]" },
+    { label: "Flexible / shared", n: seatFlex, cls: "bg-slate-300" },
+    { label: "Fully remote", n: seatRemote, cls: "bg-slate-200" },
   ].filter((s) => s.n > 0)
 
   return (
@@ -377,40 +378,59 @@ function DashboardTab({
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
-          {/* Existing vs proposed by type — both values labeled, delta per row */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">Existing vs. proposed, by type</h3>
-              <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/30" /> Existing</span>
-                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#00badc]" /> Proposed</span>
-              </div>
+          {/* Where the space goes — one glanceable row per category (the founder's
+              dashboard brief: less bar-chart real estate, more signal). One
+              allocation bar up top, then category rows in the Studio's color
+              language: proposed as the fill, today as the dark tick. */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-slate-900">Where the space goes</h3>
+              <span className="flex items-center gap-3 text-[11px] text-slate-500">
+                <span className="flex items-center gap-1.5"><span className="h-3 w-[2.5px] rounded bg-slate-700" /> today</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-[#00badc]" /> proposed</span>
+              </span>
             </div>
-            <div className="space-y-5">
+            {(() => {
+              const target = result.goals?.targetSF
+              const maxTotal = Math.max(proposedTotal, target ?? 0) || 1
+              return (
+                <div className="relative mb-4">
+                  <div className="flex h-3 gap-[2px] overflow-hidden rounded-full" style={{ width: `${(proposedTotal / maxTotal) * 100}%` }}>
+                    {catTotals.filter((c) => c.proposed > 0).map(({ cat, proposed }) => (
+                      <span key={cat} title={`${cat} · ${Math.round(proposed).toLocaleString()} SF`} style={{ width: `${(proposed / proposedTotal) * 100}%`, backgroundColor: CATEGORY_COLORS[cat].accent }} />
+                    ))}
+                  </div>
+                  {target ? (
+                    <span title={`Their number · ${target.toLocaleString()} SF`} className="absolute -inset-y-1 w-[2.5px] rounded-full bg-[#0e1a2e]" style={{ left: `${Math.min(99.5, (target / maxTotal) * 100)}%` }} />
+                  ) : null}
+                </div>
+              )
+            })()}
+            <div className="space-y-2.5">
               {catTotals.map(({ cat, existing, proposed }) => {
                 const max = Math.max(1, ...catTotals.flatMap((c) => [c.existing, c.proposed]))
                 const d = proposed - existing
                 const Icon = CAT_ICON[cat]
+                const cc = CATEGORY_COLORS[cat]
                 return (
-                  <div key={cat}>
-                    <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                      <span className="flex items-center gap-2 text-slate-700"><Icon className="h-4 w-4 text-slate-500" /> {cat}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
-                        d > 0 ? "bg-emerald-50 text-emerald-700" : d < 0 ? "bg-amber-400/10 text-amber-500" : "bg-slate-100 text-slate-400"
-                      }`}>
-                        {d === 0 ? "no change" : `${d > 0 ? "+" : ""}${Math.round(d).toLocaleString()} SF`}
-                      </span>
+                  <div key={cat} className="flex items-center gap-3">
+                    <span className="flex w-36 shrink-0 items-center gap-2 text-sm text-slate-700">
+                      <Icon className="h-4 w-4" style={{ color: cc.accent }} /> {cat}
+                    </span>
+                    <div className="relative h-2.5 flex-1 rounded-full bg-slate-100">
+                      <div className="h-2.5 rounded-full" style={{ width: `${(proposed / max) * 100}%`, backgroundColor: cc.accent }} />
+                      {existing > 0 && (
+                        <span className="absolute -inset-y-0.5 w-[2.5px] rounded-full bg-slate-700" style={{ left: `${Math.min(99.5, (existing / max) * 100)}%` }} title={`today ${Math.round(existing).toLocaleString()} SF`} />
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2.5 flex-1 rounded-full bg-slate-100/80"><div className="h-2.5 rounded-full bg-white/30" style={{ width: `${(existing / max) * 100}%` }} /></div>
-                        <span className="w-16 text-right text-[11px] tabular-nums text-slate-400">{Math.round(existing).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-2.5 flex-1 rounded-full bg-slate-100/80"><div className="h-2.5 rounded-full bg-[#00badc]" style={{ width: `${(proposed / max) * 100}%` }} /></div>
-                        <span className="w-16 text-right text-[11px] font-medium tabular-nums text-[#0089a3]/90">{Math.round(proposed).toLocaleString()}</span>
-                      </div>
-                    </div>
+                    <span className="w-32 shrink-0 text-right text-[12px] tabular-nums text-slate-500">
+                      {Math.round(existing).toLocaleString()} → <b className="text-slate-900">{Math.round(proposed).toLocaleString()}</b>
+                    </span>
+                    <span className={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-[11px] font-semibold tabular-nums ${
+                      d > 0 ? "bg-emerald-50 text-emerald-700" : d < 0 ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-400"
+                    }`}>
+                      {d === 0 ? "—" : `${d > 0 ? "+" : ""}${Math.round(d).toLocaleString()}`}
+                    </span>
                   </div>
                 )
               })}

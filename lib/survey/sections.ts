@@ -463,6 +463,9 @@ export interface SurveyState {
   // Your Goals — motivators + the expand↔optimize posture
   goalMotivators: string[]
   spacePosture: string | null
+  /** Their number — an SF target they already hold (lease/building/budget). Optional. */
+  targetSF: number | null
+  targetSource: string | null
   /** People-detail decision tree (simple headcount / named leaders / full roster). */
   peopleMode: PeopleMode
   // Existing conditions — current furniture + sizes (baseline)
@@ -511,6 +514,8 @@ export function emptyState(): SurveyState {
     departments: starterDepartments(),
     goalMotivators: [],
     spacePosture: null,
+    targetSF: null,
+    targetSource: null,
     peopleMode: "simple",
     existing: emptyExisting(),
     workChoice: null,
@@ -630,6 +635,8 @@ export function surveyStateFromResult(r: import("./types").SurveyResult): Survey
 
   s.goalMotivators = [...(r.goals?.motivators ?? [])]
   s.spacePosture = r.goals?.posture ?? null
+  s.targetSF = r.goals?.targetSF ?? null
+  s.targetSource = r.goals?.targetSource ?? null
 
   const days = r.work.daysInOffice
   s.workChoice = days >= 5 ? "office" : days <= 1 ? "remote" : "hybrid"
@@ -835,11 +842,17 @@ export function buildSurveyResult(
 
   return {
     meta: { clientName: meta.clientName, completedBy: meta.completedBy, completedAt: new Date().toISOString() },
-    ...(s.goalMotivators.length || s.spacePosture
+    ...(s.goalMotivators.length || s.spacePosture || (s.targetSF && s.targetSF > 0)
       ? {
           goals: {
             motivators: s.goalMotivators,
             ...(s.spacePosture ? { posture: s.spacePosture as "expand" | "balance" | "optimize" } : {}),
+            ...(s.targetSF && s.targetSF > 0
+              ? {
+                  targetSF: s.targetSF,
+                  ...(s.targetSource ? { targetSource: s.targetSource as "lease" | "building" | "budget" } : {}),
+                }
+              : {}),
           },
         }
       : {}),

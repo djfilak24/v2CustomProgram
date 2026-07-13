@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   const clientName = typeof body.clientName === "string" ? body.clientName.trim() : ""
   if (!clientName) return NextResponse.json({ error: "clientName required" }, { status: 400 })
   const e = await engagementStore().create(clientName)
+  await engagementStore().addEvent(e.token, { kind: "created", at: new Date().toISOString() })
   return NextResponse.json(e)
 }
 

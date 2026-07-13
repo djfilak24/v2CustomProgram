@@ -1,12 +1,13 @@
 "use client"
 
-import { ArrowRight, ArrowLeft, MessageCircle, TrendingUp, TrendingDown, CheckCircle2, Home } from "lucide-react"
+import { ArrowRight, ArrowLeft, MessageCircle, TrendingUp, TrendingDown, CheckCircle2, Home, Sparkles } from "lucide-react"
 import { WorkplaceProfile } from "./workplace-profile"
 import {
   SURVEY_STEPS, WORK_PATTERNS, SEATING_POSTURES, OFFICE_POSTURES, GROWTH_PRESETS,
   adjacencyColor, buildSurveyResult,
   type SurveyState, type LaneMap, type StepId, type ProfileScores, type CardOption,
 } from "@/lib/survey/sections"
+import { buildComparison, lineGaps } from "@/lib/survey/comparison"
 import { COLLAB_CATALOG, SUPPORT_CATALOG } from "@/lib/survey/catalog"
 import { saveSurveySeed } from "@/lib/survey/seedStorage"
 import { clearSurveyDraft } from "@/lib/survey/draftStorage"
@@ -26,6 +27,7 @@ export function Summary({
   scores,
   onBack,
   engagementHome,
+  prepHref,
   sentToNelson,
 }: {
   state: SurveyState
@@ -35,6 +37,8 @@ export function Summary({
   onBack: () => void
   /** The client's engagement home page (/s/<token>) when this run belongs to one. */
   engagementHome?: string | null
+  /** The session-prep debrief (/prep/<token>) — the client's next step when on an engagement. */
+  prepHref?: string | null
   /** True once the result has landed with NELSON automatically. */
   sentToNelson?: boolean
 }) {
@@ -56,6 +60,16 @@ export function Summary({
   })
 
   const deferredTitles = SURVEY_STEPS.filter((s) => deferred.has(s.id)).map((s) => s.title)
+
+  // The session agenda, previewed: what intake couldn't answer, framed as the
+  // meeting's job — never as the client's failure. Benchmarks are illustrative
+  // until real engagement averages exist (TODO(founder)).
+  const openItems = (() => {
+    const r = buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" })
+    const lines = buildComparison(r).lines.flatMap((l) => lineGaps(l).map(() => l.label))
+    return { lines: [...new Set(lines)], count: lines.length + deferredTitles.length }
+  })()
+  const TYPICAL_GAPS = 12
 
   const daysSummary = (() => {
     if (lanes.work !== "detailed") return labelFor(WORK_PATTERNS, state.workChoice)
@@ -217,16 +231,36 @@ export function Summary({
           {/* Right rail */}
           <aside className="space-y-5">
             <WorkplaceProfile scores={scores} />
-            {deferredTitles.length > 0 && (
-              <div className="rounded-2xl border border-amber-400/25 bg-amber-50 p-5">
-                <div className="flex items-center gap-2 text-sm font-semibold text-amber-500">
-                  <MessageCircle className="h-4 w-4" /> To cover live ({deferredTitles.length})
-                </div>
-                <ul className="mt-2 space-y-1 text-sm text-slate-600">
-                  {deferredTitles.map((t) => <li key={t}>· {t}</li>)}
-                </ul>
-              </div>
-            )}
+            {/* Going into the session — effort honored, gaps framed as the agenda */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                <Sparkles className="h-3.5 w-3.5" />
+                {openItems.count <= TYPICAL_GAPS ? "Strong intake — above average" : "Solid intake — you gave us what you could"}
+              </span>
+              <p className="mt-2.5 text-sm leading-relaxed text-slate-600">
+                Most teams leave around {TYPICAL_GAPS} open items; you left <b>{openItems.count}</b>.
+                {" "}Open items aren&apos;t homework — they&apos;re exactly what the working session is for.
+              </p>
+              {(openItems.lines.length > 0 || deferredTitles.length > 0) && (
+                <>
+                  <p className="mt-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+                    <MessageCircle className="h-3.5 w-3.5" /> We&apos;ll focus on these together
+                  </p>
+                  <ul className="mt-1.5 space-y-1 text-sm text-slate-600">
+                    {[...openItems.lines.slice(0, 4), ...deferredTitles].slice(0, 5).map((t) => <li key={t}>· {t}</li>)}
+                    {openItems.count > 5 && <li className="text-slate-400">· and a few more — all covered in your prep sheet</li>}
+                  </ul>
+                </>
+              )}
+              {prepHref && (
+                <a
+                  href={prepHref}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0e1a2e] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+                >
+                  Prep for the live session <ArrowRight className="h-4 w-4" />
+                </a>
+              )}
+            </div>
           </aside>
         </div>
 
@@ -239,23 +273,38 @@ export function Summary({
           >
             <ArrowLeft className="h-4 w-4" /> Back to edit
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              // Hand the structured answers forward and open the validation review
-              // (existing vs. proposed) before the deep canvas. The in-progress
-              // draft is done its job — clear it so the next visit starts clean.
-              saveSurveySeed(buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" }))
-              clearSurveyDraft()
-              window.location.href = "/review"
-            }}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
-          >
-            See your program comparison <ArrowRight className="h-4 w-4" />
-          </button>
+          {prepHref ? (
+            // Engagement clients don't self-serve the recommended program —
+            // the program is revealed in the session, then pushed (Phase 0
+            // ruling: recommended program is NELSON-first). Their next step
+            // is the prep sheet.
+            <a
+              href={prepHref}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
+            >
+              Prep for the live session <ArrowRight className="h-4 w-4" />
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                // Hand the structured answers forward and open the validation review
+                // (existing vs. proposed) before the deep canvas. The in-progress
+                // draft is done its job — clear it so the next visit starts clean.
+                saveSurveySeed(buildSurveyResult(state, lanes, deferred, { clientName: "", completedBy: "" }))
+                clearSurveyDraft()
+                window.location.href = "/review"
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#00badc] px-6 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-[#2fd0ee]"
+            >
+              See your program comparison <ArrowRight className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <p className="mt-4 text-center text-xs text-slate-400">
-          Everything you entered pre-populates the tool — nothing is locked in.
+          {prepHref
+            ? "Your program is being reviewed by your NELSON team — you'll walk it together in the session."
+            : "Everything you entered pre-populates the tool — nothing is locked in."}
         </p>
       </div>
     </div>

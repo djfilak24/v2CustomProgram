@@ -3,11 +3,11 @@
 import { use, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
-  ArrowLeft, ArrowRight, Printer, Share2, Undo2, Lock, Users, CalendarDays, TrendingUp,
+  ArrowLeft, ArrowRight, Printer, Share2, Undo2, Lock, Users, CalendarDays, TrendingUp, Target, ClipboardList,
 } from "lucide-react"
 import { WorkplaceProfile } from "@/components/survey/workplace-profile"
 import { ProgramMapView } from "@/components/survey/program-map"
-import { buildDeliverable, KEY_DECISION_KEYS, type DeliverableOverrides } from "@/lib/survey/deliverable"
+import { buildDeliverable, KEY_DECISION_KEYS, CATEGORY_COLORS, type DeliverableOverrides, type DeliverableAddition } from "@/lib/survey/deliverable"
 import { WORKSTATION_SIZES, OFFICE_SIZES } from "@/lib/survey/sections"
 import { isNelsonMode, nelsonCode } from "@/lib/nelsonMode"
 import type { SurveyResult } from "@/lib/survey/types"
@@ -20,12 +20,22 @@ import type { ComparisonLine } from "@/lib/survey/comparison"
  * can, and can edit the key unit sizes live — edits recompute the whole program
  * and persist, so the printed document matches what was presented.
  */
+/** The Studio session riding on the engagement — the deck renders ITS program. */
+interface DeckSession {
+  overrides?: DeliverableOverrides
+  counts?: Record<string, number>
+  additions?: DeliverableAddition[]
+  notes?: Record<string, string>
+  resolvedGaps?: Record<string, boolean>
+}
+
 export default function DeliverablePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
   const [nelson, setNelson] = useState(false)
   const [meta, setMeta] = useState<{ clientName: string; shared: boolean } | null>(null)
   const [result, setResult] = useState<SurveyResult | null>(null)
   const [overrides, setOverrides] = useState<DeliverableOverrides>({})
+  const [session, setSession] = useState<DeckSession | null>(null)
   const [state, setState] = useState<"loading" | "ready" | "gated" | "missing">("loading")
   const [idx, setIdx] = useState(0)
   const saveTimer = useRef<number | null>(null)
@@ -40,7 +50,10 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
         setMeta({ clientName: e.clientName, shared: !!e.shared })
         if (e.result) {
           setResult(e.result)
-          setOverrides(e.overrides ?? {})
+          setSession(e.session ?? null)
+          // The session's overrides are the meeting's truth; legacy engagement
+          // overrides are the fallback for pre-session engagements.
+          setOverrides(e.session?.overrides ?? e.overrides ?? {})
           setState("ready")
         } else {
           setState("gated")
@@ -49,9 +62,32 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
       .catch(() => setState("missing"))
   }, [token])
 
-  const d = useMemo(() => (result ? buildDeliverable(result, overrides) : null), [result, overrides])
+  const d = useMemo(
+    () => (result ? buildDeliverable(result, overrides, session?.counts ?? {}, session?.additions ?? []) : null),
+    [result, overrides, session],
+  )
+
+  // The session's decisions — derived exactly like the Studio derives them,
+  // so the "what we decided together" slide is the meeting's own record.
+  const decisions = useMemo(() => {
+    if (!d || !session) return []
+    const out: { text: string; note?: string }[] = []
+    const note = (id: string) => (session.notes?.[id] ? { note: session.notes[id] } : {})
+    for (const b of d.comp.lines) {
+      const sf = session.overrides?.[b.key] ?? overrides[b.key]
+      if (sf && sf > 0 && sf !== b.unitSF) out.push({ text: `${b.label} — unit size ${b.unitSF} → ${sf} SF`, ...note(`${b.key}:sf`) })
+      const q = session.counts?.[b.key]
+      if (q !== undefined && q !== b.proposedCount) out.push({ text: `${b.label} — quantity ${b.proposedCount} → ${q}`, ...note(`${b.key}:qty`) })
+    }
+    for (const a of session.additions ?? [])
+      out.push({ text: `Added ${a.label} — ${a.proposedCount} × ${a.unitSF} SF`, ...note(`add:${a.key}`) })
+    for (const [gid, on] of Object.entries(session.resolvedGaps ?? {}))
+      if (on) out.push({ text: `Confirmed live — ${gid.split("::")[1] ?? gid}`, ...note(`gapnote:${gid}`) })
+    return out
+  }, [d, session, overrides])
 
   // NELSON edits persist (debounced) — the record matches the presentation.
+  // When a Studio session exists, edits land IN the session (one truth).
   const setOverride = (key: string, sf: number | null) => {
     if (!nelson) return
     setOverrides((prev) => {
@@ -63,9 +99,10 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
         fetch(`/api/engagements/${token}`, {
           method: "PATCH",
           headers: { "x-nelson-code": nelsonCode() ?? "" },
-          body: JSON.stringify({ overrides: next }),
+          body: JSON.stringify(session ? { session: { ...session, overrides: next } } : { overrides: next }),
         }).catch(() => {})
       }, 600)
+      if (session) setSession({ ...session, overrides: next })
       return next
     })
   }
@@ -82,10 +119,12 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
   }
 
   const slides = d ? buildSlides() : []
-  function buildSlides() {
-    return [
-      "cover", "who", "profile", "map", "verdict", "compare", "program", "next",
-    ] as const
+  function buildSlides(): string[] {
+    const out: string[] = ["cover", "who", "profile", "map", "verdict"]
+    if (result?.goals?.targetSF) out.push("target")
+    if (decisions.length > 0) out.push("decided")
+    out.push("compare", "program", "next")
+    return out
   }
 
   // Keyboard navigation
@@ -176,6 +215,10 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
             </LightSlide>
           )}
           {s === "verdict" && <VerdictSlide d={d} />}
+          {s === "target" && result?.goals?.targetSF && (
+            <TargetSlide d={d} targetSF={result.goals.targetSF} source={result.goals.targetSource} />
+          )}
+          {s === "decided" && <DecidedSlide decisions={decisions} />}
           {s === "compare" && <CompareSlide d={d} />}
           {s === "program" && (
             <ProgramSlide d={d} nelson={nelson} keyed={KEYED} overrides={overrides} onOverride={setOverride} />
@@ -282,6 +325,84 @@ function VerdictSlide({ d }: { d: NonNullable<ReturnType<typeof buildDeliverable
         <span><b className="text-white">{d.totals.circulationSF.toLocaleString()}</b> SF circulation</span>
       </div>
     </div>
+  )
+}
+
+function TargetSlide({
+  d, targetSF, source,
+}: {
+  d: NonNullable<ReturnType<typeof buildDeliverable>>
+  targetSF: number
+  source?: string
+}) {
+  const gross = d.totals.grossUsableSF
+  const gap = targetSF - gross
+  const state: "spare" | "inline" | "compromise" =
+    targetSF >= gross * 1.05 ? "spare" : targetSF >= gross * 0.98 ? "inline" : "compromise"
+  const copy = {
+    spare: {
+      title: "Room to spare.",
+      body: `Your footprint carries ${gap.toLocaleString()} SF beyond what your program needs — headroom for growth, amenity, or simply a lighter lease.`,
+    },
+    inline: {
+      title: "Your number holds.",
+      body: "The program your team's answers call for and the footprint you hold agree — the comfortable verdict.",
+    },
+    compromise: {
+      title: "Reachable — and we chose the trades together.",
+      body: `Closing ${Math.abs(gap).toLocaleString()} SF took real decisions, not wishful math. The next page is the record of what we decided — and what we protected.`,
+    },
+  }[state]
+  const max = Math.max(gross, targetSF) * 1.06
+  return (
+    <div className="flex flex-1 flex-col justify-center bg-[#0e1a2e] p-10 text-white sm:p-16">
+      <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.25em] text-[#00badc]">
+        <Target className="h-4 w-4" /> Your number
+      </p>
+      <div className="mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+        <span className="text-7xl font-bold tabular-nums tracking-tight sm:text-8xl">{targetSF.toLocaleString()}</span>
+        <span className="text-2xl text-white/60">SF{source ? ` · your ${source}` : ""}</span>
+      </div>
+      <div className="relative mt-10 max-w-3xl">
+        <div className="flex h-5 gap-[2px] overflow-hidden rounded-full" style={{ width: `${(gross / max) * 100}%` }}>
+          {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
+            <span key={c.name} style={{ width: `${(c.proposedTotalSF / gross) * 100}%`, backgroundColor: CATEGORY_COLORS[c.name].accent }} />
+          ))}
+        </div>
+        <div className="absolute -inset-y-1.5 w-[3px] rounded-full bg-white" style={{ left: `${(targetSF / max) * 100}%` }} />
+        <p className="mt-3 text-sm text-white/60">
+          your program {gross.toLocaleString()} SF · your number {targetSF.toLocaleString()} SF ·{" "}
+          <b className={gap >= 0 ? "text-emerald-300" : "text-amber-300"}>{gap >= 0 ? "+" : ""}{gap.toLocaleString()} SF</b>
+        </p>
+      </div>
+      <div className="mt-8 max-w-2xl rounded-2xl border border-[#00badc]/30 bg-[#00badc]/10 p-6">
+        <p className="text-xl font-semibold text-[#7fe3f5]">{copy.title}</p>
+        <p className="mt-2 leading-relaxed text-white/75">{copy.body}</p>
+      </div>
+    </div>
+  )
+}
+
+function DecidedSlide({ decisions }: { decisions: { text: string; note?: string }[] }) {
+  return (
+    <LightSlide eyebrow="What we decided together" title="The session's record — your fingerprints on the program">
+      <div className="mx-auto w-full max-w-4xl space-y-3">
+        {decisions.slice(0, 8).map((x, i) => (
+          <div key={i} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00badc]/10 text-[#0089a3]">
+              <ClipboardList className="h-3.5 w-3.5" />
+            </span>
+            <div>
+              <p className="font-semibold text-slate-900">{x.text}</p>
+              {x.note && <p className="mt-0.5 text-sm italic text-slate-500">“{x.note}”</p>}
+            </div>
+          </div>
+        ))}
+        {decisions.length > 8 && (
+          <p className="text-center text-sm text-slate-400">+ {decisions.length - 8} more in the technical appendix</p>
+        )}
+      </div>
+    </LightSlide>
   )
 }
 

@@ -43,6 +43,13 @@ export interface SurveyResult {
     motivators: string[]
     /** Where they sit on the square-footage tension. */
     posture?: "expand" | "balance" | "optimize"
+    /**
+     * Their number — a footprint they already hold or hold out for. Optional
+     * and light; the verdict against it belongs to the live session.
+     */
+    targetSF?: number
+    /** Where the number comes from. */
+    targetSource?: "lease" | "building" | "budget"
   }
 
   /** Section 1 — Your People (+ growth, §4.5 of the spec). */

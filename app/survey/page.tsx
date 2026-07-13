@@ -203,6 +203,7 @@ export default function SurveyPage() {
           scores={scores}
           onBack={() => { setPhase("survey"); setStepIndex(steps.length - 1) }}
           engagementHome={engagement ? `/s/${engagement}` : null}
+          prepHref={engagement ? `/prep/${engagement}` : null}
           sentToNelson={sentToNelson}
         />
         {demoBar}
@@ -463,6 +464,43 @@ function StepBody({
                   </button>
                 )
               })}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-medium text-slate-600">Do you already have a number in mind?</p>
+            <p className="mb-3 text-xs text-slate-400">
+              A lease you hold, a building you&apos;re eyeing, a budget footprint. Totally optional — if you have one,
+              we&apos;ll bring the math that shows what it takes to get there.
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {([["lease", "Our current lease"], ["building", "A building we're considering"], ["budget", "A budget footprint"]] as const).map(([id, label]) => {
+                const on = state.targetSource === id
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => patch(on ? { targetSource: null, targetSF: null } : { targetSource: id })}
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      on ? "border-[#00badc]/60 bg-[#00badc]/[0.1] text-slate-900" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+              {state.targetSource && (
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="12,000"
+                    value={state.targetSF ?? ""}
+                    onChange={(e) => patch({ targetSF: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
+                    className="w-28 rounded-xl border border-[#00badc]/40 bg-white px-3 py-2.5 text-right font-semibold tabular-nums focus:border-[#00badc] focus:outline-none"
+                  />
+                  usable SF
+                </label>
+              )}
             </div>
           </div>
         </div>

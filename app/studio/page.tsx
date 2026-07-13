@@ -52,6 +52,8 @@ export default function StudioPage() {
   const [showMap, setShowMap] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const sessionToken = useRef<string | null>(null)
+  const saveTimer = useRef<number | null>(null)
   // Display toggles (the old canvas's show/hide dials, reborn in settings)
   const [showDeptChips, setShowDeptChips] = useState(true)
   const [showRatios, setShowRatios] = useState(true)
@@ -79,6 +81,7 @@ export default function StudioPage() {
 
   useEffect(() => {
     if (!nelson) return
+    sessionToken.current = null
     setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({})
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
@@ -91,11 +94,37 @@ export default function StudioPage() {
       .then(async (r) => {
         if (!r.ok) return
         const e = await r.json()
-        if (e.result) { setResult(e.result); setOverrides(e.overrides ?? {}) }
+        if (e.result) {
+          setResult(e.result)
+          // The persisted session is the truth of the last working meeting;
+          // legacy overrides are the fallback for pre-session engagements.
+          const s = e.session
+          setOverrides(s?.overrides ?? e.overrides ?? {})
+          setCounts(s?.counts ?? {})
+          setAdditions(s?.additions ?? [])
+          setNotes(s?.notes ?? {})
+          setResolvedGaps(s?.resolvedGaps ?? {})
+          sessionToken.current = source
+        }
       })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nelson, source])
+
+  // Every session edit persists (debounced) — a refresh never loses a meeting,
+  // and the client's deck renders exactly what the session decided (A1/A2).
+  useEffect(() => {
+    if (!sessionToken.current || sessionToken.current !== source) return
+    if (saveTimer.current) window.clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(() => {
+      fetch(`/api/engagements/${source}`, {
+        method: "PATCH",
+        headers: { "x-nelson-code": nelsonCode() ?? "" },
+        body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps } }),
+      }).catch(() => {})
+    }, 700)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overrides, counts, additions, notes, resolvedGaps])
 
   const d = useMemo(() => (result ? buildDeliverable(result, overrides, counts, additions) : null), [result, overrides, counts, additions])
   const baseline = d?.comp.lines ?? []
@@ -301,6 +330,16 @@ export default function StudioPage() {
                       {(d.totals.grossUsableSF - d.totals.existingSF).toLocaleString()} SF vs today
                     </p>
                   )}
+                  {result?.goals?.targetSF ? (
+                    <p className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-800">
+                      Their number: {result.goals.targetSF.toLocaleString()} SF
+                      {result.goals.targetSource ? ` (${result.goals.targetSource})` : ""} ·{" "}
+                      <span className={result.goals.targetSF - d.totals.grossUsableSF >= 0 ? "text-emerald-700" : "text-rose-700"}>
+                        {result.goals.targetSF - d.totals.grossUsableSF >= 0 ? "+" : ""}
+                        {(result.goals.targetSF - d.totals.grossUsableSF).toLocaleString()} SF
+                      </span>
+                    </p>
+                  ) : null}
                 </div>
                 <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-[13px] tabular-nums text-slate-500">
                   <Row k="Net program" v={`${d.totals.proposedNetSF.toLocaleString()}`} />
@@ -312,19 +351,34 @@ export default function StudioPage() {
               {/* Space allocation — the category color key IS the chart */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Space allocation</h3>
-                <div className="mt-3 flex h-3 gap-[2px] overflow-hidden rounded-full">
-                  {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
-                    <span
-                      key={c.name}
-                      title={`${c.name} · ${c.proposedTotalSF.toLocaleString()} SF incl. circulation`}
-                      className="h-full rounded-[2px] first:rounded-l-full last:rounded-r-full"
-                      style={{
-                        width: `${(c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100}%`,
-                        backgroundColor: CATEGORY_COLORS[c.name].accent,
-                      }}
-                    />
-                  ))}
-                </div>
+                {(() => {
+                  const target = result?.goals?.targetSF
+                  const max = Math.max(d.totals.grossUsableSF, target ?? 0) || 1
+                  return (
+                    <div className="relative mt-3">
+                      <div className="flex h-3 gap-[2px] overflow-hidden rounded-full" style={{ width: `${(d.totals.grossUsableSF / max) * 100}%` }}>
+                        {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
+                          <span
+                            key={c.name}
+                            title={`${c.name} · ${c.proposedTotalSF.toLocaleString()} SF incl. circulation`}
+                            className="h-full rounded-[2px] first:rounded-l-full last:rounded-r-full"
+                            style={{
+                              width: `${(c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100}%`,
+                              backgroundColor: CATEGORY_COLORS[c.name].accent,
+                            }}
+                          />
+                        ))}
+                      </div>
+                      {target ? (
+                        <span
+                          title={`Their number · ${target.toLocaleString()} SF`}
+                          className="absolute -inset-y-1 w-[2.5px] rounded-full bg-[#0e1a2e]"
+                          style={{ left: `${Math.min(99.5, (target / max) * 100)}%` }}
+                        />
+                      ) : null}
+                    </div>
+                  )
+                })()}
                 <div className="mt-3 space-y-2 text-[13px] tabular-nums">
                   {d.categories.map((c) => (
                     <div key={c.name} className="flex items-center gap-2">
@@ -849,6 +903,11 @@ function SurveyDrawer({ result, tab, seatOf }: { result: SurveyResult; tab: "peo
               ))}
             </div>
             {g.posture && <p className="mt-1.5 text-xs text-slate-500">Posture: {SPACE_POSTURES.find((x) => x.id === g.posture)?.label ?? g.posture}</p>}
+            {g.targetSF && (
+              <p className="mt-1.5 text-xs font-medium text-amber-700">
+                Their number: {g.targetSF.toLocaleString()} SF{g.targetSource ? ` — ${g.targetSource}` : ""}
+              </p>
+            )}
           </Block>
         )}
         <Block label="Cadence">

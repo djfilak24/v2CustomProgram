@@ -21,6 +21,26 @@ export interface SubmissionMeta {
   at: string
 }
 
+/**
+ * The Studio's working state — every live-session edit, persisted so a refresh
+ * never loses a meeting and the deliverable renders the session's program.
+ */
+export interface EngagementSession {
+  overrides?: Record<string, number>
+  counts?: Record<string, number>
+  additions?: { key: string; label: string; category: string; unitSF: number; proposedCount: number; ratio?: string }[]
+  notes?: Record<string, string>
+  resolvedGaps?: Record<string, boolean>
+  updatedAt: string
+}
+
+/** One thing that happened on the engagement — the journey the console/command view replays. */
+export interface EngagementEvent {
+  kind: "created" | "progress" | "submitted" | "shared" | "unshared" | "session"
+  at: string
+  detail?: string
+}
+
 export interface Engagement {
   token: string
   clientName: string
@@ -34,6 +54,10 @@ export interface Engagement {
   shared?: boolean
   /** Submission log — every intake that landed, newest last. */
   submissions?: SubmissionMeta[]
+  /** The Studio's persisted working state (live-session edits). */
+  session?: EngagementSession
+  /** Event log — the engagement's journey, newest last. */
+  events?: EngagementEvent[]
   createdAt: string
   updatedAt: string
 }
@@ -46,6 +70,8 @@ export interface EngagementStore {
   setProgress(token: string, progress: EngagementProgress): Promise<void>
   setShared(token: string, shared: boolean): Promise<void>
   setOverrides(token: string, overrides: Record<string, number>): Promise<void>
+  setSession(token: string, session: EngagementSession): Promise<void>
+  addEvent(token: string, event: EngagementEvent): Promise<void>
 }
 
 const newToken = () => {
@@ -71,6 +97,8 @@ function postgresStore(): EngagementStore {
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS overrides JSONB`
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS shared BOOLEAN NOT NULL DEFAULT false`
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS submissions JSONB`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS session JSONB`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS events JSONB`
     return sql
   })()
 
@@ -81,6 +109,8 @@ function postgresStore(): EngagementStore {
     ...(r.overrides ? { overrides: r.overrides as Record<string, number> } : {}),
     ...(r.shared ? { shared: true } : {}),
     ...(r.submissions ? { submissions: r.submissions as SubmissionMeta[] } : {}),
+    ...(r.session ? { session: r.session as EngagementSession } : {}),
+    ...(r.events ? { events: r.events as EngagementEvent[] } : {}),
     createdAt: new Date(r.created_at).toISOString(), updatedAt: new Date(r.updated_at).toISOString(),
   })
 
@@ -128,6 +158,20 @@ function postgresStore(): EngagementStore {
       const sql = await ready
       await sql`
         UPDATE engagements SET overrides = ${JSON.stringify(overrides)}::jsonb, updated_at = now()
+        WHERE token = ${token}`
+    },
+    async setSession(token, session) {
+      const sql = await ready
+      await sql`
+        UPDATE engagements SET session = ${JSON.stringify(session)}::jsonb, updated_at = now()
+        WHERE token = ${token}`
+    },
+    async addEvent(token, event) {
+      const sql = await ready
+      await sql`
+        UPDATE engagements SET
+          events = COALESCE(events, '[]'::jsonb) || ${JSON.stringify([event])}::jsonb,
+          updated_at = now()
         WHERE token = ${token}`
     },
   }
@@ -184,6 +228,20 @@ function fileStore(): EngagementStore {
       const e = all.find((x) => x.token === token)
       if (!e) return
       e.overrides = overrides; e.updatedAt = new Date().toISOString()
+      await save(all)
+    },
+    async setSession(token, session) {
+      const all = await load()
+      const e = all.find((x) => x.token === token)
+      if (!e) return
+      e.session = session; e.updatedAt = new Date().toISOString()
+      await save(all)
+    },
+    async addEvent(token, event) {
+      const all = await load()
+      const e = all.find((x) => x.token === token)
+      if (!e) return
+      e.events = [...(e.events ?? []), event]; e.updatedAt = new Date().toISOString()
       await save(all)
     },
   }

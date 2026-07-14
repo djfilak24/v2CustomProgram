@@ -5,9 +5,11 @@ import Image from "next/image"
 import {
   Monitor, KeyRound, FileSpreadsheet, RefreshCw, Undo2, Redo2, Search, ExternalLink, Eye, Copy, Trash2,
   Crown, AlertTriangle, ClipboardList, Users, LayoutGrid, Table2, Presentation, CheckCircle2, X,
-  Map as MapIcon, Settings2, Plus, Minus, TrendingUp, TrendingDown, ArrowRightLeft, PieChart, Gauge,
+  Map as MapIcon, Settings2, Plus, Minus, TrendingUp, TrendingDown, PieChart, Gauge,
+  ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Check, StickyNote, Upload, Image as ImageIcon,
+  Activity,
 } from "lucide-react"
-import { buildDeliverable, CATEGORY_COLORS, DEFAULT_FACTORS, type DeliverableOverrides, type DeliverableAddition, type DeliverableFactors } from "@/lib/survey/deliverable"
+import { buildDeliverable, CATEGORY_COLORS, DEFAULT_FACTORS, type DeliverableOverrides, type DeliverableAddition, type DeliverableFactors, type DeliverableCategory } from "@/lib/survey/deliverable"
 import { ProgramMapView } from "@/components/survey/program-map"
 import { exportFitPlanningPackage } from "@/lib/survey/fitPlanning"
 import { lineGaps, type ComparisonLine, type CompCategory } from "@/lib/survey/comparison"
@@ -15,6 +17,7 @@ import { COLLAB_CATALOG, SUPPORT_CATALOG, type CatalogSpace } from "@/lib/survey
 import { SpaceDetailModal } from "@/components/survey/space-detail-modal"
 import { WORKSTATION_SIZES, OFFICE_SIZES, SURVEY_STEPS, GOAL_MOTIVATORS, SPACE_POSTURES } from "@/lib/survey/sections"
 import { resolveSeating, applyDeptMoves, type SeatPlacement, type SeatingPatch, type ResolvedSeating } from "@/lib/survey/seating"
+import { MAP_DEPT_COLORS } from "@/lib/survey/programMap"
 import { isNelsonMode, nelsonCode } from "@/lib/nelsonMode"
 import { loadSurveySeed } from "@/lib/survey/seedStorage"
 import { demoResult } from "@/lib/survey/demo-scenarios"
@@ -51,6 +54,12 @@ export default function StudioPage() {
   const [deptMoves, setDeptMoves] = useState<Record<string, string>>({})
   /** Studio renames — comparison line key → display label (baseline lines only; additions carry their own label). */
   const [labelOverrides, setLabelOverrides] = useState<Record<string, string>>({})
+  /** Per-dept seat allocation — comparison line key → dept id → count. Workstations/Offices only. */
+  const [deptAlloc, setDeptAlloc] = useState<Record<string, Record<string, number>>>({})
+  /** Per-card notes from the room — comparison line key → text. */
+  const [lineNotes, setLineNotes] = useState<Record<string, string>>({})
+  /** The client's mark — a small data URL. */
+  const [logo, setLogo] = useState<string | undefined>(undefined)
 
   const [view, setView] = useState<View>("workbench")
   const [drawer, setDrawer] = useState<Drawer>(null)
@@ -74,32 +83,40 @@ export default function StudioPage() {
   const [heroKpi, setHeroKpi] = useState<"gross" | "rentable">("gross")
   /** Left rail tab — KPIs (default) or the allocation chart. */
   const [railTab, setRailTab] = useState<"kpis" | "allocation">("kpis")
+  /** Left rail collapse — a slim icon strip when the room needs the width back. */
+  const [railCollapsed, setRailCollapsed] = useState(false)
+  /** Which cards have their dept-allocation panel open (Workstations/Offices only). */
+  const [allocOpen, setAllocOpen] = useState<Record<string, boolean>>({})
+  /** Which cards have their notes field open. */
+  const [notesOpen, setNotesOpen] = useState<Record<string, boolean>>({})
 
   // ── Undo / redo — the session's working state, time-travelable ────────────
   type Snap = {
     overrides: DeliverableOverrides; counts: Record<string, number>; additions: DeliverableAddition[]
     notes: Record<string, string>; resolvedGaps: Record<string, boolean>; factors: DeliverableFactors
     peoplePatch: SeatingPatch; deptMoves: Record<string, string>; labelOverrides: Record<string, string>
+    deptAlloc: Record<string, Record<string, number>>; lineNotes: Record<string, string>
   }
   const history = useRef<{ past: Snap[]; future: Snap[]; skip: boolean }>({ past: [], future: [], skip: false })
   const [histVer, setHistVer] = useState(0) // re-render hook for disabled states
   useEffect(() => {
     const h = history.current
     if (h.skip) { h.skip = false; return }
-    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides }
+    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes }
     const last = h.past[h.past.length - 1]
     if (last && JSON.stringify(last) === JSON.stringify(snap)) return
     h.past.push(snap)
     if (h.past.length > 60) h.past.shift()
     h.future = []
     setHistVer((v) => v + 1)
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes])
   const applySnap = (s: Snap) => {
     history.current.skip = true
     setOverrides(s.overrides); setCounts(s.counts); setAdditions(s.additions)
     setNotes(s.notes); setResolvedGaps(s.resolvedGaps); setFactors(s.factors)
     setPeoplePatch(s.peoplePatch ?? {})
     setDeptMoves(s.deptMoves ?? {}); setLabelOverrides(s.labelOverrides ?? {})
+    setDeptAlloc(s.deptAlloc ?? {}); setLineNotes(s.lineNotes ?? {})
     setHistVer((v) => v + 1)
   }
   const undo = () => {
@@ -118,6 +135,14 @@ export default function StudioPage() {
   void histVer
 
   useEffect(() => { setNelson(isNelsonMode()) }, [])
+  // Rail collapse is a personal viewing preference, not engagement data — kept locally.
+  useEffect(() => { setRailCollapsed(localStorage.getItem("nelson:studioRailCollapsed") === "1") }, [])
+  const toggleRailCollapsed = () => {
+    setRailCollapsed((v) => {
+      localStorage.setItem("nelson:studioRailCollapsed", v ? "0" : "1")
+      return !v
+    })
+  }
 
   // Close the settings menu on any click outside it. (A fixed backdrop can't
   // work here: the header's backdrop-blur makes it the containing block for
@@ -143,7 +168,7 @@ export default function StudioPage() {
     sessionToken.current = null
     history.current = { past: [], future: [], skip: false }
     setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({}); setPeoplePatch({})
-    setDeptMoves({}); setLabelOverrides({})
+    setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setLogo(undefined)
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
       if (seed) { setResult(seed); setSource("seed"); return }
@@ -169,6 +194,9 @@ export default function StudioPage() {
           setPeoplePatch(s?.people ?? {})
           setDeptMoves(s?.deptMoves ?? {})
           setLabelOverrides(s?.labels ?? {})
+          setDeptAlloc(s?.deptAlloc ?? {})
+          setLineNotes(s?.lineNotes ?? {})
+          setLogo(s?.logo)
           sessionToken.current = source
         }
       })
@@ -187,13 +215,18 @@ export default function StudioPage() {
       fetch(`/api/engagements/${source}`, {
         method: "PATCH",
         headers: { "x-nelson-code": nelsonCode() ?? "" },
-        body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch, deptMoves, labels: labelOverrides } }),
+        body: JSON.stringify({
+          session: {
+            overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch, deptMoves,
+            labels: labelOverrides, deptAlloc, lineNotes, logo,
+          },
+        }),
       })
         .then(() => setSaveState("saved"))
         .catch(() => setSaveState("idle"))
     }, 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, logo])
 
   // The Department Manager's dept-to-dept moves apply on top of the intake,
   // never mutating it — everything downstream (program math, seating, map,
@@ -206,6 +239,74 @@ export default function StudioPage() {
   )
   const baseline = d?.comp.lines ?? []
   const baseOf = (key: string) => baseline.find((l) => l.key === key)
+
+  // Dept-allocation cross-check: across every card in a category, how many
+  // seats are allocated to a department vs. how many are actually configured
+  // — the family-level answer, not just one card's.
+  const categoryAllocTotals = useMemo(() => {
+    const out: Record<string, { allocated: number; qty: number }> = {}
+    if (!d) return out
+    for (const cat of d.categories) {
+      let allocated = 0
+      let qty = 0
+      for (const l of cat.lines) {
+        const row = deptAlloc[l.key]
+        if (row) allocated += Object.values(row).reduce((a, b) => a + b, 0)
+        qty += l.proposedCount
+      }
+      out[cat.name] = { allocated, qty }
+    }
+    return out
+  }, [d, deptAlloc])
+
+  // The per-dept "ask" a seat-count line should reconcile against — the
+  // survey's own per-dept numbers for offices/workstations, keyed by dept id.
+  const surveyAskByDept = (line: ComparisonLine): Record<string, number> | null => {
+    if (!viewResult) return null
+    if (line.key === "offices") return viewResult.spaces.privateOfficesByDept
+    if (line.key === "workstations") return viewResult.work.dedicatedByDept ?? null
+    return null
+  }
+
+  // The rail's Program status block — configured vs. engine, at the whole-
+  // program level, so the aggregate answer is a glance away without opening
+  // a single card.
+  const programStatusBars = useMemo(() => {
+    if (!d) return [] as { label: string; configured: number; goal: number }[]
+    const out: { label: string; configured: number; goal: number }[] = []
+    for (const catName of ["Workstations", "Offices"] as const) {
+      const cat = d.categories.find((c) => c.name === catName)
+      if (!cat) continue
+      const engineQty = cat.lines.reduce((s, l) => s + (baseOf(l.key)?.proposedCount ?? 0), 0)
+      const configuredQty = cat.lines.reduce((s, l) => s + l.proposedCount, 0)
+      if (engineQty > 0 || configuredQty > 0) out.push({ label: catName, configured: configuredQty, goal: engineQty })
+    }
+    return out
+  }, [d, baseline])
+
+  // Logo upload — downscaled client-side to a small square PNG so the
+  // session record stays light; shows on the rail, the donut, and the deck.
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const handleLogoFile = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new window.Image()
+      img.onload = () => {
+        const size = 256
+        const canvas = document.createElement("canvas")
+        canvas.width = size; canvas.height = size
+        const ctx = canvas.getContext("2d")
+        if (!ctx) return
+        const scale = Math.min(size / img.width, size / img.height)
+        const w = img.width * scale, h = img.height * scale
+        ctx.clearRect(0, 0, size, size)
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h)
+        setLogo(canvas.toDataURL("image/png"))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  }
 
   // ── Derived: who gets the seats — the one seating resolver (lib/survey/seating),
   // also used by the program map, so the Department Manager's moves and the
@@ -438,6 +539,10 @@ export default function StudioPage() {
                 onClick={() => viewResult && d && exportFitPlanningPackage(viewResult, d, {
                   decisions: decisions.map((x) => ({ text: x.text, note: notes[x.id] })),
                   gaps: gaps.map((g) => ({ line: g.line, message: g.message, resolved: !!resolvedGaps[g.id], note: notes[`gapnote:${g.id}`] })),
+                  spaceNotes: Object.entries(lineNotes).filter(([, n]) => n.trim()).map(([key, note]) => ({
+                    line: baseline.find((l) => l.key === key)?.label ?? additions.find((a) => a.key === key)?.label ?? key,
+                    note,
+                  })),
                 })}
                 disabled={!d}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#0e1a2e] px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:opacity-40"
@@ -499,7 +604,7 @@ export default function StudioPage() {
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
                           <button
-                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setMenuOpen(false) }}
+                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setMenuOpen(false) }}
                             className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                           >
                             <Undo2 className="h-3 w-3" /> Reset program edits
@@ -517,27 +622,78 @@ export default function StudioPage() {
           <p className="p-16 text-center text-slate-400"><RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />Loading program…</p>
         ) : (
           <main className={`mx-auto grid max-w-[1900px] gap-6 px-6 py-6 ${
-            briefing ? "grid-cols-[360px_minmax(0,1fr)]" : drawer ? "grid-cols-[280px_minmax(0,1fr)_360px]" : "grid-cols-[280px_minmax(0,1fr)]"
+            railCollapsed
+              ? drawer ? "grid-cols-[64px_minmax(0,1fr)_360px]" : "grid-cols-[64px_minmax(0,1fr)]"
+              : briefing ? "grid-cols-[360px_minmax(0,1fr)]" : drawer ? "grid-cols-[280px_minmax(0,1fr)_360px]" : "grid-cols-[280px_minmax(0,1fr)]"
           }`}>
-            {/* ── Left rail: docked, tabbed, one clear number hierarchy ──────── */}
+            {/* ── Left rail: docked, collapsible, one clear number hierarchy ── */}
             <aside className="sticky top-[57px] h-[calc(100vh-73px)] self-start overflow-y-auto rounded-2xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-100 px-5 py-4">
-                <h2 className={briefing ? "text-xl font-bold" : "text-lg font-bold"}>{d.clientName}</h2>
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                  <span className="tabular-nums">{d.current} people today</span>
-                  <ArrowRightLeft className="h-3 w-3 text-slate-300" />
-                  <span className="tabular-nums">{d.future} at plan</span>
-                  {d.future !== d.current && (
-                    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${d.future > d.current ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                      {d.future > d.current ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                      {d.future > d.current ? "+" : ""}{Math.round(((d.future - d.current) / (d.current || 1)) * 100)}%
+              {railCollapsed ? (
+                /* Collapsed — a slim icon strip; the room gets its width back. */
+                <div className="flex flex-col items-center gap-3 px-2 py-4">
+                  <button
+                    onClick={toggleRailCollapsed}
+                    title="Expand"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </button>
+                  {logo && <img src={logo} alt="" className="h-8 w-8 rounded-lg object-contain" />}
+                  <div className="flex flex-col items-center rounded-lg bg-[#00badc]/10 px-1.5 py-2 text-center" title={`${(heroKpi === "gross" ? d.totals.grossUsableSF : d.totals.estimatedRentableSF).toLocaleString()} SF`}>
+                    <span className="text-[8px] font-bold uppercase text-[#0089a3]">SF</span>
+                    <span className="text-[11px] font-bold tabular-nums text-slate-900">
+                      {Math.round((heroKpi === "gross" ? d.totals.grossUsableSF : d.totals.estimatedRentableSF) / 1000)}k
+                    </span>
+                  </div>
+                  {openGaps > 0 && (
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-700" title={`${openGaps} open gaps`}>
+                      {openGaps}
                     </span>
                   )}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-400">{d.daysInOffice} days/wk</p>
+                  {editedCount > 0 && (
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#00badc]/15 text-[10px] font-bold text-[#0089a3]" title={`${editedCount} decisions`}>
+                      {editedCount}
+                    </span>
+                  )}
+                </div>
+              ) : (
+              <>
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {logo && <img src={logo} alt="" className="h-7 w-7 shrink-0 rounded-lg object-contain" />}
+                    <h2 className={`truncate ${briefing ? "text-xl font-bold" : "text-lg font-bold"}`}>{d.clientName}</h2>
+                  </div>
+                  <button
+                    onClick={toggleRailCollapsed}
+                    title="Collapse"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    <ChevronsLeft className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {/* Identity as stat cells, not a sentence */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Today</p>
+                    <p className="text-lg font-bold tabular-nums leading-tight text-slate-900">{d.current}</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">At plan</p>
+                    <p className="flex items-baseline gap-1 text-lg font-bold tabular-nums leading-tight text-slate-900">
+                      {d.future}
+                      {d.future !== d.current && (
+                        <span className={`text-[10px] font-bold ${d.future > d.current ? "text-emerald-600" : "text-amber-600"}`}>
+                          {d.future > d.current ? "+" : ""}{Math.round(((d.future - d.current) / (d.current || 1)) * 100)}%
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-slate-400">{d.daysInOffice} days/wk</p>
               </div>
 
-              {/* Rail tabs — KPIs (today's read) / Allocation (the chart) */}
+              {/* Rail tabs — KPIs (today's read) / Allocation (the donut) */}
               <div className="flex gap-1 border-b border-slate-100 px-3 py-2">
                 {([["kpis", Gauge, "KPIs"], ["allocation", PieChart, "Allocation"]] as const).map(([id, Icon, label]) => (
                   <button
@@ -559,31 +715,45 @@ export default function StudioPage() {
                     const secondary = heroKpi === "gross" ? d.totals.estimatedRentableSF : d.totals.grossUsableSF
                     const primaryLabel = heroKpi === "gross" ? "Gross usable" : "Est. rentable"
                     const secondaryLabel = heroKpi === "gross" ? "Est. rentable" : "Gross usable"
-                    const grossDelta = d.totals.existingSF > 0 ? d.totals.grossUsableSF - d.totals.existingSF : null
+                    const hasToday = d.totals.existingSF > 0
+                    const grossDelta = hasToday ? d.totals.grossUsableSF - d.totals.existingSF : null
+                    const grossPct = hasToday ? Math.round(((d.totals.grossUsableSF - d.totals.existingSF) / d.totals.existingSF) * 100) : null
+                    const barMax = Math.max(d.totals.existingSF, primary) || 1
                     return (
                       <>
-                        {/* Tier 1 — the magic number, whichever the designer leads with */}
+                        {/* Tier 1 — before → after → change; the baseline is never invisible */}
                         <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0089a3]">{primaryLabel}</p>
-                        <div className="flex flex-wrap items-baseline gap-2">
+                        {hasToday && (
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            Today <b className="tabular-nums text-slate-600">{d.totals.existingSF.toLocaleString()}</b> SF
+                          </p>
+                        )}
+                        <div className="mt-0.5 flex flex-wrap items-baseline gap-2">
                           <p className={`${briefing ? "text-5xl" : "text-4xl"} font-bold tabular-nums tracking-tight`}>
                             {primary.toLocaleString()}<span className="ml-1 text-base font-medium text-slate-400">SF</span>
                           </p>
-                          {heroKpi === "gross" && grossDelta !== null && (
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${grossDelta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-emerald-50 text-emerald-700"}`}>
-                              {grossDelta >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                              {grossDelta >= 0 ? "+" : ""}{grossDelta.toLocaleString()} vs today
-                            </span>
-                          )}
                         </div>
+                        {heroKpi === "gross" && grossDelta !== null && (
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                            {grossDelta >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {grossDelta >= 0 ? "+" : ""}{grossDelta.toLocaleString()} SF{grossPct !== null ? ` (${grossPct >= 0 ? "+" : ""}${grossPct}%)` : ""} vs today
+                          </span>
+                        )}
+                        {/* the comparison, drawn — muted "today" bar over the hero's own bar */}
+                        {hasToday && (
+                          <div className="mt-3">
+                            <div className="h-2 w-full rounded-full bg-slate-100">
+                              <div className="h-2 rounded-full bg-slate-300" style={{ width: `${(d.totals.existingSF / barMax) * 100}%` }} />
+                            </div>
+                            <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-[#00badc]/10">
+                              <div className="h-2 rounded-full bg-[#00badc]" style={{ width: `${(primary / barMax) * 100}%` }} />
+                            </div>
+                          </div>
+                        )}
                         {/* right next to it — the counterpart KPI, not buried */}
-                        <p className="mt-1.5 text-sm text-slate-500">
+                        <p className="mt-2.5 text-sm text-slate-500">
                           {secondaryLabel} <b className="tabular-nums text-slate-700">{secondary.toLocaleString()}</b> SF
                           {heroKpi === "gross" && <span className="text-slate-400"> · ×{(1 + d.totals.rentableFactor).toFixed(2)} load</span>}
-                          {heroKpi === "rentable" && grossDelta !== null && (
-                            <span className={`ml-1.5 font-semibold ${grossDelta >= 0 ? "text-emerald-600" : "text-emerald-600"}`}>
-                              ({grossDelta >= 0 ? "+" : ""}{grossDelta.toLocaleString()} vs today)
-                            </span>
-                          )}
                         </p>
 
                         {result?.goals?.targetSF ? (
@@ -625,35 +795,20 @@ export default function StudioPage() {
               ) : (
                 <div className="p-5">
                   <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Space allocation</h3>
-                  {(() => {
-                    const target = result?.goals?.targetSF
-                    const max = Math.max(d.totals.grossUsableSF, target ?? 0) || 1
-                    return (
-                      <div className="relative mt-3">
-                        <div className="flex h-3 gap-[2px] overflow-hidden rounded-full" style={{ width: `${(d.totals.grossUsableSF / max) * 100}%` }}>
-                          {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
-                            <span
-                              key={c.name}
-                              title={`${c.name} · ${c.proposedTotalSF.toLocaleString()} SF incl. circulation`}
-                              className="h-full rounded-[2px] first:rounded-l-full last:rounded-r-full"
-                              style={{
-                                width: `${(c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100}%`,
-                                backgroundColor: CATEGORY_COLORS[c.name].accent,
-                              }}
-                            />
-                          ))}
-                        </div>
-                        {target ? (
-                          <span
-                            title={`Their number · ${target.toLocaleString()} SF`}
-                            className="absolute -inset-y-1 w-[2.5px] rounded-full bg-[#0e1a2e]"
-                            style={{ left: `${Math.min(99.5, (target / max) * 100)}%` }}
-                          />
-                        ) : null}
-                      </div>
-                    )
-                  })()}
-                  <div className="mt-3 space-y-2 text-[13px] tabular-nums">
+                  <DonutChart categories={d.categories} total={d.totals.grossUsableSF} logo={logo} />
+                  <div className="mt-2 flex justify-center">
+                    <button
+                      onClick={() => logoInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:border-[#00badc]/40 hover:text-[#0089a3]"
+                    >
+                      <Upload className="h-3 w-3" /> {logo ? "Replace logo" : "Upload logo"}
+                    </button>
+                    <input
+                      ref={logoInputRef} type="file" accept="image/*" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = "" }}
+                    />
+                  </div>
+                  <div className="mt-4 space-y-2 text-[13px] tabular-nums">
                     {d.categories.map((c) => (
                       <div key={c.name} className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: CATEGORY_COLORS[c.name].accent }} />
@@ -668,6 +823,70 @@ export default function StudioPage() {
                 </div>
               )}
 
+              {/* Program status — configured vs. engine, the whole program, one glance */}
+              {programStatusBars.length > 0 && (
+                <div className="border-t border-slate-100 p-5">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Program status</h3>
+                  <div className="mt-3 space-y-3">
+                    {programStatusBars.map((b) => {
+                      const pct = b.goal > 0 ? Math.min(100, (b.configured / b.goal) * 100) : 0
+                      const diff = b.goal - b.configured
+                      return (
+                        <div key={b.label}>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-medium text-slate-600">{b.label}</span>
+                            <span className="tabular-nums text-slate-500">
+                              {b.configured} / {b.goal}{diff > 0 ? ` (${diff} short)` : diff < 0 ? ` (${-diff} over)` : " (matched)"}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 rounded-full bg-slate-100">
+                            <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: diff > 0 ? "#f59e0b" : diff < 0 ? "#f43f5e" : "#10b981" }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {result?.goals?.targetSF && (() => {
+                      const goal = result.goals!.targetSF!
+                      const configured = d.totals.grossUsableSF
+                      const pct = goal > 0 ? Math.min(100, (configured / goal) * 100) : 0
+                      const diff = goal - configured
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-medium text-slate-600">Target SF</span>
+                            <span className="tabular-nums text-slate-500">
+                              {configured.toLocaleString()} / {goal.toLocaleString()}{diff > 0 ? ` (${diff.toLocaleString()} short)` : diff < 0 ? ` (${(-diff).toLocaleString()} over)` : " (matched)"}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 rounded-full bg-slate-100">
+                            <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: diff > 0 ? "#f59e0b" : diff < 0 ? "#f43f5e" : "#10b981" }} />
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* In this session — the live aggregate of what's being worked */}
+              <div className="border-t border-slate-100 p-5">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">In this session</h3>
+                <div className="mt-3 space-y-2 text-[13px]">
+                  <button onClick={() => setDrawer("decisions")} className="flex w-full items-center justify-between text-slate-600 transition-colors hover:text-slate-900">
+                    <span className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5 text-slate-400" /> Edits made</span>
+                    <b className="tabular-nums">{editedCount}</b>
+                  </button>
+                  <button onClick={() => setDrawer("gaps")} className="flex w-full items-center justify-between text-slate-600 transition-colors hover:text-slate-900">
+                    <span className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-slate-400" /> Gaps closed</span>
+                    <b className="tabular-nums">{gaps.filter((g) => resolvedGaps[g.id]).length} / {gaps.length}</b>
+                  </button>
+                  <button onClick={() => setView("people")} className="flex w-full items-center justify-between text-slate-600 transition-colors hover:text-slate-900">
+                    <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-slate-400" /> People moved</span>
+                    <b className="tabular-nums">{decisions.filter((x) => x.id.startsWith("seat:") || x.id.startsWith("dept:")).length}</b>
+                  </button>
+                </div>
+              </div>
+
               {/* Briefing: the session's story rides the summary column */}
               {briefing && decisions.length > 0 && (
                 <div className="border-t border-slate-100 p-5">
@@ -681,6 +900,8 @@ export default function StudioPage() {
                     {decisions.length > 5 && <p className="text-xs text-slate-400">+ {decisions.length - 5} more on the record</p>}
                   </div>
                 </div>
+              )}
+              </>
               )}
             </aside>
 
@@ -756,9 +977,14 @@ export default function StudioPage() {
                   if (!visible.length) return null
                   const cc = CATEGORY_COLORS[cat.name]
                   const asTable = !briefing && !!tableCats[cat.name]
+                  // Configured vs. what the engine recommends, at the category level —
+                  // the same triangle the cards show, aggregated to a glance.
+                  const engineQty = cat.lines.reduce((s, l) => s + (baseOf(l.key)?.proposedCount ?? 0), 0)
+                  const configuredQty = cat.lines.reduce((s, l) => s + l.proposedCount, 0)
+                  const toGo = engineQty - configuredQty
                   return (
                     <div key={cat.name} className="mb-8">
-                      <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: cc.text }}>
+                      <h3 className="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: cc.text }}>
                         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cc.accent }} />
                         {cat.name}
                         <span className="ml-1 font-medium normal-case tracking-normal text-slate-400">
@@ -774,6 +1000,20 @@ export default function StudioPage() {
                           </button>
                         )}
                       </h3>
+                      {!briefing && engineQty > 0 && (
+                        <div className="mb-3 flex items-center gap-2.5">
+                          <div className="h-1.5 max-w-xs flex-1 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${Math.min(100, (configuredQty / engineQty) * 100)}%`, backgroundColor: cc.accent }}
+                            />
+                          </div>
+                          <span className="whitespace-nowrap text-[11px] font-medium tabular-nums text-slate-400">
+                            configured <b className="text-slate-600">{configuredQty}</b> / engine <b className="text-slate-600">{engineQty}</b>
+                            {toGo > 0 ? ` · ${toGo} to go` : toGo < 0 ? ` · ${-toGo} over` : " · matched"}
+                          </span>
+                        </div>
+                      )}
                       {asTable ? (
                         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                           <table className="w-full text-sm">
@@ -808,6 +1048,18 @@ export default function StudioPage() {
                                 ? (category) => setAdditions((p) => p.map((a) => (a.key === l.key ? { ...a, category } : a)))
                                 : undefined
                             }
+                            departments={viewResult.people.departments.map((dep, i) => ({ id: dep.id, name: dep.name, color: MAP_DEPT_COLORS[i % MAP_DEPT_COLORS.length] }))}
+                            deptAlloc={deptAlloc[l.key] ?? {}}
+                            onAllocChange={(deptId, n) => setDeptAlloc((p) => ({ ...p, [l.key]: { ...p[l.key], [deptId]: Math.max(0, n) } }))}
+                            surveyAskByDept={surveyAskByDept(l)}
+                            categoryAllocated={categoryAllocTotals[cat.name]?.allocated ?? 0}
+                            categoryQty={categoryAllocTotals[cat.name]?.qty ?? 0}
+                            allocOpen={!!allocOpen[l.key]}
+                            onToggleAlloc={() => setAllocOpen((p) => ({ ...p, [l.key]: !p[l.key] }))}
+                            note={lineNotes[l.key] ?? ""}
+                            onNote={(text) => setLineNotes((p) => ({ ...p, [l.key]: text }))}
+                            notesOpen={!!notesOpen[l.key]}
+                            onToggleNotes={() => setNotesOpen((p) => ({ ...p, [l.key]: !p[l.key] }))}
                           />
                         ))}
                         {!briefing && (
@@ -1083,6 +1335,8 @@ const ADDITION_CATEGORIES: CompCategory[] = ["Workstations", "Offices", "Collabo
 
 function SpaceCard({
   line, base, result, briefing, colors, showChips, showRatios, compact, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename, onCategory,
+  departments, deptAlloc, onAllocChange, surveyAskByDept, categoryAllocated, categoryQty, allocOpen, onToggleAlloc,
+  note, onNote, notesOpen, onToggleNotes,
 }: {
   line: ComparisonLine
   base?: ComparisonLine
@@ -1103,6 +1357,19 @@ function SpaceCard({
   onRename?: (name: string) => void
   /** Custom (studio-added) cards only — which category's total this counts toward. */
   onCategory?: (category: CompCategory) => void
+  /** Dept-allocation panel — Workstations/Offices only (collab/support skip it by design). */
+  departments: { id: string; name: string; color: string }[]
+  deptAlloc: Record<string, number>
+  onAllocChange: (deptId: string, n: number) => void
+  surveyAskByDept: Record<string, number> | null
+  categoryAllocated: number
+  categoryQty: number
+  allocOpen: boolean
+  onToggleAlloc: () => void
+  note: string
+  onNote: (text: string) => void
+  notesOpen: boolean
+  onToggleNotes: () => void
 }) {
   const [who, setWho] = useState(false)
   const deptName = (id: string) => result.people.departments.find((x) => x.id === id)?.name ?? id
@@ -1142,6 +1409,14 @@ function SpaceCard({
     const item = result.spaces.collaboration.find((c) => c.type === line.key.replace(/^collab:/, ""))
     alloc = Object.entries(item?.byDept ?? {}).filter(([, v]) => v > 0).map(([k, v]) => [deptName(k), v])
   }
+
+  // Seat accounting — where every configured seat goes, by department.
+  // Scoped to Workstations/Offices only; collab/support share space by design
+  // and don't map one-to-one to a person.
+  const seatAccounted = line.category === "Workstations" || line.category === "Offices"
+  const allocatedTotal = Object.values(deptAlloc).reduce((a, b) => a + b, 0)
+  const unassigned = Math.max(0, line.proposedCount - allocatedTotal)
+  const over = Math.max(0, allocatedTotal - line.proposedCount)
 
   return (
     <div
@@ -1215,49 +1490,55 @@ function SpaceCard({
         </div>
       )}
 
-      <div className="flex items-center gap-3 px-4 py-2.5">
-        {briefing ? (
+      {briefing ? (
+        <div className="flex items-center gap-3 px-4 py-2.5">
           <span className="text-sm text-slate-600 tabular-nums">{line.proposedCount} × {line.unitSF} SF{dims(line.unitSF) ? ` (${dims(line.unitSF)})` : ""}</span>
-        ) : (
-          <>
-            {/* Qty leads — the count matters more than the unit size */}
-            <div className="flex items-center gap-1">
+          <span className="ml-auto text-sm font-bold tabular-nums text-slate-900">{(line.proposedCount * line.unitSF).toLocaleString()} SF</span>
+        </div>
+      ) : (
+        /* Number grid — QTY / SF EA / TOTAL SF as labeled cells, the same
+           anatomy everywhere in the Studio; qty gets width to spare so a
+           3-digit count never clips. */
+        <div className="mx-4 mb-2.5 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-slate-100 bg-slate-100">
+          <div className="bg-white px-2.5 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Qty</p>
+            <div className="mt-1 flex items-center gap-0.5">
               <button
                 onClick={() => onQty(Math.max(0, line.proposedCount - 1))}
                 aria-label="Decrease quantity"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#00badc]/10 text-[#0089a3] transition-colors hover:bg-[#00badc]/20"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00badc]/10 text-[#0089a3] transition-colors hover:bg-[#00badc]/20"
               >
-                <Minus className="h-3.5 w-3.5" />
+                <Minus className="h-3 w-3" />
               </button>
               <input
                 type="number" min={0} value={line.proposedCount}
                 onChange={(e) => onQty(Math.max(0, Number(e.target.value)))}
-                className="w-11 rounded-md border-none bg-transparent text-center text-xl font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
+                className="w-full min-w-0 rounded-md border-none bg-transparent text-center text-lg font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
               />
               <button
                 onClick={() => onQty(line.proposedCount + 1)}
                 aria-label="Increase quantity"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#00badc]/10 text-[#0089a3] transition-colors hover:bg-[#00badc]/20"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00badc]/10 text-[#0089a3] transition-colors hover:bg-[#00badc]/20"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3 w-3" />
               </button>
             </div>
-            <label className="flex items-center gap-1 text-[11px] text-slate-400">
-              ×
-              <input
-                type="number" min={1} value={line.unitSF}
-                onChange={(e) => onSf(e.target.value === "" ? null : Number(e.target.value))}
-                className="w-14 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-right text-xs tabular-nums focus:border-[#00badc] focus:outline-none"
-              />
-              SF
-            </label>
-            {!compact && dims(line.unitSF) && <span className="text-[11px] font-medium text-[#0089a3]">{dims(line.unitSF)}</span>}
-          </>
-        )}
-        <span className="ml-auto text-sm font-bold tabular-nums text-slate-900">
-          {(line.proposedCount * line.unitSF).toLocaleString()} SF
-        </span>
-      </div>
+          </div>
+          <div className="bg-white px-2.5 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">SF ea</p>
+            <input
+              type="number" min={1} value={line.unitSF}
+              onChange={(e) => onSf(e.target.value === "" ? null : Number(e.target.value))}
+              className="mt-1 w-full min-w-0 rounded-md border-none bg-transparent text-center text-lg font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
+            />
+            {!compact && dims(line.unitSF) && <p className="text-center text-[10px] font-medium text-[#0089a3]">{dims(line.unitSF)}</p>}
+          </div>
+          <div className="bg-[#e9f7fb]/60 px-2.5 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wide text-[#0089a3]">Total SF</p>
+            <p className="mt-1.5 text-center text-lg font-bold tabular-nums text-slate-900">{(line.proposedCount * line.unitSF).toLocaleString()}</p>
+          </div>
+        </div>
+      )}
 
       {showChips && alloc.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 px-4 py-2">
@@ -1280,6 +1561,110 @@ function SpaceCard({
               {p.extra > 0 && `${p.names.length ? " + " : ""}${p.extra} unnamed`}
             </p>
           ))}
+        </div>
+      )}
+
+      {/* Dept allocation — collapsible, seat-accounted lines only. Answers
+          "we added two, where did they go" and "we cut one, who loses a
+          seat" with real per-department numbers instead of a silent total. */}
+      {!briefing && seatAccounted && (
+        <div className="border-t border-slate-100">
+          <button
+            onClick={onToggleAlloc}
+            className="flex w-full items-center justify-between px-4 py-2 text-left transition-colors hover:bg-slate-50"
+          >
+            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              {allocOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              Dept allocation
+            </span>
+            {unassigned > 0 ? (
+              <span className="text-[11px] font-bold text-orange-600">{unassigned} unassigned</span>
+            ) : over > 0 ? (
+              <span className="text-[11px] font-bold text-rose-600">{over} over</span>
+            ) : allocatedTotal > 0 ? (
+              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600"><Check className="h-3 w-3" /> fully seated</span>
+            ) : (
+              <span className="text-[11px] text-slate-300">not allocated</span>
+            )}
+          </button>
+          {allocOpen && (
+            <div className="px-4 pb-3">
+              {categoryQty > 0 && (
+                <p className="mb-2 text-[10px] leading-relaxed text-slate-400">
+                  Across all {line.category} cards: <b className="text-slate-600">{categoryAllocated} / {categoryQty}</b> planned
+                </p>
+              )}
+              <div className="space-y-1">
+                {departments.map((dep) => {
+                  const val = deptAlloc[dep.id] ?? 0
+                  const ask = surveyAskByDept?.[dep.id]
+                  const matches = ask !== undefined && val === ask
+                  const diverges = ask !== undefined && ask > 0 && !matches
+                  return (
+                    <div key={dep.id} className="flex items-center justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-1.5 truncate text-xs text-slate-700">
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: dep.color }} />
+                        <span className="truncate">{dep.name}</span>
+                        {matches && <Check className="h-3 w-3 shrink-0 text-emerald-500" aria-label="Matches what the survey asked for this department" />}
+                        {diverges && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title={`Survey asked ${ask} for this department`} />}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1">
+                        <button
+                          onClick={() => onAllocChange(dep.id, val - 1)}
+                          aria-label={`Decrease ${dep.name} allocation`}
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+                        >
+                          <Minus className="h-2.5 w-2.5" />
+                        </button>
+                        <span className="w-5 text-center text-xs font-semibold tabular-nums text-slate-800">{val}</span>
+                        <button
+                          onClick={() => onAllocChange(dep.id, val + 1)}
+                          aria-label={`Increase ${dep.name} allocation`}
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+                        >
+                          <Plus className="h-2.5 w-2.5" />
+                        </button>
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="mt-2.5 border-t border-slate-100 pt-2">
+                {unassigned > 0 && (
+                  <p className="text-[11px] font-medium text-orange-600">{unassigned} configured but not yet given to a department.</p>
+                )}
+                {over > 0 && (
+                  <p className="text-[11px] font-medium text-rose-600">{over} more allocated than configured — trim a department below, or raise the qty above.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Notes — what the room said, riding into the brief and the fit-planning package. */}
+      {!briefing && (
+        <div className="border-t border-slate-100">
+          <button
+            onClick={onToggleNotes}
+            className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-[11px] font-medium text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600"
+          >
+            <StickyNote className="h-3 w-3" />
+            Notes
+            {note.trim() && <span className="h-1.5 w-1.5 rounded-full bg-[#00badc]" />}
+            <span className="ml-auto">{notesOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}</span>
+          </button>
+          {notesOpen && (
+            <div className="px-4 pb-3">
+              <textarea
+                value={note}
+                onChange={(e) => onNote(e.target.value)}
+                placeholder="Add notes about this space…"
+                rows={2}
+                className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-[#00badc] focus:outline-none"
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1598,6 +1983,42 @@ function Block({ label, children }: { label: string; children: React.ReactNode }
     <div className="rounded-xl border border-slate-200 p-3">
       <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
       {children}
+    </div>
+  )
+}
+
+/** The category mix, drawn — the client's own mark at the center when uploaded. */
+function DonutChart({ categories, total, logo }: { categories: DeliverableCategory[]; total: number; logo?: string }) {
+  const R = 38
+  const C = 2 * Math.PI * R
+  let offset = 0
+  const segments = categories.filter((c) => c.proposedTotalSF > 0)
+  return (
+    <div className="relative mx-auto mt-3 h-32 w-32">
+      <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+        <circle cx="50" cy="50" r={R} fill="none" stroke="#f1f5f9" strokeWidth="13" />
+        {segments.map((c) => {
+          const frac = c.proposedTotalSF / (total || 1)
+          const dash = frac * C
+          const el = (
+            <circle
+              key={c.name} cx="50" cy="50" r={R} fill="none" stroke={CATEGORY_COLORS[c.name].accent} strokeWidth="13"
+              strokeDasharray={`${dash} ${C - dash}`} strokeDashoffset={-offset} strokeLinecap="butt"
+            >
+              <title>{`${c.name} · ${c.proposedTotalSF.toLocaleString()} SF · ${Math.round(frac * 100)}%`}</title>
+            </circle>
+          )
+          offset += dash
+          return el
+        })}
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {logo ? (
+          <img src={logo} alt="" className="h-14 w-14 rounded-full object-contain" />
+        ) : (
+          <Image src="/NELSON_color.png" alt="" width={56} height={56} className="h-8 w-auto opacity-40" />
+        )}
+      </div>
     </div>
   )
 }

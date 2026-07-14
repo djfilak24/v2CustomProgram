@@ -46,6 +46,17 @@ export interface EngagementSession {
   deptMoves?: Record<string, string>
   /** Studio renames — comparison line key → display label. */
   labels?: Record<string, string>
+  /**
+   * Per-department allocation for a line — comparison line key → department
+   * id → count. Seeded from the survey's own per-dept ask; a session-level
+   * refinement that never touches the intake. Only meaningful for lines
+   * where a person actually occupies the seat (workstations, offices).
+   */
+  deptAlloc?: Record<string, Record<string, number>>
+  /** Per-card notes from the room — comparison line key → text. Rides into the designer brief and the fit-planning package. */
+  lineNotes?: Record<string, string>
+  /** The client's mark — a small data URL, shown on the rail, briefing, and deck cover. */
+  logo?: string
   /** Deliverable beat composer — slide id → included (absent = included). */
   beats?: Record<string, boolean>
   updatedAt: string

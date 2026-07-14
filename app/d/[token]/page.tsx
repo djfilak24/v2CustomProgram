@@ -36,6 +36,8 @@ interface DeckSession {
   people?: { officeEmployeeIds?: string[]; deskEmployeeIds?: string[] }
   /** Studio renames — comparison line key → display label. */
   labels?: Record<string, string>
+  /** The client's mark, uploaded in the Studio — rides onto the cover. */
+  logo?: string
   /** The beat composer: slide id → included (absent = included). */
   beats?: Record<string, boolean>
 }
@@ -326,7 +328,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
           key={s}
           className={`slide relative ${i === idx ? "flex slide-in" : "hidden"} min-h-screen flex-col print:flex print:min-h-0 print:h-[7.5in] print:w-[13.333in] print:overflow-hidden`}
         >
-          {s === "cover" && <CoverSlide clientName={meta.clientName} d={d} result={result!} />}
+          {s === "cover" && <CoverSlide clientName={meta.clientName} d={d} result={result!} logo={session?.logo} />}
           {s === "who" && <WhoSlide d={d} result={result!} />}
           {s === "growth" && <GrowthSlide result={result!} />}
           {s === "howwork" && <HowWorkSlide d={d} result={result!} />}
@@ -411,7 +413,7 @@ export default function DeliverablePage({ params }: { params: Promise<{ token: s
 
 /* ── Slides ────────────────────────────────────────────────────────────────── */
 
-function CoverSlide({ clientName, d, result }: { clientName: string; d: NonNullable<ReturnType<typeof buildDeliverable>>; result: SurveyResult }) {
+function CoverSlide({ clientName, d, result, logo }: { clientName: string; d: NonNullable<ReturnType<typeof buildDeliverable>>; result: SurveyResult; logo?: string }) {
   // The cover alone summarizes the engagement (Advisory #5).
   const oneLiner = [
     `${d.current} → ${d.future} people`,
@@ -424,7 +426,15 @@ function CoverSlide({ clientName, d, result }: { clientName: string; d: NonNulla
       <Image src="/office-1.jpg" alt="" fill className="object-cover opacity-25" priority />
       <div className="absolute inset-0 bg-gradient-to-t from-[#0e1a2e] via-transparent to-[#0e1a2e]/60" />
       <div className="relative z-10 flex flex-1 flex-col justify-between p-10 sm:p-16">
-        <Image src="/NELSON_whiteBlueFin.png" alt="NELSON" width={190} height={45} className="h-9 w-auto self-start" priority />
+        <div className="flex items-center justify-between">
+          <Image src="/NELSON_whiteBlueFin.png" alt="NELSON" width={190} height={45} className="h-9 w-auto" priority />
+          {logo && (
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/95 p-2 shadow-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logo} alt={`${clientName} mark`} className="h-full w-full object-contain" />
+            </div>
+          )}
+        </div>
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#00badc]">Workplace Program</p>
           <h1 className="mt-4 max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl">{clientName}</h1>

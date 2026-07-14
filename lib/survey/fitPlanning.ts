@@ -42,6 +42,8 @@ function sheet(rows: Cell[][], widths: number[]): XLSX.WorkSheet {
 export interface FitPlanningExtras {
   decisions?: { text: string; note?: string }[]
   gaps?: { line: string; message: string; resolved: boolean; note?: string }[]
+  /** Per-card notes from the room — the color commentary a spreadsheet never captures on its own. */
+  spaceNotes?: { line: string; note: string }[]
 }
 
 export function buildFitPlanningWorkbook(result: SurveyResult, d: Deliverable, extras?: FitPlanningExtras): XLSX.WorkBook {
@@ -198,6 +200,15 @@ export function buildFitPlanningWorkbook(result: SurveyResult, d: Deliverable, e
       ...extras.gaps.map((g) => [cell(g.line), cell(g.message), cell(g.resolved ? "Resolved" : "OPEN"), cell(g.note ?? "")]),
     ]
     XLSX.utils.book_append_sheet(wb, sheet(rows, [26, 50, 10, 36]), "Gaps")
+  }
+  if (extras?.spaceNotes?.length) {
+    const rows: Cell[][] = [
+      [title("Notes from the room — per space")],
+      [],
+      [header("Space"), header("Note")],
+      ...extras.spaceNotes.map((n) => [cell(n.line), cell(n.note)]),
+    ]
+    XLSX.utils.book_append_sheet(wb, sheet(rows, [30, 70]), "Space Notes")
   }
 
   return wb

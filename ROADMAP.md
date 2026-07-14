@@ -63,6 +63,13 @@ comps approved in principle; scenario scorecard run — see
 [SCENARIO_SCORECARD.md](./SCENARIO_SCORECARD.md) for scores, gaps CC-1…CC-6,
 and the loop plan (S4 and S5 are the journeys to re-score).*
 
+*Status 2026-07-14: the 0.1 hierarchy pass is shipped in `/studio` —
+**Evidence Stack** cards, a flush command spine, and a canvas-wide summary
+masthead. Engine · survey · today · departments · allocation · dimensions ·
+notes are independent visibility layers, with Working Session, Client Review,
+and Numbers Only presets. The five card and five summary studies remain at
+`/lab/studio-hierarchy` as the decision record.*
+
 *Status 2026-07-13 (overnight, loop iteration 1): **A1, A2, A3 shipped** —
 Studio sessions persist to the engagement and the deck renders them
 (including the "What we decided together" slide); the target runs survey →

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { KeyRound, Target, LayoutGrid, GitCompareArrows, Presentation, ArrowRight, FlaskConical, MonitorPlay } from "lucide-react"
+import { KeyRound, Target, LayoutGrid, GitCompareArrows, Presentation, ArrowRight, FlaskConical, MonitorPlay, Layers3 } from "lucide-react"
 import { isNelsonMode } from "@/lib/nelsonMode"
 
 /**
@@ -13,6 +13,15 @@ import { isNelsonMode } from "@/lib/nelsonMode"
  * real numbers behind it. NELSON-only.
  */
 const EXPLORATIONS = [
+  {
+    href: "/lab/studio-hierarchy",
+    icon: Layers3,
+    tag: "0.1 · hierarchy study",
+    title: "Studio cards + summary systems",
+    question:
+      "Five card anatomies and five anchored summary systems, all carrying the real engine / survey / today / configured evidence stack.",
+    accent: "#00badc",
+  },
   {
     href: "/lab/target",
     icon: Target,

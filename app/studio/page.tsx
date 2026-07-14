@@ -27,6 +27,8 @@ interface EngRow { token: string; clientName: string; status: string; hasResult:
 interface SeatGroup { dept: string; names: string[]; extra: number }
 type View = "workbench" | "focus" | "briefing" | "people"
 type Drawer = "gaps" | "decisions" | "survey" | null
+type LayerPreset = "working" | "client" | "numbers"
+type LayerKey = "engine" | "survey" | "today" | "departments" | "allocations" | "dimensions" | "notes"
 
 /**
  * The Studio v2 — the NELSON engagement workbench, rebuilt to the founder's
@@ -74,7 +76,13 @@ export default function StudioPage() {
   const mapRef = useRef<HTMLDivElement>(null)
   // Display toggles (the old canvas's show/hide dials, reborn in settings)
   const [showDeptChips, setShowDeptChips] = useState(true)
+  /** Independent evidence layers: the room controls what is visible without changing the program. */
   const [showRatios, setShowRatios] = useState(true)
+  const [showSurveyEvidence, setShowSurveyEvidence] = useState(true)
+  const [showTodayEvidence, setShowTodayEvidence] = useState(true)
+  const [showAllocations, setShowAllocations] = useState(true)
+  const [showDimensions, setShowDimensions] = useState(true)
+  const [showNotesLayer, setShowNotesLayer] = useState(true)
   /** Workbench detail layers: full = every connected data point; compact = the numbers. */
   const [compactCards, setCompactCards] = useState(false)
   /** Per-category card ↔ table pivot in the Workbench. */
@@ -142,6 +150,24 @@ export default function StudioPage() {
       localStorage.setItem("nelson:studioRailCollapsed", v ? "0" : "1")
       return !v
     })
+  }
+
+  const applyLayerPreset = (preset: LayerPreset) => {
+    if (preset === "working") {
+      setShowRatios(true); setShowSurveyEvidence(true); setShowTodayEvidence(true)
+      setShowDeptChips(true); setShowAllocations(true); setShowDimensions(true); setShowNotesLayer(true)
+      setCompactCards(false)
+      return
+    }
+    if (preset === "client") {
+      setShowRatios(true); setShowSurveyEvidence(true); setShowTodayEvidence(true)
+      setShowDeptChips(true); setShowAllocations(false); setShowDimensions(true); setShowNotesLayer(false)
+      setCompactCards(false)
+      return
+    }
+    setShowRatios(false); setShowSurveyEvidence(false); setShowTodayEvidence(false)
+    setShowDeptChips(false); setShowAllocations(false); setShowDimensions(false); setShowNotesLayer(false)
+    setCompactCards(true)
   }
 
   // Close the settings menu on any click outside it. (A fixed backdrop can't
@@ -462,10 +488,10 @@ export default function StudioPage() {
         {detail && <SpaceDetailModal space={detail} onClose={() => setDetail(null)} />}
 
         {/* Header */}
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-6 py-2.5 backdrop-blur-md">
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-4 py-2.5 backdrop-blur-md 2xl:px-6">
           <div className="mx-auto flex max-w-[1900px] items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Image src="/NELSON_color.png" alt="NELSON" width={140} height={33} className="h-6 w-auto" priority />
+            <div className="flex min-w-0 items-center gap-2 2xl:gap-3">
+              <Image src="/NELSON_color.png" alt="NELSON" width={140} height={33} className="h-5 w-auto 2xl:h-6" priority />
               <span className="text-sm text-slate-400">·</span>
               <span className="text-sm font-medium text-slate-700">Studio</span>
               {/* View presets — Advisory #6.10 */}
@@ -474,16 +500,17 @@ export default function StudioPage() {
                   <button
                     key={id}
                     onClick={() => { setView(id); if (id === "briefing") setDrawer(null) }}
+                    title={label}
                     className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                       view === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    <Icon className="h-3.5 w-3.5" /> {label}
+                    <Icon className="h-3.5 w-3.5" /> <span className={id === "workbench" ? "" : "hidden 2xl:inline"}>{label}</span>
                   </button>
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-1.5 2xl:gap-2">
               {!briefing && (
                 <span className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
                   <button
@@ -500,19 +527,19 @@ export default function StudioPage() {
                   </button>
                 </span>
               )}
-              <DrawerBtn active={showMap} onClick={() => setShowMap(!showMap)} icon={<MapIcon className="h-3.5 w-3.5" />}>
-                Map
+              <DrawerBtn label="Program map" active={showMap} onClick={() => setShowMap(!showMap)} icon={<MapIcon className="h-3.5 w-3.5" />}>
+                <span className="hidden 2xl:inline">Map</span>
               </DrawerBtn>
               {!briefing && (
                 <>
-                  <DrawerBtn active={drawer === "gaps"} onClick={() => setDrawer(drawer === "gaps" ? null : "gaps")} icon={<AlertTriangle className="h-3.5 w-3.5" />}>
-                    Gaps{openGaps > 0 && <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-700">{openGaps}</span>}
+                  <DrawerBtn label="Gaps" active={drawer === "gaps"} onClick={() => setDrawer(drawer === "gaps" ? null : "gaps")} icon={<AlertTriangle className="h-3.5 w-3.5" />}>
+                    <span className="hidden 2xl:inline">Gaps</span>{openGaps > 0 && <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-700">{openGaps}</span>}
                   </DrawerBtn>
-                  <DrawerBtn active={drawer === "decisions"} onClick={() => setDrawer(drawer === "decisions" ? null : "decisions")} icon={<ClipboardList className="h-3.5 w-3.5" />}>
-                    Decisions{editedCount > 0 && <span className="ml-1 rounded-full bg-[#00badc]/15 px-1.5 text-[10px] font-bold text-[#0089a3]">{editedCount}</span>}
+                  <DrawerBtn label="Decisions" active={drawer === "decisions"} onClick={() => setDrawer(drawer === "decisions" ? null : "decisions")} icon={<ClipboardList className="h-3.5 w-3.5" />}>
+                    <span className="hidden 2xl:inline">Decisions</span>{editedCount > 0 && <span className="ml-1 rounded-full bg-[#00badc]/15 px-1.5 text-[10px] font-bold text-[#0089a3]">{editedCount}</span>}
                   </DrawerBtn>
-                  <DrawerBtn active={drawer === "survey"} onClick={() => setDrawer(drawer === "survey" ? null : "survey")} icon={<Users className="h-3.5 w-3.5" />}>
-                    Survey
+                  <DrawerBtn label="Survey" active={drawer === "survey"} onClick={() => setDrawer(drawer === "survey" ? null : "survey")} icon={<Users className="h-3.5 w-3.5" />}>
+                    <span className="hidden 2xl:inline">Survey</span>
                   </DrawerBtn>
                   <span className="mx-1 h-5 w-px bg-slate-200" />
                 </>
@@ -529,7 +556,7 @@ export default function StudioPage() {
               <select
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
-                className="max-w-56 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-[#00badc] focus:outline-none"
+                className="w-44 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-[#00badc] focus:outline-none 2xl:w-56"
               >
                 <option value="seed">Local seed / last reviewed</option>
                 <option value="demo">Demo — Law Firm</option>
@@ -545,9 +572,10 @@ export default function StudioPage() {
                   })),
                 })}
                 disabled={!d}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#0e1a2e] px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:opacity-40"
+                title="Export the Fit-Planning Package"
+                className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-[#0e1a2e] px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:opacity-40 2xl:px-3.5"
               >
-                <FileSpreadsheet className="h-4 w-4" /> Fit-Planning Package
+                <FileSpreadsheet className="h-4 w-4" /> <span className="hidden 2xl:inline">Fit-Planning Package</span><span className="2xl:hidden">Export</span>
               </button>
 
               {/* Settings — display toggles + open-elsewhere links */}
@@ -565,8 +593,13 @@ export default function StudioPage() {
                 {menuOpen && (
                   <div className="absolute right-0 top-full z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
                       <p className="px-2 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Display</p>
-                      <MenuToggle on={showDeptChips} onClick={() => setShowDeptChips((v) => !v)}>Department chips</MenuToggle>
-                      <MenuToggle on={showRatios} onClick={() => setShowRatios((v) => !v)}>Validation triangle (engine/survey/today)</MenuToggle>
+                      <MenuToggle on={showRatios} onClick={() => setShowRatios((v) => !v)}>Engine recommendation</MenuToggle>
+                      <MenuToggle on={showSurveyEvidence} onClick={() => setShowSurveyEvidence((v) => !v)}>Survey ask</MenuToggle>
+                      <MenuToggle on={showTodayEvidence} onClick={() => setShowTodayEvidence((v) => !v)}>Existing / today</MenuToggle>
+                      <MenuToggle on={showDeptChips} onClick={() => setShowDeptChips((v) => !v)}>Department evidence</MenuToggle>
+                      <MenuToggle on={showAllocations} onClick={() => setShowAllocations((v) => !v)}>Allocation controls</MenuToggle>
+                      <MenuToggle on={showDimensions} onClick={() => setShowDimensions((v) => !v)}>Dimension language</MenuToggle>
+                      <MenuToggle on={showNotesLayer} onClick={() => setShowNotesLayer((v) => !v)}>Space notes</MenuToggle>
                       <MenuToggle on={compactCards} onClick={() => setCompactCards((v) => !v)}>Compact cards</MenuToggle>
                       <div className="flex items-center justify-between px-2 py-1.5 text-xs font-medium text-slate-700">
                         <span>Rail hero KPI</span>
@@ -621,13 +654,13 @@ export default function StudioPage() {
         {!d || !result || !viewResult ? (
           <p className="p-16 text-center text-slate-400"><RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />Loading program…</p>
         ) : (
-          <main className={`mx-auto grid max-w-[1900px] gap-6 px-6 py-6 ${
+          <main className={`grid min-h-[calc(100vh-57px)] w-full gap-0 ${
             railCollapsed
-              ? drawer ? "grid-cols-[64px_minmax(0,1fr)_360px]" : "grid-cols-[64px_minmax(0,1fr)]"
-              : briefing ? "grid-cols-[360px_minmax(0,1fr)]" : drawer ? "grid-cols-[280px_minmax(0,1fr)_360px]" : "grid-cols-[280px_minmax(0,1fr)]"
+              ? drawer ? "grid-cols-[56px_minmax(0,1fr)_360px]" : "grid-cols-[56px_minmax(0,1fr)]"
+              : briefing ? "grid-cols-[340px_minmax(0,1fr)]" : drawer ? "grid-cols-[300px_minmax(0,1fr)_360px]" : "grid-cols-[300px_minmax(0,1fr)]"
           }`}>
             {/* ── Left rail: docked, collapsible, one clear number hierarchy ── */}
-            <aside className="sticky top-[57px] h-[calc(100vh-73px)] self-start overflow-y-auto rounded-2xl border border-slate-200 bg-white">
+            <aside className="sticky top-[57px] z-10 h-[calc(100vh-57px)] self-start overflow-y-auto border-r border-slate-200 bg-white">
               {railCollapsed ? (
                 /* Collapsed — a slim icon strip; the room gets its width back. */
                 <div className="flex flex-col items-center gap-3 px-2 py-4">
@@ -906,7 +939,9 @@ export default function StudioPage() {
             </aside>
 
             {/* ── Center: the spaces (Workbench cards / Focus table / Briefing) ─ */}
-            <section>
+            <section className="min-w-0 bg-[#f3f7fa]">
+              <StudioSummaryMasthead d={d} result={viewResult} openGaps={openGaps} editedCount={editedCount} />
+              <div className="px-6 py-5">
               {showMap && (
                 <div className="mb-8">
                   <div className="mb-3 flex items-center justify-between gap-4">
@@ -945,6 +980,29 @@ export default function StudioPage() {
                 </>
               ) : (
               <>
+              {!briefing && (
+                <LayerVisibilityBar
+                  layers={{
+                    engine: showRatios,
+                    survey: showSurveyEvidence,
+                    today: showTodayEvidence,
+                    departments: showDeptChips,
+                    allocations: showAllocations,
+                    dimensions: showDimensions,
+                    notes: showNotesLayer,
+                  }}
+                  onToggle={(layer) => {
+                    if (layer === "engine") setShowRatios((v) => !v)
+                    else if (layer === "survey") setShowSurveyEvidence((v) => !v)
+                    else if (layer === "today") setShowTodayEvidence((v) => !v)
+                    else if (layer === "departments") setShowDeptChips((v) => !v)
+                    else if (layer === "allocations") setShowAllocations((v) => !v)
+                    else if (layer === "dimensions") setShowDimensions((v) => !v)
+                    else setShowNotesLayer((v) => !v)
+                  }}
+                  onPreset={applyLayerPreset}
+                />
+              )}
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h2 className={briefing ? "text-2xl font-bold tracking-tight" : "text-xl font-bold tracking-tight"}>
                   {briefing ? "Your program" : "Spaces"}
@@ -1015,7 +1073,7 @@ export default function StudioPage() {
                         </div>
                       )}
                       {asTable ? (
-                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                           <table className="w-full text-sm">
                             <tbody className="divide-y divide-slate-100 tabular-nums">
                               <FocusRows
@@ -1026,11 +1084,14 @@ export default function StudioPage() {
                           </table>
                         </div>
                       ) : (
-                      <div className={`grid gap-3.5 ${briefing ? "xl:grid-cols-2 2xl:grid-cols-3" : "xl:grid-cols-2 2xl:grid-cols-3"}`}>
+                      <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr))]">
                         {visible.map((l) => (
                           <SpaceCard
                             key={l.key} line={l} base={baseOf(l.key)} result={viewResult} briefing={briefing}
                             colors={cc} showChips={showDeptChips && !compactCards} showRatios={showRatios && !compactCards}
+                            showSurvey={showSurveyEvidence && !compactCards} showToday={showTodayEvidence && !compactCards}
+                            showAllocations={showAllocations && !compactCards} showDimensions={showDimensions && !compactCards}
+                            showNotes={showNotesLayer && !compactCards}
                             compact={compactCards}
                             people={l.key === "offices" ? seats.offices : l.key === "workstations" ? seats.desks : undefined}
                             onQty={(n) => setQty(l.key, n)}
@@ -1070,7 +1131,7 @@ export default function StudioPage() {
                                 key, label: "New space", category: cat.name, unitSF: 100, proposedCount: 1,
                               }])
                             }}
-                            className="flex min-h-[104px] items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 text-sm font-semibold text-slate-400 transition-colors hover:border-[#00badc]/50 hover:text-[#0089a3]"
+                            className="flex min-h-[104px] items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 text-sm font-semibold text-slate-400 transition-colors hover:border-[#00badc]/50 hover:text-[#0089a3]"
                           >
                             <Plus className="h-4 w-4" /> Add custom space
                           </button>
@@ -1083,11 +1144,12 @@ export default function StudioPage() {
               )}
               </>
               )}
+              </div>
             </section>
 
             {/* ── Right drawer ──────────────────────────────────────────────── */}
             {drawer && !briefing && (
-              <aside className="max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5">
+              <aside className="sticky top-[57px] h-[calc(100vh-57px)] space-y-3 overflow-y-auto border-l border-slate-200 bg-white p-5">
                 {drawer === "gaps" && (
                   <>
                     <DrawerTitle icon={<AlertTriangle className="h-4 w-4 text-amber-500" />} title={`Gaps · ${openGaps} open`} onClose={() => setDrawer(null)} />
@@ -1207,6 +1269,126 @@ export default function StudioPage() {
         : ["Leadership and door-required roles", "Doubles as a 2–3 person meeting point"],
     }
   }
+}
+
+/* ── Canvas chrome: fixed summary + explicit data-layer controls ─────────── */
+
+function StudioSummaryMasthead({
+  d, result, openGaps, editedCount,
+}: {
+  d: NonNullable<ReturnType<typeof buildDeliverable>>
+  result: SurveyResult
+  openGaps: number
+  editedCount: number
+}) {
+  const gross = d.totals.grossUsableSF
+  const existing = d.totals.existingSF
+  const delta = existing > 0 ? gross - existing : null
+  const target = result.goals?.targetSF
+  const targetGap = target ? target - gross : null
+
+  return (
+    <div className="sticky top-[57px] z-20 border-b border-slate-200 bg-white shadow-sm">
+      <div className="grid min-h-[104px] grid-cols-[minmax(300px,1.4fr)_repeat(3,minmax(150px,1fr))]">
+        <div className="bg-[#0e1a2e] px-6 py-4 text-white">
+          <p className="truncate text-[9px] font-bold uppercase tracking-[0.15em] text-[#00badc]">{d.clientName} / session program</p>
+          <p className="mt-1.5 text-3xl font-bold tabular-nums tracking-tight">
+            {gross.toLocaleString()} <span className="text-sm font-semibold text-white/45">SF gross usable</span>
+          </p>
+          {delta !== null ? (
+            <p className={`mt-1 text-[11px] font-semibold ${delta >= 0 ? "text-emerald-300" : "text-amber-300"}`}>
+              {delta >= 0 ? "+" : ""}{delta.toLocaleString()} SF vs today ({existing.toLocaleString()} SF)
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] text-white/40">No existing footprint captured</p>
+          )}
+        </div>
+        <SummaryStat
+          label="Client target"
+          value={target ? `${target.toLocaleString()} SF` : "Not captured"}
+          detail={targetGap === null ? "Set in intake or live" : `${targetGap >= 0 ? "+" : ""}${targetGap.toLocaleString()} SF ${targetGap >= 0 ? "room" : "over"}`}
+          tone={targetGap === null ? "muted" : targetGap >= 0 ? "good" : "warn"}
+        />
+        <SummaryStat label="Planning density" value={`${d.totals.sfPerPerson} SF / person`} detail={`${d.future} people at plan / ${d.daysInOffice} days in`} />
+        <SummaryStat
+          label="Session record"
+          value={`${editedCount} edit${editedCount === 1 ? "" : "s"}`}
+          detail={`${openGaps} gap${openGaps === 1 ? "" : "s"} open`}
+          tone={openGaps > 0 ? "warn" : "good"}
+        />
+      </div>
+      <div className="flex h-1.5 w-full overflow-hidden bg-slate-100" aria-label="Program area by category">
+        {d.categories.map((category) => (
+          <span
+            key={category.name}
+            title={`${category.name}: ${category.proposedTotalSF.toLocaleString()} SF`}
+            style={{ width: `${(category.proposedTotalSF / (gross || 1)) * 100}%`, backgroundColor: CATEGORY_COLORS[category.name].accent }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SummaryStat({
+  label, value, detail, tone = "muted",
+}: {
+  label: string
+  value: string
+  detail: string
+  tone?: "muted" | "good" | "warn"
+}) {
+  return (
+    <div className="border-r border-slate-200 px-5 py-4 last:border-r-0">
+      <p className="text-[9px] font-bold uppercase tracking-[0.13em] text-slate-400">{label}</p>
+      <p className="mt-2 text-xl font-bold tabular-nums text-slate-900">{value}</p>
+      <p className={`mt-1 text-[11px] font-medium ${tone === "good" ? "text-emerald-700" : tone === "warn" ? "text-amber-700" : "text-slate-400"}`}>{detail}</p>
+    </div>
+  )
+}
+
+function LayerVisibilityBar({
+  layers, onToggle, onPreset,
+}: {
+  layers: Record<LayerKey, boolean>
+  onToggle: (layer: LayerKey) => void
+  onPreset: (preset: LayerPreset) => void
+}) {
+  const labels: Record<LayerKey, string> = {
+    engine: "Engine",
+    survey: "Survey",
+    today: "Today",
+    departments: "Departments",
+    allocations: "Allocation",
+    dimensions: "Dimensions",
+    notes: "Notes",
+  }
+
+  return (
+    <div className="mb-5 flex flex-wrap items-center gap-2 border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+      <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700"><Settings2 className="h-3.5 w-3.5" /> Visible data</span>
+      {(Object.keys(labels) as LayerKey[]).map((layer) => (
+        <button
+          key={layer}
+          onClick={() => onToggle(layer)}
+          aria-pressed={layers[layer]}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+            layers[layer]
+              ? "border-[#00badc]/35 bg-[#00badc]/10 text-[#007c94]"
+              : "border-slate-200 bg-white text-slate-400 hover:text-slate-600"
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${layers[layer] ? "bg-[#00badc]" : "bg-slate-300"}`} />
+          {labels[layer]}
+        </button>
+      ))}
+      <div className="ml-auto flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500">
+        <button onClick={() => onPreset("working")} className="px-2.5 py-1.5 hover:bg-white hover:text-slate-900">Working session</button>
+        <button onClick={() => onPreset("client")} className="border-l border-slate-200 px-2.5 py-1.5 hover:bg-white hover:text-slate-900">Client review</button>
+        <button onClick={() => onPreset("numbers")} className="border-l border-slate-200 px-2.5 py-1.5 hover:bg-white hover:text-slate-900">Numbers only</button>
+      </div>
+    </div>
+  )
 }
 
 /* ── Department Manager: every person, where they sit, one click to move ── */
@@ -1334,7 +1516,7 @@ function dims(sf: number): string | null {
 const ADDITION_CATEGORIES: CompCategory[] = ["Workstations", "Offices", "Collaboration", "Support"]
 
 function SpaceCard({
-  line, base, result, briefing, colors, showChips, showRatios, compact, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename, onCategory,
+  line, base, result, briefing, colors, showChips, showRatios, showSurvey, showToday, showAllocations, showDimensions, showNotes, compact, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename, onCategory,
   departments, deptAlloc, onAllocChange, surveyAskByDept, categoryAllocated, categoryQty, allocOpen, onToggleAlloc,
   note, onNote, notesOpen, onToggleNotes,
 }: {
@@ -1345,6 +1527,11 @@ function SpaceCard({
   colors: { accent: string; text: string; tint: string }
   showChips: boolean
   showRatios: boolean
+  showSurvey: boolean
+  showToday: boolean
+  showAllocations: boolean
+  showDimensions: boolean
+  showNotes: boolean
   /** Compact layer: just the name and the numbers — the fast read. */
   compact?: boolean
   /** Named seat assignments (offices/workstations only) — who actually sits here. */
@@ -1420,23 +1607,30 @@ function SpaceCard({
 
   return (
     <div
-      className={`rounded-2xl border bg-white transition-shadow hover:shadow-md ${isAddition ? "border-[#00badc]/40" : "border-slate-200"}`}
-      style={{ borderLeft: `3px solid ${colors.accent}` }}
+      className={`overflow-hidden rounded-lg border bg-white transition-shadow hover:shadow-md ${isAddition ? "border-[#00badc]/40" : "border-slate-200"}`}
+      style={{ borderTop: `3px solid ${colors.accent}` }}
     >
-      <div className="flex items-center gap-2 px-4 pb-1 pt-3">
-        {onRename ? (
-          <input
-            value={line.label}
-            onChange={(e) => onRename(e.target.value)}
-            className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent text-[15px] font-semibold text-slate-900 hover:border-slate-200 focus:border-[#00badc] focus:outline-none"
-          />
-        ) : (
-          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-slate-900">{line.label}</span>
-        )}
-        <span className="flex shrink-0 items-center gap-1">
-          {sfChanged && <Dot c="#f43f5e" title="Unit size changed from ratio baseline" />}
-          {qtyChanged && <Dot c="#8b5cf6" title="Quantity changed from ratio baseline" />}
-        </span>
+      <div className="flex items-start gap-3 px-5 pb-3 pt-4">
+        <div className="min-w-0 flex-1">
+          <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: colors.text }}>
+            {line.category}{isAddition ? " / Studio addition" : " / Program standard"}
+          </p>
+          <div className="flex items-center gap-2">
+            {onRename ? (
+              <input
+                value={line.label}
+                onChange={(e) => onRename(e.target.value)}
+                className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent text-base font-bold text-slate-900 hover:border-slate-200 focus:border-[#00badc] focus:outline-none"
+              />
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-base font-bold text-slate-900">{line.label}</span>
+            )}
+            <span className="flex shrink-0 items-center gap-1">
+              {sfChanged && <Dot c="#f43f5e" title="Unit size changed from ratio baseline" />}
+              {qtyChanged && <Dot c="#8b5cf6" title="Quantity changed from ratio baseline" />}
+            </span>
+          </div>
+        </div>
         {!briefing && (
           <span className="flex shrink-0 items-center">
             {hasPeople && (
@@ -1467,29 +1661,6 @@ function SpaceCard({
         </div>
       )}
 
-      {/* The validation triangle — glanceable, colored, not a run-on line */}
-      {showRatios && (
-        <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2">
-          {engineCount !== undefined ? (
-            <Token label="Engine" value={engineCount} title="What the planning ratios recommend" />
-          ) : (
-            <span className="text-[11px] text-slate-400">added in studio</span>
-          )}
-          {surveyAsk !== null && <Token muted label="You asked" value={surveyAsk} title="What the client's intake literally requested" />}
-          {supportFlagged && (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700" title="The client flagged this space as must-have">
-              flagged by client
-            </span>
-          )}
-          {line.existingCount > 0 && <Token muted label="Today" value={line.existingCount} title="What they have right now" />}
-          {engineCount !== undefined && configuredDelta !== 0 && (
-            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700" title="Configured quantity vs. the engine's recommendation">
-              {configuredDelta > 0 ? "+" : ""}{configuredDelta} vs engine
-            </span>
-          )}
-        </div>
-      )}
-
       {briefing ? (
         <div className="flex items-center gap-3 px-4 py-2.5">
           <span className="text-sm text-slate-600 tabular-nums">{line.proposedCount} × {line.unitSF} SF{dims(line.unitSF) ? ` (${dims(line.unitSF)})` : ""}</span>
@@ -1499,9 +1670,9 @@ function SpaceCard({
         /* Number grid — QTY / SF EA / TOTAL SF as labeled cells, the same
            anatomy everywhere in the Studio; qty gets width to spare so a
            3-digit count never clips. */
-        <div className="mx-4 mb-2.5 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-slate-100 bg-slate-100">
-          <div className="bg-white px-2.5 py-2">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Qty</p>
+        <div className="grid grid-cols-3 gap-px border-y border-slate-200 bg-slate-200">
+          <div className="bg-white px-5 py-3.5">
+            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Configured quantity</p>
             <div className="mt-1 flex items-center gap-0.5">
               <button
                 onClick={() => onQty(Math.max(0, line.proposedCount - 1))}
@@ -1513,7 +1684,7 @@ function SpaceCard({
               <input
                 type="number" min={0} value={line.proposedCount}
                 onChange={(e) => onQty(Math.max(0, Number(e.target.value)))}
-                className="w-full min-w-0 rounded-md border-none bg-transparent text-center text-lg font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
+                className="w-full min-w-0 rounded-md border-none bg-transparent text-center text-xl font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
               />
               <button
                 onClick={() => onQty(line.proposedCount + 1)}
@@ -1524,34 +1695,73 @@ function SpaceCard({
               </button>
             </div>
           </div>
-          <div className="bg-white px-2.5 py-2">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">SF ea</p>
+          <div className="bg-white px-5 py-3.5">
+            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Unit area</p>
             <input
               type="number" min={1} value={line.unitSF}
               onChange={(e) => onSf(e.target.value === "" ? null : Number(e.target.value))}
-              className="mt-1 w-full min-w-0 rounded-md border-none bg-transparent text-center text-lg font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
+              className="mt-1 w-full min-w-0 rounded-md border-none bg-transparent text-center text-xl font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
             />
-            {!compact && dims(line.unitSF) && <p className="text-center text-[10px] font-medium text-[#0089a3]">{dims(line.unitSF)}</p>}
+            {showDimensions && dims(line.unitSF) && <p className="text-center text-[10px] font-semibold text-[#0089a3]">{dims(line.unitSF)}</p>}
           </div>
-          <div className="bg-[#e9f7fb]/60 px-2.5 py-2">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-[#0089a3]">Total SF</p>
-            <p className="mt-1.5 text-center text-lg font-bold tabular-nums text-slate-900">{(line.proposedCount * line.unitSF).toLocaleString()}</p>
+          <div className="bg-[#e9f7fb] px-5 py-3.5">
+            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#0089a3]">Planned area</p>
+            <p className="mt-2 text-center text-xl font-bold tabular-nums text-slate-900">{(line.proposedCount * line.unitSF).toLocaleString()} <span className="text-xs font-semibold text-slate-400">SF</span></p>
           </div>
         </div>
       )}
 
+      {!briefing && (showRatios || showSurvey || showToday) && (
+        <div
+          className="grid divide-x divide-slate-100 border-b border-slate-200 bg-slate-50"
+          style={{ gridTemplateColumns: `repeat(${[showToday, showSurvey, showRatios, true].filter(Boolean).length}, minmax(0, 1fr))` }}
+        >
+          {showToday && (
+            <EvidenceCell
+              label="Today"
+              value={line.existingCountKnown ? line.existingCount : "—"}
+              detail={line.existingCountKnown ? `${line.existingCount - line.proposedCount >= 0 ? "+" : ""}${line.existingCount - line.proposedCount} vs plan` : "not captured"}
+            />
+          )}
+          {showSurvey && (
+            <EvidenceCell
+              label="Survey ask"
+              value={surveyAsk ?? (supportFlagged ? "Yes" : "—")}
+              detail={supportFlagged ? "client must-have" : surveyAsk !== null && engineCount !== undefined ? `${surveyAsk - engineCount >= 0 ? "+" : ""}${surveyAsk - engineCount} vs engine` : "no count requested"}
+              warning={supportFlagged || (surveyAsk !== null && engineCount !== undefined && surveyAsk !== engineCount)}
+            />
+          )}
+          {showRatios && (
+            <EvidenceCell
+              label="Engine"
+              value={engineCount ?? "—"}
+              detail={line.ratio ?? (isAddition ? "added in Studio" : "ratio baseline")}
+            />
+          )}
+          <EvidenceCell
+            label="Configured plan"
+            value={line.proposedCount}
+            detail={engineCount === undefined ? "session truth" : configuredDelta === 0 ? "matches engine" : `${configuredDelta > 0 ? "+" : ""}${configuredDelta} vs engine`}
+            active
+            warning={configuredDelta !== 0}
+          />
+        </div>
+      )}
+
       {showChips && alloc.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 px-4 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-5 py-3">
           {alloc.map(([name, n]) => (
             <span key={name} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: colors.tint, color: colors.text }}>
               {name} · {n}
             </span>
           ))}
+          {seatAccounted && unassigned > 0 && <span className="ml-auto text-[11px] font-bold text-amber-700">{unassigned} unassigned</span>}
+          {seatAccounted && over > 0 && <span className="ml-auto text-[11px] font-bold text-rose-700">{over} over plan</span>}
         </div>
       )}
 
       {/* Who gets these seats — names by the survey's seating hierarchy */}
-      {who && !briefing && !compact && hasPeople && (
+      {showAllocations && who && !briefing && !compact && hasPeople && (
         <div className="space-y-1 border-t border-slate-100 px-4 py-2.5">
           {people!.map((p) => (
             <p key={p.dept} className="text-[11px] leading-relaxed text-slate-600">
@@ -1567,7 +1777,7 @@ function SpaceCard({
       {/* Dept allocation — collapsible, seat-accounted lines only. Answers
           "we added two, where did they go" and "we cut one, who loses a
           seat" with real per-department numbers instead of a silent total. */}
-      {!briefing && seatAccounted && (
+      {!briefing && showAllocations && seatAccounted && (
         <div className="border-t border-slate-100">
           <button
             onClick={onToggleAlloc}
@@ -1643,7 +1853,7 @@ function SpaceCard({
       )}
 
       {/* Notes — what the room said, riding into the brief and the fit-planning package. */}
-      {!briefing && (
+      {!briefing && showNotes && (
         <div className="border-t border-slate-100">
           <button
             onClick={onToggleNotes}
@@ -1671,15 +1881,22 @@ function SpaceCard({
   )
 }
 
-/** One validation-triangle token — a labeled, colored figure, not a grey run-on. */
-function Token({ label, value, title, muted }: { label: string; value: number; title: string; muted?: boolean }) {
+/** One source-of-truth cell in the card's evidence ledger. */
+function EvidenceCell({
+  label, value, detail, active, warning,
+}: {
+  label: string
+  value: string | number
+  detail: string
+  active?: boolean
+  warning?: boolean
+}) {
   return (
-    <span
-      title={title}
-      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${muted ? "bg-slate-100 text-slate-500" : "bg-[#00badc]/12 text-[#0089a3]"}`}
-    >
-      {label} <b className="tabular-nums">{value}</b>
-    </span>
+    <div className={`min-w-0 px-4 py-3 ${active ? "bg-[#e9f7fb]" : ""}`}>
+      <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
+      <p className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">{value}</p>
+      <p className={`truncate text-[10px] ${warning ? "font-semibold text-amber-700" : "text-slate-400"}`} title={detail}>{detail}</p>
+    </div>
   )
 }
 
@@ -1911,9 +2128,9 @@ function IconBtn({ title, onClick, children }: { title: string; onClick: () => v
   )
 }
 
-function DrawerBtn({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
+function DrawerBtn({ label, active, onClick, icon, children }: { label: string; active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <button onClick={onClick}
+    <button onClick={onClick} title={label} aria-label={label}
       className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
         active ? "border-[#00badc]/50 bg-[#00badc]/10 text-slate-900" : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-800"
       }`}>

@@ -68,6 +68,41 @@ export function resolveSeating(result: SurveyResult, patch?: SeatingPatch): Reso
   return { byId, byDept }
 }
 
+/**
+ * Applies the Studio's department moves on top of the intake's own roster —
+ * a person id → destination department id. Relocates the named employee and
+ * shifts both departments' headcounts ±1; everything else about the intake
+ * stays untouched. Pure: returns a new SurveyResult, never mutates the input,
+ * so the intake stays immutable and a refresh always starts from the source
+ * of truth. A no-op when there are no moves (identity, not a clone).
+ */
+export function applyDeptMoves(result: SurveyResult, moves?: Record<string, string>): SurveyResult {
+  if (!moves || Object.keys(moves).length === 0) return result
+  const departments = result.people.departments.map((d) => ({ ...d, employees: [...(d.employees ?? [])] }))
+  const byId = new Map(departments.map((d) => [d.id, d]))
+
+  for (const [personId, toDeptId] of Object.entries(moves)) {
+    const to = byId.get(toDeptId)
+    if (!to) continue
+    let moved: NonNullable<(typeof departments)[number]["employees"]>[number] | undefined
+    for (const dep of departments) {
+      if (dep.id === toDeptId) continue
+      const idx = dep.employees.findIndex((e) => e.id === personId)
+      if (idx >= 0) {
+        moved = dep.employees.splice(idx, 1)[0]
+        dep.headcount = Math.max(0, dep.headcount - 1)
+        break
+      }
+    }
+    if (moved) {
+      to.employees.push(moved)
+      to.headcount += 1
+    }
+  }
+
+  return { ...result, people: { ...result.people, departments } }
+}
+
 /** Named office-holders for a department, in placement order — what the map draws. */
 export function officeHoldersFor(
   result: SurveyResult,

@@ -5,16 +5,16 @@ import Image from "next/image"
 import {
   Monitor, KeyRound, FileSpreadsheet, RefreshCw, Undo2, Redo2, Search, ExternalLink, Eye, Copy, Trash2,
   Crown, AlertTriangle, ClipboardList, Users, LayoutGrid, Table2, Presentation, CheckCircle2, X,
-  Map as MapIcon, Settings2,
+  Map as MapIcon, Settings2, Plus, Minus, TrendingUp, TrendingDown, ArrowRightLeft, PieChart, Gauge,
 } from "lucide-react"
 import { buildDeliverable, CATEGORY_COLORS, DEFAULT_FACTORS, type DeliverableOverrides, type DeliverableAddition, type DeliverableFactors } from "@/lib/survey/deliverable"
 import { ProgramMapView } from "@/components/survey/program-map"
 import { exportFitPlanningPackage } from "@/lib/survey/fitPlanning"
-import { lineGaps, type ComparisonLine } from "@/lib/survey/comparison"
+import { lineGaps, type ComparisonLine, type CompCategory } from "@/lib/survey/comparison"
 import { COLLAB_CATALOG, SUPPORT_CATALOG, type CatalogSpace } from "@/lib/survey/catalog"
 import { SpaceDetailModal } from "@/components/survey/space-detail-modal"
 import { WORKSTATION_SIZES, OFFICE_SIZES, SURVEY_STEPS, GOAL_MOTIVATORS, SPACE_POSTURES } from "@/lib/survey/sections"
-import { resolveSeating, type SeatPlacement, type SeatingPatch, type ResolvedSeating } from "@/lib/survey/seating"
+import { resolveSeating, applyDeptMoves, type SeatPlacement, type SeatingPatch, type ResolvedSeating } from "@/lib/survey/seating"
 import { isNelsonMode, nelsonCode } from "@/lib/nelsonMode"
 import { loadSurveySeed } from "@/lib/survey/seedStorage"
 import { demoResult } from "@/lib/survey/demo-scenarios"
@@ -47,6 +47,10 @@ export default function StudioPage() {
   const [factors, setFactors] = useState<DeliverableFactors>({})
   /** Department Manager moves — office/desk picks that override the intake. */
   const [peoplePatch, setPeoplePatch] = useState<SeatingPatch>({})
+  /** Department Manager moves — person id → destination department id. */
+  const [deptMoves, setDeptMoves] = useState<Record<string, string>>({})
+  /** Studio renames — comparison line key → display label (baseline lines only; additions carry their own label). */
+  const [labelOverrides, setLabelOverrides] = useState<Record<string, string>>({})
 
   const [view, setView] = useState<View>("workbench")
   const [drawer, setDrawer] = useState<Drawer>(null)
@@ -66,31 +70,36 @@ export default function StudioPage() {
   const [compactCards, setCompactCards] = useState(false)
   /** Per-category card ↔ table pivot in the Workbench. */
   const [tableCats, setTableCats] = useState<Record<string, boolean>>({})
+  /** Left rail: which readout leads the hero — designers vary on this. */
+  const [heroKpi, setHeroKpi] = useState<"gross" | "rentable">("gross")
+  /** Left rail tab — KPIs (default) or the allocation chart. */
+  const [railTab, setRailTab] = useState<"kpis" | "allocation">("kpis")
 
   // ── Undo / redo — the session's working state, time-travelable ────────────
   type Snap = {
     overrides: DeliverableOverrides; counts: Record<string, number>; additions: DeliverableAddition[]
     notes: Record<string, string>; resolvedGaps: Record<string, boolean>; factors: DeliverableFactors
-    peoplePatch: SeatingPatch
+    peoplePatch: SeatingPatch; deptMoves: Record<string, string>; labelOverrides: Record<string, string>
   }
   const history = useRef<{ past: Snap[]; future: Snap[]; skip: boolean }>({ past: [], future: [], skip: false })
   const [histVer, setHistVer] = useState(0) // re-render hook for disabled states
   useEffect(() => {
     const h = history.current
     if (h.skip) { h.skip = false; return }
-    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch }
+    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides }
     const last = h.past[h.past.length - 1]
     if (last && JSON.stringify(last) === JSON.stringify(snap)) return
     h.past.push(snap)
     if (h.past.length > 60) h.past.shift()
     h.future = []
     setHistVer((v) => v + 1)
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides])
   const applySnap = (s: Snap) => {
     history.current.skip = true
     setOverrides(s.overrides); setCounts(s.counts); setAdditions(s.additions)
     setNotes(s.notes); setResolvedGaps(s.resolvedGaps); setFactors(s.factors)
     setPeoplePatch(s.peoplePatch ?? {})
+    setDeptMoves(s.deptMoves ?? {}); setLabelOverrides(s.labelOverrides ?? {})
     setHistVer((v) => v + 1)
   }
   const undo = () => {
@@ -134,6 +143,7 @@ export default function StudioPage() {
     sessionToken.current = null
     history.current = { past: [], future: [], skip: false }
     setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({}); setPeoplePatch({})
+    setDeptMoves({}); setLabelOverrides({})
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
       if (seed) { setResult(seed); setSource("seed"); return }
@@ -157,6 +167,8 @@ export default function StudioPage() {
           setResolvedGaps(s?.resolvedGaps ?? {})
           setFactors(s?.factors ?? {})
           setPeoplePatch(s?.people ?? {})
+          setDeptMoves(s?.deptMoves ?? {})
+          setLabelOverrides(s?.labels ?? {})
           sessionToken.current = source
         }
       })
@@ -175,17 +187,22 @@ export default function StudioPage() {
       fetch(`/api/engagements/${source}`, {
         method: "PATCH",
         headers: { "x-nelson-code": nelsonCode() ?? "" },
-        body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch } }),
+        body: JSON.stringify({ session: { overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch, deptMoves, labels: labelOverrides } }),
       })
         .then(() => setSaveState("saved"))
         .catch(() => setSaveState("idle"))
     }, 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides])
+
+  // The Department Manager's dept-to-dept moves apply on top of the intake,
+  // never mutating it — everything downstream (program math, seating, map,
+  // drawers) reads this view so a move is consistent everywhere in the Studio.
+  const viewResult = useMemo(() => (result ? applyDeptMoves(result, deptMoves) : null), [result, deptMoves])
 
   const d = useMemo(
-    () => (result ? buildDeliverable(result, overrides, counts, additions, factors, peoplePatch) : null),
-    [result, overrides, counts, additions, factors, peoplePatch],
+    () => (viewResult ? buildDeliverable(viewResult, overrides, counts, additions, factors, peoplePatch, labelOverrides) : null),
+    [viewResult, overrides, counts, additions, factors, peoplePatch, labelOverrides],
   )
   const baseline = d?.comp.lines ?? []
   const baseOf = (key: string) => baseline.find((l) => l.key === key)
@@ -194,17 +211,17 @@ export default function StudioPage() {
   // also used by the program map, so the Department Manager's moves and the
   // whiteboard never drift apart.
   const resolved = useMemo(
-    () => (result ? resolveSeating(result, peoplePatch) : { byId: {}, byDept: {} }),
-    [result, peoplePatch],
+    () => (viewResult ? resolveSeating(viewResult, peoplePatch) : { byId: {}, byDept: {} }),
+    [viewResult, peoplePatch],
   )
   const seats = useMemo(() => {
     const offices: SeatGroup[] = []
     const desks: SeatGroup[] = []
-    if (!result) return { byId: resolved.byId, offices, desks }
-    for (const dep of result.people.departments) {
+    if (!viewResult) return { byId: resolved.byId, offices, desks }
+    for (const dep of viewResult.people.departments) {
       const rows = resolved.byDept[dep.id] ?? []
-      const nOff = result.spaces.privateOfficesByDept[dep.id] ?? 0
-      const nDesk = result.work.dedicatedByDept?.[dep.id] ?? 0
+      const nOff = viewResult.spaces.privateOfficesByDept[dep.id] ?? 0
+      const nDesk = viewResult.work.dedicatedByDept?.[dep.id] ?? 0
       const offNames = rows.filter((r) => r.placement === "office")
       const deskNames = rows.filter((r) => r.placement === "desk")
       if (nOff > 0 || offNames.length > 0)
@@ -213,17 +230,17 @@ export default function StudioPage() {
         desks.push({ dept: dep.name, names: deskNames.map((e) => e.name), extra: Math.max(0, nDesk - deskNames.length) })
     }
     return { byId: resolved.byId, offices, desks }
-  }, [result, resolved])
+  }, [viewResult, resolved])
 
   // Move a person office ↔ desk ↔ flex. Snapshots everyone's CURRENT resolved
   // placement as the new explicit baseline before applying the one move — so
   // the first move ever made never silently un-seats everyone else who was
   // still riding the leaders-first convention.
   const moveSeat = (id: string, next: SeatPlacement) => {
-    if (!result) return
+    if (!viewResult) return
     const officeIds = new Set<string>()
     const deskIds = new Set<string>()
-    for (const dep of result.people.departments) {
+    for (const dep of viewResult.people.departments) {
       for (const row of resolved.byDept[dep.id] ?? []) {
         if (row.id === id) continue
         if (row.placement === "office") officeIds.add(row.id)
@@ -233,6 +250,12 @@ export default function StudioPage() {
     if (next === "office") officeIds.add(id)
     else if (next === "desk") deskIds.add(id)
     setPeoplePatch({ officeEmployeeIds: [...officeIds], deskEmployeeIds: [...deskIds] })
+  }
+
+  // Move a person to a different department — headcounts on both sides shift
+  // with them (they drive the engine), logged as a decision, undoable.
+  const moveDept = (personId: string, toDeptId: string) => {
+    setDeptMoves((p) => ({ ...p, [personId]: toDeptId }))
   }
 
   // ── Derived: the decision log (deviations ARE the log — Advisory #6.6) ─────
@@ -268,9 +291,9 @@ export default function StudioPage() {
       }
     }
     // Department Manager seat moves — the session's placement vs the intake's own.
-    if (result && Object.keys(peoplePatch).length > 0) {
-      const before = resolveSeating(result)
-      for (const dep of result.people.departments) {
+    if (viewResult && Object.keys(peoplePatch).length > 0) {
+      const before = resolveSeating(viewResult)
+      for (const dep of viewResult.people.departments) {
         for (const row of resolved.byDept[dep.id] ?? []) {
           const was = before.byId[row.id] ?? "flex"
           if (was !== row.placement)
@@ -278,9 +301,25 @@ export default function StudioPage() {
         }
       }
     }
+    // Department Manager reassignments — who moved departments, and where from.
+    if (result && Object.keys(deptMoves).length > 0) {
+      for (const [personId, toDeptId] of Object.entries(deptMoves)) {
+        const to = viewResult?.people.departments.find((dep) => dep.id === toDeptId)
+        const from = result.people.departments.find((dep) => (dep.employees ?? []).some((e) => e.id === personId))
+        const person = from?.employees?.find((e) => e.id === personId)
+        if (to && from && person)
+          out.push({ id: `dept:${personId}`, text: `${person.name} — ${from.name} → ${to.name}` })
+      }
+    }
+    // Renames — the session's label vs the engine's own.
+    for (const [key, label] of Object.entries(labelOverrides)) {
+      const orig = baseline.find((l) => l.key === key)
+      if (orig && orig.label !== label)
+        out.push({ id: `label:${key}`, text: `"${orig.label}" renamed to "${label}"` })
+    }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d, overrides, counts, additions, resolvedGaps, factors, peoplePatch, resolved, result])
+  }, [d, overrides, counts, additions, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, resolved, viewResult, result, baseline])
 
   // ── Derived: gaps (intake holes + deferred questions) ──────────────────────
   const gaps = useMemo(() => {
@@ -396,7 +435,7 @@ export default function StudioPage() {
                 {rows.map((r) => <option key={r.token} value={r.token}>{r.clientName}</option>)}
               </select>
               <button
-                onClick={() => result && d && exportFitPlanningPackage(result, d, {
+                onClick={() => viewResult && d && exportFitPlanningPackage(viewResult, d, {
                   decisions: decisions.map((x) => ({ text: x.text, note: notes[x.id] })),
                   gaps: gaps.map((g) => ({ line: g.line, message: g.message, resolved: !!resolvedGaps[g.id], note: notes[`gapnote:${g.id}`] })),
                 })}
@@ -422,8 +461,22 @@ export default function StudioPage() {
                   <div className="absolute right-0 top-full z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
                       <p className="px-2 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Display</p>
                       <MenuToggle on={showDeptChips} onClick={() => setShowDeptChips((v) => !v)}>Department chips</MenuToggle>
-                      <MenuToggle on={showRatios} onClick={() => setShowRatios((v) => !v)}>Ratio · survey · today</MenuToggle>
+                      <MenuToggle on={showRatios} onClick={() => setShowRatios((v) => !v)}>Validation triangle (engine/survey/today)</MenuToggle>
                       <MenuToggle on={compactCards} onClick={() => setCompactCards((v) => !v)}>Compact cards</MenuToggle>
+                      <div className="flex items-center justify-between px-2 py-1.5 text-xs font-medium text-slate-700">
+                        <span>Rail hero KPI</span>
+                        <span className="flex overflow-hidden rounded-lg border border-slate-200 text-[11px] font-semibold">
+                          {(["gross", "rentable"] as const).map((k) => (
+                            <button
+                              key={k}
+                              onClick={() => setHeroKpi(k)}
+                              className={`px-2 py-1 capitalize transition-colors ${heroKpi === k ? "bg-[#00badc]/15 text-[#0089a3]" : "text-slate-400 hover:bg-slate-50"}`}
+                            >
+                              {k}
+                            </button>
+                          ))}
+                        </span>
+                      </div>
                       <p className="mt-2 border-t border-slate-100 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Planning dials — logged as decisions</p>
                       <Dial label="Circulation · individual" pct value={factors.circIndividual ?? DEFAULT_FACTORS.circIndividual}
                         onChange={(v) => setFactors((p) => ({ ...p, circIndividual: v }))} />
@@ -446,7 +499,7 @@ export default function StudioPage() {
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
                           <button
-                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setMenuOpen(false) }}
+                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setMenuOpen(false) }}
                             className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                           >
                             <Undo2 className="h-3 w-3" /> Reset program edits
@@ -460,52 +513,164 @@ export default function StudioPage() {
           </div>
         </header>
 
-        {!d || !result ? (
+        {!d || !result || !viewResult ? (
           <p className="p-16 text-center text-slate-400"><RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />Loading program…</p>
         ) : (
           <main className={`mx-auto grid max-w-[1900px] gap-6 px-6 py-6 ${
             briefing ? "grid-cols-[360px_minmax(0,1fr)]" : drawer ? "grid-cols-[280px_minmax(0,1fr)_360px]" : "grid-cols-[280px_minmax(0,1fr)]"
           }`}>
-            {/* ── Left rail: ONE hero number, everything else subordinate ───── */}
-            <aside className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            {/* ── Left rail: docked, tabbed, one clear number hierarchy ──────── */}
+            <aside className="sticky top-[57px] h-[calc(100vh-73px)] self-start overflow-y-auto rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-100 px-5 py-4">
                 <h2 className={briefing ? "text-xl font-bold" : "text-lg font-bold"}>{d.clientName}</h2>
-                <p className="mt-0.5 text-xs text-slate-400">{d.current} → {d.future} people · {d.daysInOffice} days/wk</p>
-                <div className="mt-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0089a3]">Gross usable</p>
-                  <p className={`${briefing ? "text-5xl" : "text-4xl"} font-bold tabular-nums tracking-tight`}>
-                    {d.totals.grossUsableSF.toLocaleString()}<span className="ml-1 text-base font-medium text-slate-400">SF</span>
-                  </p>
-                  {d.totals.existingSF > 0 && (
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {d.totals.grossUsableSF - d.totals.existingSF >= 0 ? "+" : ""}
-                      {(d.totals.grossUsableSF - d.totals.existingSF).toLocaleString()} SF vs today
-                    </p>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="tabular-nums">{d.current} people today</span>
+                  <ArrowRightLeft className="h-3 w-3 text-slate-300" />
+                  <span className="tabular-nums">{d.future} at plan</span>
+                  {d.future !== d.current && (
+                    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${d.future > d.current ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                      {d.future > d.current ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                      {d.future > d.current ? "+" : ""}{Math.round(((d.future - d.current) / (d.current || 1)) * 100)}%
+                    </span>
                   )}
-                  {result?.goals?.targetSF ? (
-                    <p className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-800">
-                      Their number: {result.goals.targetSF.toLocaleString()} SF
-                      {result.goals.targetSource ? ` (${result.goals.targetSource})` : ""} ·{" "}
-                      <span className={result.goals.targetSF - d.totals.grossUsableSF >= 0 ? "text-emerald-700" : "text-rose-700"}>
-                        {result.goals.targetSF - d.totals.grossUsableSF >= 0 ? "+" : ""}
-                        {(result.goals.targetSF - d.totals.grossUsableSF).toLocaleString()} SF
-                      </span>
-                    </p>
-                  ) : null}
-                </div>
-                <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-[13px] tabular-nums text-slate-500">
-                  <Row k="Net program" v={`${d.totals.proposedNetSF.toLocaleString()}`} />
-                  <Row k="Circulation" v={`${d.totals.circulationSF.toLocaleString()}`} />
-                  <Row k={`Load ×${(1 + d.totals.rentableFactor).toFixed(2)} → rentable`} v={`${d.totals.estimatedRentableSF.toLocaleString()}`} />
-                  <Row k="SF / person" v={`${d.totals.sfPerPerson}`} />
-                  {Object.keys(factors).length > 0 && (
-                    <p className="pt-1 text-[11px] font-medium text-[#0089a3]">planning dials tuned — on the decision log</p>
-                  )}
-                </div>
+                </p>
+                <p className="mt-0.5 text-xs text-slate-400">{d.daysInOffice} days/wk</p>
               </div>
+
+              {/* Rail tabs — KPIs (today's read) / Allocation (the chart) */}
+              <div className="flex gap-1 border-b border-slate-100 px-3 py-2">
+                {([["kpis", Gauge, "KPIs"], ["allocation", PieChart, "Allocation"]] as const).map(([id, Icon, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setRailTab(id)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                      railTab === id ? "bg-slate-100 text-slate-900" : "text-slate-400 hover:text-slate-700"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" /> {label}
+                  </button>
+                ))}
+              </div>
+
+              {railTab === "kpis" ? (
+                <div className="p-5">
+                  {(() => {
+                    const primary = heroKpi === "gross" ? d.totals.grossUsableSF : d.totals.estimatedRentableSF
+                    const secondary = heroKpi === "gross" ? d.totals.estimatedRentableSF : d.totals.grossUsableSF
+                    const primaryLabel = heroKpi === "gross" ? "Gross usable" : "Est. rentable"
+                    const secondaryLabel = heroKpi === "gross" ? "Est. rentable" : "Gross usable"
+                    const grossDelta = d.totals.existingSF > 0 ? d.totals.grossUsableSF - d.totals.existingSF : null
+                    return (
+                      <>
+                        {/* Tier 1 — the magic number, whichever the designer leads with */}
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0089a3]">{primaryLabel}</p>
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <p className={`${briefing ? "text-5xl" : "text-4xl"} font-bold tabular-nums tracking-tight`}>
+                            {primary.toLocaleString()}<span className="ml-1 text-base font-medium text-slate-400">SF</span>
+                          </p>
+                          {heroKpi === "gross" && grossDelta !== null && (
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${grossDelta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-emerald-50 text-emerald-700"}`}>
+                              {grossDelta >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                              {grossDelta >= 0 ? "+" : ""}{grossDelta.toLocaleString()} vs today
+                            </span>
+                          )}
+                        </div>
+                        {/* right next to it — the counterpart KPI, not buried */}
+                        <p className="mt-1.5 text-sm text-slate-500">
+                          {secondaryLabel} <b className="tabular-nums text-slate-700">{secondary.toLocaleString()}</b> SF
+                          {heroKpi === "gross" && <span className="text-slate-400"> · ×{(1 + d.totals.rentableFactor).toFixed(2)} load</span>}
+                          {heroKpi === "rentable" && grossDelta !== null && (
+                            <span className={`ml-1.5 font-semibold ${grossDelta >= 0 ? "text-emerald-600" : "text-emerald-600"}`}>
+                              ({grossDelta >= 0 ? "+" : ""}{grossDelta.toLocaleString()} vs today)
+                            </span>
+                          )}
+                        </p>
+
+                        {result?.goals?.targetSF ? (
+                          <p className="mt-3 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-800">
+                            Their number: {result.goals.targetSF.toLocaleString()} SF
+                            {result.goals.targetSource ? ` (${result.goals.targetSource})` : ""} ·{" "}
+                            <span className={result.goals.targetSF - d.totals.grossUsableSF >= 0 ? "text-emerald-700" : "text-rose-700"}>
+                              {result.goals.targetSF - d.totals.grossUsableSF >= 0 ? "+" : ""}
+                              {(result.goals.targetSF - d.totals.grossUsableSF).toLocaleString()} SF
+                            </span>
+                          </p>
+                        ) : null}
+
+                        {/* Tier 2 — SF/person outranks circulation; it's the number a
+                            client actually reasons about, so it gets real size. */}
+                        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">SF / person</p>
+                            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">{d.totals.sfPerPerson}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">People at plan</p>
+                            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">{d.future}</p>
+                          </div>
+                        </div>
+
+                        {/* Tier 3 — the technical breakdown, demoted to small rows */}
+                        <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-[13px] tabular-nums text-slate-500">
+                          <Row k="Net program" v={`${d.totals.proposedNetSF.toLocaleString()}`} />
+                          <Row k="Circulation" v={`${d.totals.circulationSF.toLocaleString()}`} />
+                          {Object.keys(factors).length > 0 && (
+                            <p className="pt-1 text-[11px] font-medium text-[#0089a3]">planning dials tuned — on the decision log</p>
+                          )}
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+              ) : (
+                <div className="p-5">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Space allocation</h3>
+                  {(() => {
+                    const target = result?.goals?.targetSF
+                    const max = Math.max(d.totals.grossUsableSF, target ?? 0) || 1
+                    return (
+                      <div className="relative mt-3">
+                        <div className="flex h-3 gap-[2px] overflow-hidden rounded-full" style={{ width: `${(d.totals.grossUsableSF / max) * 100}%` }}>
+                          {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
+                            <span
+                              key={c.name}
+                              title={`${c.name} · ${c.proposedTotalSF.toLocaleString()} SF incl. circulation`}
+                              className="h-full rounded-[2px] first:rounded-l-full last:rounded-r-full"
+                              style={{
+                                width: `${(c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100}%`,
+                                backgroundColor: CATEGORY_COLORS[c.name].accent,
+                              }}
+                            />
+                          ))}
+                        </div>
+                        {target ? (
+                          <span
+                            title={`Their number · ${target.toLocaleString()} SF`}
+                            className="absolute -inset-y-1 w-[2.5px] rounded-full bg-[#0e1a2e]"
+                            style={{ left: `${Math.min(99.5, (target / max) * 100)}%` }}
+                          />
+                        ) : null}
+                      </div>
+                    )
+                  })()}
+                  <div className="mt-3 space-y-2 text-[13px] tabular-nums">
+                    {d.categories.map((c) => (
+                      <div key={c.name} className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: CATEGORY_COLORS[c.name].accent }} />
+                        <span className="text-slate-600">{c.name}</span>
+                        <span className="ml-auto font-medium text-slate-800">{c.proposedTotalSF.toLocaleString()} SF</span>
+                        <span className="w-9 shrink-0 text-right text-[11px] text-slate-400">
+                          {Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Briefing: the session's story rides the summary column */}
               {briefing && decisions.length > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="border-t border-slate-100 p-5">
                   <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Decided together, today</h3>
                   <div className="mt-3 space-y-2">
                     {decisions.slice(0, 5).map((x) => (
@@ -517,50 +682,6 @@ export default function StudioPage() {
                   </div>
                 </div>
               )}
-              {/* Space allocation — the category color key IS the chart */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Space allocation</h3>
-                {(() => {
-                  const target = result?.goals?.targetSF
-                  const max = Math.max(d.totals.grossUsableSF, target ?? 0) || 1
-                  return (
-                    <div className="relative mt-3">
-                      <div className="flex h-3 gap-[2px] overflow-hidden rounded-full" style={{ width: `${(d.totals.grossUsableSF / max) * 100}%` }}>
-                        {d.categories.filter((c) => c.proposedTotalSF > 0).map((c) => (
-                          <span
-                            key={c.name}
-                            title={`${c.name} · ${c.proposedTotalSF.toLocaleString()} SF incl. circulation`}
-                            className="h-full rounded-[2px] first:rounded-l-full last:rounded-r-full"
-                            style={{
-                              width: `${(c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100}%`,
-                              backgroundColor: CATEGORY_COLORS[c.name].accent,
-                            }}
-                          />
-                        ))}
-                      </div>
-                      {target ? (
-                        <span
-                          title={`Their number · ${target.toLocaleString()} SF`}
-                          className="absolute -inset-y-1 w-[2.5px] rounded-full bg-[#0e1a2e]"
-                          style={{ left: `${Math.min(99.5, (target / max) * 100)}%` }}
-                        />
-                      ) : null}
-                    </div>
-                  )
-                })()}
-                <div className="mt-3 space-y-2 text-[13px] tabular-nums">
-                  {d.categories.map((c) => (
-                    <div key={c.name} className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: CATEGORY_COLORS[c.name].accent }} />
-                      <span className="text-slate-600">{c.name}</span>
-                      <span className="ml-auto font-medium text-slate-800">{c.proposedTotalSF.toLocaleString()} SF</span>
-                      <span className="w-9 shrink-0 text-right text-[11px] text-slate-400">
-                        {Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </aside>
 
             {/* ── Center: the spaces (Workbench cards / Focus table / Briefing) ─ */}
@@ -593,11 +714,11 @@ export default function StudioPage() {
                       Click a placement to move someone — offices and desks recompute live, and the move joins the decision log.
                     </p>
                   </div>
-                  {result && (
+                  {viewResult && (
                     <DepartmentManager
-                      result={result} seating={resolved}
-                      officesByDept={result.spaces.privateOfficesByDept} desksByDept={result.work.dedicatedByDept ?? {}}
-                      onMove={moveSeat}
+                      result={viewResult} seating={resolved}
+                      officesByDept={viewResult.spaces.privateOfficesByDept} desksByDept={viewResult.work.dedicatedByDept ?? {}}
+                      onMove={moveSeat} onMoveDept={moveDept}
                     />
                   )}
                 </>
@@ -668,7 +789,7 @@ export default function StudioPage() {
                       <div className={`grid gap-3.5 ${briefing ? "xl:grid-cols-2 2xl:grid-cols-3" : "xl:grid-cols-2 2xl:grid-cols-3"}`}>
                         {visible.map((l) => (
                           <SpaceCard
-                            key={l.key} line={l} base={baseOf(l.key)} result={result} briefing={briefing}
+                            key={l.key} line={l} base={baseOf(l.key)} result={viewResult} briefing={briefing}
                             colors={cc} showChips={showDeptChips && !compactCards} showRatios={showRatios && !compactCards}
                             compact={compactCards}
                             people={l.key === "offices" ? seats.offices : l.key === "workstations" ? seats.desks : undefined}
@@ -677,9 +798,31 @@ export default function StudioPage() {
                             onInfo={() => setDetail(detailFor(l))}
                             onDuplicate={() => duplicate(l)}
                             onDelete={l.key.startsWith("studio:") ? () => setAdditions((p) => p.filter((a) => a.key !== l.key)) : undefined}
-                            onRename={l.key.startsWith("studio:") ? (name) => setAdditions((p) => p.map((a) => (a.key === l.key ? { ...a, label: name } : a))) : undefined}
+                            onRename={
+                              l.key.startsWith("studio:")
+                                ? (name) => setAdditions((p) => p.map((a) => (a.key === l.key ? { ...a, label: name } : a)))
+                                : (name) => setLabelOverrides((p) => ({ ...p, [l.key]: name }))
+                            }
+                            onCategory={
+                              l.key.startsWith("studio:")
+                                ? (category) => setAdditions((p) => p.map((a) => (a.key === l.key ? { ...a, category } : a)))
+                                : undefined
+                            }
                           />
                         ))}
+                        {!briefing && (
+                          <button
+                            onClick={() => {
+                              const key = `studio:custom:${Date.now().toString(36)}`
+                              setAdditions((p) => [...p, {
+                                key, label: "New space", category: cat.name, unitSF: 100, proposedCount: 1,
+                              }])
+                            }}
+                            className="flex min-h-[104px] items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 text-sm font-semibold text-slate-400 transition-colors hover:border-[#00badc]/50 hover:text-[#0089a3]"
+                          >
+                            <Plus className="h-4 w-4" /> Add custom space
+                          </button>
+                        )}
                       </div>
                       )}
                     </div>
@@ -757,7 +900,7 @@ export default function StudioPage() {
                         </button>
                       ))}
                     </div>
-                    <SurveyDrawer result={result} tab={surveyTab} seatOf={seats.byId} />
+                    <SurveyDrawer result={viewResult} tab={surveyTab} seatOf={seats.byId} />
                   </>
                 )}
               </aside>
@@ -817,13 +960,14 @@ export default function StudioPage() {
 /* ── Department Manager: every person, where they sit, one click to move ── */
 
 function DepartmentManager({
-  result, seating, officesByDept, desksByDept, onMove,
+  result, seating, officesByDept, desksByDept, onMove, onMoveDept,
 }: {
   result: SurveyResult
   seating: ResolvedSeating
   officesByDept: Record<string, number>
   desksByDept: Record<string, number>
   onMove: (id: string, next: SeatPlacement) => void
+  onMoveDept: (id: string, toDeptId: string) => void
 }) {
   return (
     <div className="space-y-5">
@@ -870,30 +1014,46 @@ function DepartmentManager({
             ) : (
               <div className="mt-4 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                 {rows.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                  <div key={r.id} className="flex items-center justify-between gap-1.5 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
                     <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-slate-800">
                       {r.isLeader && <Crown className="h-3 w-3 shrink-0 text-amber-500" />}
                       <span className="truncate">{r.name}</span>
                     </span>
-                    <span className="flex shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white text-[10px] font-semibold">
-                      {(["office", "desk", "flex"] as const).map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => onMove(r.id, p)}
-                          title={`Move to ${p === "flex" ? "shared — no dedicated seat" : p}`}
-                          className={`px-2 py-1 capitalize transition-colors ${
-                            r.placement === p
-                              ? p === "office"
-                                ? "bg-[#2563eb]/12 text-[#1d4ed8]"
-                                : p === "desk"
-                                  ? "bg-[#00badc]/15 text-[#0089a3]"
-                                  : "bg-slate-200 text-slate-600"
-                              : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-                          }`}
+                    <span className="flex shrink-0 items-center gap-1">
+                      <span className="flex overflow-hidden rounded-lg border border-slate-200 bg-white text-[10px] font-semibold">
+                        {(["office", "desk", "flex"] as const).map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => onMove(r.id, p)}
+                            title={`Move to ${p === "flex" ? "shared — no dedicated seat" : p}`}
+                            className={`px-2 py-1 capitalize transition-colors ${
+                              r.placement === p
+                                ? p === "office"
+                                  ? "bg-[#2563eb]/12 text-[#1d4ed8]"
+                                  : p === "desk"
+                                    ? "bg-[#00badc]/15 text-[#0089a3]"
+                                    : "bg-slate-200 text-slate-600"
+                                : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </span>
+                      <span className="relative shrink-0">
+                        <select
+                          value=""
+                          onChange={(e) => { if (e.target.value) onMoveDept(r.id, e.target.value) }}
+                          title="Move to a different department"
+                          aria-label={`Move ${r.name} to a different department`}
+                          className="appearance-none rounded-lg border border-slate-200 bg-white p-1 text-slate-400 hover:border-[#00badc]/50 hover:text-[#0089a3] focus:border-[#00badc] focus:outline-none"
                         >
-                          {p}
-                        </button>
-                      ))}
+                          <option value="">···</option>
+                          {result.people.departments.filter((other) => other.id !== dep.id).map((other) => (
+                            <option key={other.id} value={other.id}>→ {other.name}</option>
+                          ))}
+                        </select>
+                      </span>
                     </span>
                   </div>
                 ))}
@@ -919,8 +1079,10 @@ function dims(sf: number): string | null {
 
 /* ── The card ──────────────────────────────────────────────────────────── */
 
+const ADDITION_CATEGORIES: CompCategory[] = ["Workstations", "Offices", "Collaboration", "Support"]
+
 function SpaceCard({
-  line, base, result, briefing, colors, showChips, showRatios, compact, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename,
+  line, base, result, briefing, colors, showChips, showRatios, compact, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename, onCategory,
 }: {
   line: ComparisonLine
   base?: ComparisonLine
@@ -939,6 +1101,8 @@ function SpaceCard({
   onDuplicate: () => void
   onDelete?: () => void
   onRename?: (name: string) => void
+  /** Custom (studio-added) cards only — which category's total this counts toward. */
+  onCategory?: (category: CompCategory) => void
 }) {
   const [who, setWho] = useState(false)
   const deptName = (id: string) => result.people.departments.find((x) => x.id === id)?.name ?? id
@@ -947,7 +1111,9 @@ function SpaceCard({
   const isAddition = line.key.startsWith("studio:")
   const hasPeople = (people?.length ?? 0) > 0
 
-  // Ratio · Survey · Today — the validation triangle (Advisory #6.4)
+  // The validation triangle: what the engine recommends, what the client
+  // literally asked for, and what they have today — three independent
+  // answers to "how many of these should exist?" (Advisory #6.4).
   const surveyAsk = (() => {
     if (line.key === "offices") {
       const s = Object.values(result.spaces.privateOfficesByDept).reduce((a, b) => a + b, 0)
@@ -964,6 +1130,10 @@ function SpaceCard({
     }
     return null
   })()
+  // Support has no per-dept count in the survey — only a must-have flag.
+  const supportFlagged = line.category === "Support" && result.spaces.support.includes(line.key.replace(/^support:/, ""))
+  const engineCount = base?.proposedCount
+  const configuredDelta = engineCount !== undefined ? line.proposedCount - engineCount : 0
 
   let alloc: [string, number][] = []
   if (line.key === "offices") alloc = Object.entries(result.spaces.privateOfficesByDept).filter(([, v]) => v > 0).map(([k, v]) => [deptName(k), v])
@@ -1006,13 +1176,43 @@ function SpaceCard({
         )}
       </div>
 
-      {/* Ratio · Survey · Today */}
+      {/* Custom-card only: which category this counts toward — visible only
+          when the card is a Studio addition, so a baseline line can never be
+          silently recategorized out of the math it belongs to. */}
+      {onCategory && !briefing && (
+        <div className="px-4 pb-1">
+          <select
+            value={line.category}
+            onChange={(e) => onCategory(e.target.value as CompCategory)}
+            title="Which category's total this space counts toward"
+            className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 focus:border-[#00badc] focus:outline-none"
+          >
+            {ADDITION_CATEGORIES.map((c) => <option key={c} value={c}>counts toward {c}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* The validation triangle — glanceable, colored, not a run-on line */}
       {showRatios && (
-        <p className="px-4 text-[11px] text-slate-400">
-          {line.ratio ? <>ratio {line.ratio}{base ? ` → ${base.proposedCount}` : ""}</> : "added in studio"}
-          {surveyAsk !== null && <> · survey {surveyAsk}</>}
-          {line.existingCount > 0 && <> · today {line.existingCount}</>}
-        </p>
+        <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2">
+          {engineCount !== undefined ? (
+            <Token label="Engine" value={engineCount} title="What the planning ratios recommend" />
+          ) : (
+            <span className="text-[11px] text-slate-400">added in studio</span>
+          )}
+          {surveyAsk !== null && <Token muted label="You asked" value={surveyAsk} title="What the client's intake literally requested" />}
+          {supportFlagged && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700" title="The client flagged this space as must-have">
+              flagged by client
+            </span>
+          )}
+          {line.existingCount > 0 && <Token muted label="Today" value={line.existingCount} title="What they have right now" />}
+          {engineCount !== undefined && configuredDelta !== 0 && (
+            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700" title="Configured quantity vs. the engine's recommendation">
+              {configuredDelta > 0 ? "+" : ""}{configuredDelta} vs engine
+            </span>
+          )}
+        </div>
       )}
 
       <div className="flex items-center gap-3 px-4 py-2.5">
@@ -1020,23 +1220,36 @@ function SpaceCard({
           <span className="text-sm text-slate-600 tabular-nums">{line.proposedCount} × {line.unitSF} SF{dims(line.unitSF) ? ` (${dims(line.unitSF)})` : ""}</span>
         ) : (
           <>
-            <label className="flex items-center gap-1.5 text-xs text-slate-500">
-              Qty
+            {/* Qty leads — the count matters more than the unit size */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onQty(Math.max(0, line.proposedCount - 1))}
+                aria-label="Decrease quantity"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#00badc]/10 text-[#0089a3] transition-colors hover:bg-[#00badc]/20"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
               <input
                 type="number" min={0} value={line.proposedCount}
                 onChange={(e) => onQty(Math.max(0, Number(e.target.value)))}
-                className="w-14 rounded-md border border-[#00badc]/40 bg-[#e9f7fb]/50 px-1.5 py-1 text-right text-sm tabular-nums focus:border-[#00badc] focus:outline-none"
+                className="w-11 rounded-md border-none bg-transparent text-center text-xl font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
               />
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-slate-500">
-              × SF
-              <span className="flex flex-col">
-                <input
-                  type="number" min={1} value={line.unitSF}
-                  onChange={(e) => onSf(e.target.value === "" ? null : Number(e.target.value))}
-                  className="w-[70px] rounded-md border border-[#00badc]/40 bg-[#e9f7fb]/50 px-1.5 py-1 text-right text-sm tabular-nums focus:border-[#00badc] focus:outline-none"
-                />
-              </span>
+              <button
+                onClick={() => onQty(line.proposedCount + 1)}
+                aria-label="Increase quantity"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#00badc]/10 text-[#0089a3] transition-colors hover:bg-[#00badc]/20"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <label className="flex items-center gap-1 text-[11px] text-slate-400">
+              ×
+              <input
+                type="number" min={1} value={line.unitSF}
+                onChange={(e) => onSf(e.target.value === "" ? null : Number(e.target.value))}
+                className="w-14 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-right text-xs tabular-nums focus:border-[#00badc] focus:outline-none"
+              />
+              SF
             </label>
             {!compact && dims(line.unitSF) && <span className="text-[11px] font-medium text-[#0089a3]">{dims(line.unitSF)}</span>}
           </>
@@ -1070,6 +1283,18 @@ function SpaceCard({
         </div>
       )}
     </div>
+  )
+}
+
+/** One validation-triangle token — a labeled, colored figure, not a grey run-on. */
+function Token({ label, value, title, muted }: { label: string; value: number; title: string; muted?: boolean }) {
+  return (
+    <span
+      title={title}
+      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${muted ? "bg-slate-100 text-slate-500" : "bg-[#00badc]/12 text-[#0089a3]"}`}
+    >
+      {label} <b className="tabular-nums">{value}</b>
+    </span>
   )
 }
 

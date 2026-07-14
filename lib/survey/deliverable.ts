@@ -100,11 +100,14 @@ export function buildDeliverable(
   factors: DeliverableFactors = {},
   /** The Studio's seating moves (Department Manager) — office/desk overrides. */
   people?: SeatingPatch,
+  /** Studio renames — comparison line key → display label, session-adjustable. */
+  labels: Record<string, string> = {},
 ): Deliverable {
   const comp = buildComparison(result)
   const lines: ComparisonLine[] = [
     ...comp.lines.map((l) => ({
       ...l,
+      label: labels[l.key] ?? l.label,
       unitSF: overrides[l.key] && overrides[l.key] > 0 ? overrides[l.key] : l.unitSF,
       proposedCount: counts[l.key] !== undefined && counts[l.key] >= 0 ? counts[l.key] : l.proposedCount,
     })),

@@ -35,6 +35,7 @@ interface Eng {
     notes?: Record<string, string>
     resolvedGaps?: Record<string, boolean>
     people?: { officeEmployeeIds?: string[]; deskEmployeeIds?: string[] }
+    labels?: Record<string, string>
     updatedAt?: string
   }
   progress?: { stage: string; step?: number; total?: number; updatedAt: string }
@@ -68,7 +69,7 @@ export default function CommandPage({ params }: { params: Promise<{ token: strin
   const d = useMemo(
     () =>
       e?.result
-        ? buildDeliverable(e.result, e.session?.overrides ?? e.overrides ?? {}, e.session?.counts ?? {}, e.session?.additions ?? [], {}, e.session?.people)
+        ? buildDeliverable(e.result, e.session?.overrides ?? e.overrides ?? {}, e.session?.counts ?? {}, e.session?.additions ?? [], {}, e.session?.people, e.session?.labels)
         : null,
     [e],
   )

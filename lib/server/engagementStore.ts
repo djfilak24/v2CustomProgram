@@ -39,6 +39,13 @@ export interface EngagementSession {
    * "the intake's answer still stands."
    */
   people?: { officeEmployeeIds?: string[]; deskEmployeeIds?: string[] }
+  /**
+   * Department moves from the Studio People tab — person id → destination
+   * department id, applied on top of the intake's own roster.
+   */
+  deptMoves?: Record<string, string>
+  /** Studio renames — comparison line key → display label. */
+  labels?: Record<string, string>
   /** Deliverable beat composer — slide id → included (absent = included). */
   beats?: Record<string, boolean>
   updatedAt: string

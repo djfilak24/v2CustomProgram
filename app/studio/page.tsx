@@ -13,7 +13,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, PolarAngleAxis, PolarGrid, Radar, RadarChart,
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts"
-import { buildDeliverable, CATEGORY_COLORS, DEFAULT_FACTORS, type DeliverableOverrides, type DeliverableAddition, type DeliverableFactors, type DeliverableCategory } from "@/lib/survey/deliverable"
+import { buildDeliverable, CATEGORY_COLORS, DEFAULT_FACTORS, type Deliverable, type DeliverableOverrides, type DeliverableAddition, type DeliverableFactors, type DeliverableCategory } from "@/lib/survey/deliverable"
 import { ProgramMapView } from "@/components/survey/program-map"
 import { exportFitPlanningPackage } from "@/lib/survey/fitPlanning"
 import { lineGaps, type ComparisonLine, type CompCategory } from "@/lib/survey/comparison"
@@ -102,6 +102,9 @@ export default function StudioPage() {
   const [heroKpi, setHeroKpi] = useState<"gross" | "rentable">("gross")
   /** Left rail tab — the docked Studio summary system. */
   const [railTab, setRailTab] = useState<RailTab>("dashboard")
+  const [allocationView, setAllocationView] = useState<"mix" | "departments" | "types">("mix")
+  const [profileView, setProfileView] = useState<"movement" | "balance">("movement")
+  const [sessionView, setSessionView] = useState<"impact" | "log">("impact")
   /** Left rail collapse — a slim icon strip when the room needs the width back. */
   const [railCollapsed, setRailCollapsed] = useState(false)
   /** Which cards have their notes field open. */
@@ -425,6 +428,10 @@ export default function StudioPage() {
   }, [viewResult, resolved, seatAssignments, seatCardOptions])
 
   const engineDeliverable = useMemo(() => (viewResult ? buildDeliverable(viewResult) : null), [viewResult])
+  const configuredProfile = useMemo(
+    () => (d && engineDeliverable ? programExpressionProfile(d, engineDeliverable) : d?.profile),
+    [d, engineDeliverable],
+  )
   const sessionImpact = useMemo(() => {
     if (!d || !engineDeliverable) return []
     return d.categories.map((category) => {
@@ -795,13 +802,17 @@ export default function StudioPage() {
                     <h2 className={`truncate ${briefing ? "text-xl font-bold" : "text-lg font-bold"}`}>{d.clientName}</h2>
                     </div>
                   </div>
-                  <button
-                    onClick={toggleRailCollapsed}
-                    title="Collapse"
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <ChevronsLeft className="h-3.5 w-3.5" />
-                  </button>
+                  <span className="flex shrink-0 items-center gap-0.5">
+                    <button onClick={() => logoInputRef.current?.click()} title={logo ? "Replace client logo" : "Upload client logo"} className="flex h-6 w-6 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"><Upload className="h-3.5 w-3.5" /></button>
+                    <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleLogoFile(file); e.target.value = "" }} />
+                    <button
+                      onClick={toggleRailCollapsed}
+                      title="Collapse"
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                    >
+                      <ChevronsLeft className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
                 </div>
                 {/* Identity as stat cells, not a sentence */}
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -814,7 +825,7 @@ export default function StudioPage() {
                     <p className="flex items-baseline gap-1 text-lg font-bold tabular-nums leading-tight text-slate-900">
                       {d.future}
                       {d.future !== d.current && (
-                        <span className={`text-[10px] font-bold ${d.future > d.current ? "text-emerald-600" : "text-amber-600"}`}>
+                        <span className="text-[10px] font-bold text-[#0089a3]">
                           {d.future > d.current ? "+" : ""}{Math.round(((d.future - d.current) / (d.current || 1)) * 100)}%
                         </span>
                       )}
@@ -847,9 +858,7 @@ export default function StudioPage() {
               <div className="p-5">
                 {(() => {
                   const primary = heroKpi === "gross" ? d.totals.grossUsableSF : d.totals.estimatedRentableSF
-                  const secondary = heroKpi === "gross" ? d.totals.estimatedRentableSF : d.totals.grossUsableSF
                   const primaryLabel = heroKpi === "gross" ? "Gross usable area" : "Estimated rentable area"
-                  const secondaryLabel = heroKpi === "gross" ? "Rentable estimate" : "Gross usable"
                   const hasToday = d.totals.existingSF > 0
                   const grossDelta = hasToday ? d.totals.grossUsableSF - d.totals.existingSF : 0
                   const grossPct = hasToday ? Math.round((grossDelta / d.totals.existingSF) * 100) : 0
@@ -859,39 +868,33 @@ export default function StudioPage() {
                     return (
                       <>
                         <div className="flex items-center justify-between">
-                          <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Program balance</h3>
-                          <span className="text-[9px] font-semibold text-slate-400">Net + circulation</span>
+                          <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Allocation</h3>
+                          <span className="text-[9px] font-semibold text-slate-400">Live configuration</span>
                         </div>
-                        <DonutChart categories={d.categories} total={d.totals.grossUsableSF} logo={logo} />
-                        <div className="mt-2 flex justify-center">
-                          <button
-                            onClick={() => logoInputRef.current?.click()}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:border-[#00badc]/40 hover:text-[#0089a3]"
-                          >
-                            <Upload className="h-3 w-3" /> {logo ? "Replace logo" : "Upload logo"}
-                          </button>
-                          <input
-                            ref={logoInputRef} type="file" accept="image/*" className="hidden"
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = "" }}
-                          />
-                        </div>
-                        <div className="mt-4 space-y-2 text-[13px] tabular-nums">
-                          {d.categories.map((c) => (
-                            <div key={c.name}>
-                              <div className="flex items-center gap-2">
-                                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: CATEGORY_COLORS[c.name].accent }} />
-                                <span className="text-slate-600">{c.name}</span>
-                                <span className="ml-auto font-medium text-slate-800">{c.proposedTotalSF.toLocaleString()} SF</span>
-                                <span className="w-9 shrink-0 text-right text-[11px] text-slate-400">
-                                  {Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%
-                                </span>
-                              </div>
-                              <div className="mt-1 h-1.5 rounded-full bg-slate-100">
-                                <div className="h-1.5 rounded-full" style={{ width: `${Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%`, backgroundColor: CATEGORY_COLORS[c.name].accent }} />
-                              </div>
+                        <RailSubTabs
+                          value={allocationView}
+                          options={[{ id: "mix", label: "Mix" }, { id: "departments", label: "Departments" }, { id: "types", label: "Types" }]}
+                          onChange={setAllocationView}
+                        />
+                        {allocationView === "mix" && (
+                          <>
+                            <DonutChart categories={d.categories} total={d.totals.grossUsableSF} logo={logo} />
+                            <div className="mt-3 space-y-2 text-[13px] tabular-nums">
+                              {d.categories.map((category) => (
+                                <CategoryDistributionRow key={category.name} category={category} total={d.totals.grossUsableSF} />
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </>
+                        )}
+                        {allocationView === "departments" && viewResult && (
+                          <DepartmentDistribution
+                            result={viewResult}
+                            rosterPeople={rosterPeople}
+                            seatOptions={seatCardOptions}
+                            deptAlloc={deptAlloc}
+                          />
+                        )}
+                        {allocationView === "types" && <SpaceTypeDistribution categories={d.categories} />}
                       </>
                     )
                   }
@@ -901,38 +904,31 @@ export default function StudioPage() {
                       <>
                         <div className="flex items-center justify-between">
                           <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">People + place profile</h3>
-                          <span className="text-[9px] font-semibold text-[#0089a3]">Survey signal</span>
+                          <span className="text-[9px] font-semibold text-[#0089a3]">Profile movement</span>
                         </div>
-                        <StudioProfileRadar scores={d.profile} />
-                        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-slate-200">
-                          <div className="bg-slate-50 p-3">
-                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Place</p>
-                            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{d.totals.sfPerPerson}</p>
-                            <p className="text-[10px] text-slate-500">SF / person</p>
-                          </div>
-                          <div className="bg-slate-50 p-3">
-                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">People</p>
-                            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{d.future}</p>
-                            <p className="text-[10px] text-slate-500">at plan</p>
-                          </div>
-                        </div>
-                        <div className="mt-4 space-y-2">
-                          {programStatusBars.map((b) => {
-                            const pct = b.goal > 0 ? Math.min(100, (b.configured / b.goal) * 100) : 0
-                            const diff = b.configured - b.goal
-                            return (
-                              <div key={b.label}>
-                                <div className="flex justify-between text-[11px]">
-                                  <span className="font-medium text-slate-600">{b.label}</span>
-                                  <span className="tabular-nums text-slate-500">{b.configured} / {b.goal}{diff === 0 ? " matched" : ` (${diff > 0 ? "+" : ""}${diff})`}</span>
-                                </div>
-                                <div className="mt-1 h-2 rounded-full bg-slate-100">
-                                  <div className="h-2 rounded-full bg-[#00badc]" style={{ width: `${pct}%` }} />
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
+                        <RailSubTabs
+                          value={profileView}
+                          options={[{ id: "movement", label: "Movement" }, { id: "balance", label: "Balance" }]}
+                          onChange={setProfileView}
+                        />
+                        {profileView === "movement" && configuredProfile && (
+                          <>
+                            <StudioProfileRadar scores={d.profile} configured={configuredProfile} />
+                            <div className="flex items-center justify-center gap-4 text-[9px] font-semibold text-slate-500">
+                              <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-slate-400" /> Survey profile</span>
+                              <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-[#00badc]" /> Program expression</span>
+                            </div>
+                            <p className="mt-3 text-[10px] leading-4 text-slate-400">The second shape reflects how the current configuration expresses the survey profile. It is descriptive, not a score.</p>
+                          </>
+                        )}
+                        {profileView === "balance" && (
+                          <PeoplePlaceBalance
+                            deliverable={d}
+                            engine={engineDeliverable}
+                            rosterPeople={rosterPeople}
+                            status={programStatusBars}
+                          />
+                        )}
                       </>
                     )
                   }
@@ -954,15 +950,67 @@ export default function StudioPage() {
                             <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Gaps closed</p>
                           </button>
                           <button onClick={() => setView("people")} className="bg-slate-50 p-3 text-left">
-                            <p className="text-2xl font-bold tabular-nums text-slate-900">{decisions.filter((x) => x.id.startsWith("seat:") || x.id.startsWith("dept:")).length}</p>
+                            <p className="text-2xl font-bold tabular-nums text-slate-900">{decisions.filter((x) => x.id.startsWith("seat:") || x.id.startsWith("dept:") || x.id.startsWith("assignment:")).length}</p>
                             <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">People moved</p>
                           </button>
                         </div>
-                        <SessionImpactChart data={sessionImpact} />
-                        <div className="mt-4 space-y-2">
-                          {(decisions.length ? decisions : [{ id: "empty", text: "No session decisions yet. Adjust counts, area, allocation, or gaps and they will appear here." }]).slice(0, 5).map((x) => (
-                            <p key={x.id} className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] leading-snug text-slate-600">{x.text}</p>
-                          ))}
+                        <RailSubTabs
+                          value={sessionView}
+                          options={[{ id: "impact", label: "Impact" }, { id: "log", label: "Change log" }]}
+                          onChange={setSessionView}
+                        />
+                        {sessionView === "impact" && (
+                          <>
+                            <SessionImpactChart data={sessionImpact} />
+                            <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-slate-200">
+                              <div className="bg-slate-50 p-3"><p className="text-[9px] font-bold uppercase text-slate-400">Net movement</p><p className="mt-1 text-lg font-bold tabular-nums text-slate-900">{d.totals.proposedNetSF - (engineDeliverable?.totals.proposedNetSF ?? d.totals.proposedNetSF) > 0 ? "+" : ""}{(d.totals.proposedNetSF - (engineDeliverable?.totals.proposedNetSF ?? d.totals.proposedNetSF)).toLocaleString()} SF</p></div>
+                              <div className="bg-slate-50 p-3"><p className="text-[9px] font-bold uppercase text-slate-400">Density movement</p><p className="mt-1 text-lg font-bold tabular-nums text-slate-900">{d.totals.sfPerPerson - (engineDeliverable?.totals.sfPerPerson ?? d.totals.sfPerPerson) > 0 ? "+" : ""}{d.totals.sfPerPerson - (engineDeliverable?.totals.sfPerPerson ?? d.totals.sfPerPerson)} <span className="text-[10px] text-slate-400">SF/person</span></p></div>
+                            </div>
+                          </>
+                        )}
+                        {sessionView === "log" && (
+                          <div className="mt-3 space-y-2">
+                            {(decisions.length ? decisions : [{ id: "empty", text: "No session changes yet. Adjust counts, area, allocation, or gaps and they will appear here." }]).map((item, index) => (
+                              <div key={item.id} className="grid grid-cols-[22px_minmax(0,1fr)] gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[9px] font-bold text-slate-400">{index + 1}</span>
+                                <p className="text-[11px] leading-4 text-slate-600">{item.text}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )
+                  }
+
+                  if (railTab === "kpis") {
+                    const loadFactor = 1 + d.totals.rentableFactor
+                    const engineSfPerPerson = engineDeliverable?.totals.sfPerPerson ?? d.totals.sfPerPerson
+                    return (
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Planning KPIs</h3>
+                          <div className="flex rounded-md bg-slate-100 p-0.5 text-[9px] font-bold">
+                            {(["gross", "rentable"] as const).map((mode) => <button key={mode} onClick={() => setHeroKpi(mode)} className={`rounded px-2 py-1 capitalize ${heroKpi === mode ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"}`}>{mode}</button>)}
+                          </div>
+                        </div>
+                        <div className="mt-3 border-b border-slate-100 pb-4">
+                          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#0089a3]">{primaryLabel}</p>
+                          <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight text-slate-900">{primary.toLocaleString()}<span className="ml-1 text-sm font-semibold text-slate-400">SF</span></p>
+                          {hasToday && <p className="mt-1 text-[11px] font-medium text-slate-500">{grossDelta > 0 ? "+" : ""}{grossDelta.toLocaleString()} SF from today</p>}
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-slate-200">
+                          <RailMetric label="Net program" value={d.totals.proposedNetSF.toLocaleString()} unit="SF" />
+                          <RailMetric label="Circulation" value={d.totals.circulationSF.toLocaleString()} unit="SF" />
+                          <RailMetric label="SF / person" value={String(d.totals.sfPerPerson)} detail={`${d.totals.sfPerPerson - engineSfPerPerson >= 0 ? "+" : ""}${d.totals.sfPerPerson - engineSfPerPerson} from engine`} />
+                          <RailMetric label="People at plan" value={String(d.future)} detail={`${d.daysInOffice} days / week`} />
+                          <RailMetric label="Rentable load" value={`×${loadFactor.toFixed(2)}`} detail="editable in settings" />
+                          <RailMetric label="Est. rentable" value={d.totals.estimatedRentableSF.toLocaleString()} unit="SF" />
+                        </div>
+                        <div className="mt-4">
+                          <div className="flex items-center justify-between"><h4 className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">Configured / engine</h4><span className="text-[9px] text-slate-400">Reference only</span></div>
+                          <div className="mt-2 space-y-3">
+                            {programStatusBars.map((row) => <ProgramStatusRow key={row.label} {...row} />)}
+                          </div>
                         </div>
                       </>
                     )
@@ -1015,23 +1063,16 @@ export default function StudioPage() {
                           <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Gaps</p>
                         </button>
                         <button onClick={() => setView("people")} className="bg-slate-50 p-3 text-left">
-                          <p className="text-xl font-bold tabular-nums text-slate-900">{decisions.filter((x) => x.id.startsWith("seat:") || x.id.startsWith("dept:")).length}</p>
+                          <p className="text-xl font-bold tabular-nums text-slate-900">{decisions.filter((x) => x.id.startsWith("seat:") || x.id.startsWith("dept:") || x.id.startsWith("assignment:")).length}</p>
                           <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Moves</p>
                         </button>
                       </div>
-                      {railTab === "kpis" && (
-                        <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-[13px] tabular-nums text-slate-500">
-                          <Row k={secondaryLabel} v={`${secondary.toLocaleString()} SF`} />
-                          <Row k="Net program" v={`${d.totals.proposedNetSF.toLocaleString()} SF`} />
-                          <Row k="Circulation" v={`${d.totals.circulationSF.toLocaleString()} SF`} />
-                        </div>
-                      )}
                       {railTab === "dashboard" && (
                         <>
                           <div className="mt-5">
                             <div className="flex items-center justify-between">
                               <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Program balance</h3>
-                              <button onClick={() => setRailTab("allocation")} className="text-[10px] font-bold text-[#0089a3]">View charts</button>
+                              <button onClick={() => setRailTab("allocation")} className="text-[10px] font-bold text-[#0089a3]">View distribution</button>
                             </div>
                             <div className="mt-3 space-y-2">
                               {d.categories.map((c) => (
@@ -1045,6 +1086,10 @@ export default function StudioPage() {
                               ))}
                             </div>
                           </div>
+                          <button onClick={() => { setRailTab("session"); setSessionView("impact") }} className="mt-4 flex w-full items-center justify-between border-t border-slate-100 pt-3 text-left">
+                            <span><span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Session impact</span><span className="mt-0.5 block text-[10px] text-slate-500">Current configuration from engine</span></span>
+                            <span className="text-sm font-bold tabular-nums text-slate-800">{sessionImpact.reduce((sum, row) => sum + row.delta, 0) > 0 ? "+" : ""}{Math.round(sessionImpact.reduce((sum, row) => sum + row.delta, 0)).toLocaleString()} SF</span>
+                          </button>
                           {Object.keys(factors).length > 0 && <p className="mt-4 rounded-lg bg-[#00badc]/10 px-3 py-2 text-[11px] font-medium text-[#0089a3]">Planning dials tuned on the session record.</p>}
                         </>
                       )}
@@ -2458,15 +2503,137 @@ function Block({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** The category mix, drawn — the client's own mark at the center when uploaded. */
-function StudioProfileRadar({ scores }: { scores: ProfileScores }) {
-  const data = PROFILE_AXES.map((axis) => ({ axis, value: scores[axis] }))
+function programExpressionProfile(deliverable: Deliverable, engine: Deliverable): ProfileScores {
+  const next = { ...deliverable.profile }
+  const ratio = (category: DeliverableCategory["name"]) => {
+    const current = deliverable.categories.find((row) => row.name === category)?.proposedNetSF ?? 0
+    const baseline = engine.categories.find((row) => row.name === category)?.proposedNetSF ?? 0
+    return baseline > 0 ? current / baseline : 1
+  }
+  const clamp = (value: number) => Math.max(0, Math.min(10, Math.round(value * 10) / 10))
+  next.Collaboration = clamp(next.Collaboration + (ratio("Collaboration") - 1) * 2.4)
+  next.Amenity = clamp(next.Amenity + (ratio("Support") - 1) * 2.2)
+  next.Privacy = clamp(next.Privacy + (ratio("Offices") - 1) * 2.5)
+  next.Flexibility = clamp(next.Flexibility + ((ratio("Collaboration") + ratio("Support")) / 2 - 1) * 1.8)
+  const densityRatio = deliverable.totals.sfPerPerson > 0 ? engine.totals.sfPerPerson / deliverable.totals.sfPerPerson : 1
+  next.Density = clamp(next.Density + (densityRatio - 1) * 3)
+  return next
+}
+
+function RailSubTabs<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (value: T) => void }) {
+  return (
+    <div className="mt-3 flex overflow-hidden rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[9px] font-bold">
+      {options.map((option) => <button key={option.id} onClick={() => onChange(option.id)} className={`flex-1 rounded px-2 py-1.5 ${value === option.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}>{option.label}</button>)}
+    </div>
+  )
+}
+
+function RailMetric({ label, value, unit, detail }: { label: string; value: string; unit?: string; detail?: string }) {
+  return (
+    <div className="bg-slate-50 p-3">
+      <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-400">{label}</p>
+      <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">{value}{unit && <span className="ml-1 text-[9px] font-semibold text-slate-400">{unit}</span>}</p>
+      {detail && <p className="mt-0.5 truncate text-[9px] text-slate-400">{detail}</p>}
+    </div>
+  )
+}
+
+function ProgramStatusRow({ label, configured, goal }: { label: string; configured: number; goal: number }) {
+  const max = Math.max(configured, goal, 1)
+  const delta = configured - goal
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[10px]"><span className="font-semibold text-slate-600">{label}</span><span className="tabular-nums text-slate-500">{configured} configured · {goal} engine</span></div>
+      <div className="mt-1.5 space-y-1">
+        <div className="h-1.5 bg-slate-100"><div className="h-1.5 bg-slate-300" style={{ width: `${(goal / max) * 100}%` }} /></div>
+        <div className="h-1.5 bg-[#00badc]/10"><div className="h-1.5 bg-[#00badc]" style={{ width: `${(configured / max) * 100}%` }} /></div>
+      </div>
+      <p className="mt-1 text-[9px] text-slate-400">{delta === 0 ? "No movement" : `${delta > 0 ? "+" : ""}${delta} from engine`}</p>
+    </div>
+  )
+}
+
+function CategoryDistributionRow({ category, total }: { category: DeliverableCategory; total: number }) {
+  const percent = Math.round((category.proposedTotalSF / (total || 1)) * 100)
+  return (
+    <div>
+      <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: CATEGORY_COLORS[category.name].accent }} /><span className="text-slate-600">{category.name}</span><span className="ml-auto font-medium text-slate-800">{category.proposedTotalSF.toLocaleString()} SF</span><span className="w-8 text-right text-[10px] text-slate-400">{percent}%</span></div>
+      <div className="mt-1 h-1.5 bg-slate-100"><div className="h-1.5" style={{ width: `${percent}%`, backgroundColor: CATEGORY_COLORS[category.name].accent }} /></div>
+    </div>
+  )
+}
+
+function DepartmentDistribution({ result, rosterPeople, seatOptions, deptAlloc }: {
+  result: SurveyResult
+  rosterPeople: { id: string; name: string; department: string; assignment: string | "flex" }[]
+  seatOptions: { key: string; label: string; category: "Workstations" | "Offices" }[]
+  deptAlloc: Record<string, Record<string, number>>
+}) {
+  const rows = result.people.departments.map((department) => {
+    const named = rosterPeople.filter((person) => person.department === department.name)
+    const categoryFor = (assignment: string) => seatOptions.find((option) => option.key === assignment)?.category
+    const namedWorkstations = named.filter((person) => categoryFor(person.assignment) === "Workstations").length
+    const namedOffices = named.filter((person) => categoryFor(person.assignment) === "Offices").length
+    const allocated = (category: "Workstations" | "Offices") => seatOptions.filter((option) => option.category === category).reduce((sum, option) => sum + (deptAlloc[option.key]?.[department.id] ?? 0), 0)
+    const workstationPlan = allocated("Workstations") || result.work.dedicatedByDept?.[department.id] || 0
+    const officePlan = allocated("Offices") || result.spaces.privateOfficesByDept[department.id] || 0
+    return { name: department.name, headcount: department.futureHeadcount ?? department.headcount, workstationPlan, officePlan, namedWorkstations, namedOffices }
+  })
+  const max = Math.max(1, ...rows.map((row) => row.workstationPlan + row.officePlan))
+  return (
+    <div className="mt-4 divide-y divide-slate-100">
+      {rows.map((row) => (
+        <div key={row.name} className="py-3 first:pt-0">
+          <div className="flex items-center justify-between gap-2"><span className="truncate text-[11px] font-semibold text-slate-700">{row.name}</span><span className="shrink-0 text-[9px] tabular-nums text-slate-400">{row.headcount} people</span></div>
+          <div className="mt-1.5 flex h-2 overflow-hidden bg-slate-100"><span className="bg-[#00badc]" style={{ width: `${(row.workstationPlan / max) * 100}%` }} /><span className="bg-[#2563eb]" style={{ width: `${(row.officePlan / max) * 100}%` }} /></div>
+          <div className="mt-1 flex items-center gap-3 text-[9px] text-slate-400"><span><b className="text-[#0089a3]">{row.workstationPlan}</b> workstations · {row.namedWorkstations} named</span><span><b className="text-blue-600">{row.officePlan}</b> offices · {row.namedOffices} named</span></div>
+        </div>
+      ))}
+      {!rows.length && <p className="py-4 text-xs text-slate-400">No department allocation is available.</p>}
+    </div>
+  )
+}
+
+function SpaceTypeDistribution({ categories }: { categories: DeliverableCategory[] }) {
+  const rows = categories.flatMap((category) => category.lines.map((line) => ({ ...line, total: line.proposedCount * line.unitSF, accent: CATEGORY_COLORS[category.name].accent }))).filter((line) => line.total > 0).sort((a, b) => b.total - a.total)
+  const max = Math.max(1, ...rows.map((row) => row.total))
+  return (
+    <div className="mt-4 space-y-3">
+      {rows.map((row) => <div key={row.key}><div className="flex items-center justify-between gap-2 text-[10px]"><span className="truncate font-medium text-slate-600">{row.label}</span><span className="shrink-0 tabular-nums text-slate-400">{row.proposedCount} × {row.unitSF} · <b className="text-slate-600">{row.total.toLocaleString()} SF</b></span></div><div className="mt-1 h-1.5 bg-slate-100"><div className="h-1.5" style={{ width: `${(row.total / max) * 100}%`, backgroundColor: row.accent }} /></div></div>)}
+    </div>
+  )
+}
+
+function PeoplePlaceBalance({ deliverable, engine, rosterPeople, status }: { deliverable: Deliverable; engine: Deliverable | null; rosterPeople: { assignment: string | "flex" }[]; status: { label: string; configured: number; goal: number }[] }) {
+  const namedAssigned = rosterPeople.filter((person) => person.assignment !== "flex").length
+  const peoplePct = rosterPeople.length ? Math.round((namedAssigned / rosterPeople.length) * 100) : 0
+  const engineGross = engine?.totals.grossUsableSF ?? deliverable.totals.grossUsableSF
+  const placePct = engineGross ? Math.max(0, Math.round((1 - Math.abs(deliverable.totals.grossUsableSF - engineGross) / engineGross) * 100)) : 100
+  return (
+    <div className="mt-4">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-slate-200">
+        <RailMetric label="People connected" value={`${peoplePct}%`} detail={`${namedAssigned} of ${rosterPeople.length} named`} />
+        <RailMetric label="Place reference" value={`${placePct}%`} detail="proximity to engine area" />
+      </div>
+      <div className="mt-4 space-y-4">
+        <div><div className="flex justify-between text-[10px]"><span className="font-semibold text-slate-600">People</span><span className="text-slate-400">named assignment</span></div><div className="mt-1 h-2 bg-slate-100"><div className="h-2 bg-[#00badc]" style={{ width: `${peoplePct}%` }} /></div></div>
+        <div><div className="flex justify-between text-[10px]"><span className="font-semibold text-slate-600">Place</span><span className="text-slate-400">configured / engine reference</span></div><div className="mt-1 h-2 bg-slate-100"><div className="h-2 bg-[#2563eb]" style={{ width: `${placePct}%` }} /></div></div>
+      </div>
+      <div className="mt-5 border-t border-slate-100 pt-4"><p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Program expression</p><div className="mt-3 space-y-3">{status.map((row) => <ProgramStatusRow key={row.label} {...row} />)}</div></div>
+    </div>
+  )
+}
+
+function StudioProfileRadar({ scores, configured }: { scores: ProfileScores; configured?: ProfileScores }) {
+  const data = PROFILE_AXES.map((axis) => ({ axis, value: scores[axis], configured: configured?.[axis] }))
   return (
     <div className="my-2 h-[190px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <RadarChart data={data} outerRadius="62%">
           <PolarGrid stroke="#dbe3ea" />
           <PolarAngleAxis dataKey="axis" tick={{ fill: "#64748b", fontSize: 9 }} />
-          <Radar dataKey="value" stroke="#00badc" fill="#00badc" fillOpacity={0.22} isAnimationActive animationDuration={300} />
+          <Radar dataKey="value" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.08} isAnimationActive={false} />
+          {configured && <Radar dataKey="configured" stroke="#00badc" fill="#00badc" fillOpacity={0.16} isAnimationActive animationDuration={300} />}
         </RadarChart>
       </ResponsiveContainer>
     </div>
@@ -2531,15 +2698,6 @@ function DonutChart({ categories, total, logo }: { categories: DeliverableCatego
           <Image src="/NELSON_color.png" alt="" width={56} height={56} className="h-8 w-auto opacity-40" />
         )}
       </div>
-    </div>
-  )
-}
-
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-slate-500">{k}</span>
-      <span className="font-medium text-slate-800">{v}</span>
     </div>
   )
 }

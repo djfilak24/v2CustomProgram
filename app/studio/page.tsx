@@ -166,8 +166,8 @@ export default function StudioPage() {
   void histVer
 
   useEffect(() => { setNelson(isNelsonMode()) }, [])
-  // Rail collapse is a personal viewing preference, not engagement data — kept locally.
-  useEffect(() => { setRailCollapsed(localStorage.getItem("nelson:studioRailCollapsed") === "1") }, [])
+  // The rail stays open in Program/Briefing and yields the entire viewport in People.
+  useEffect(() => { localStorage.removeItem("nelson:studioRailCollapsed"); setRailCollapsed(false) }, [])
   useEffect(() => {
     const saved = Number(localStorage.getItem("nelson:studioRailWidth"))
     if (Number.isFinite(saved) && saved >= 230) setRailWidth(Math.min(420, saved))
@@ -806,9 +806,10 @@ export default function StudioPage() {
         ) : (
           <main
             className="grid min-h-[calc(100vh-57px)] w-full gap-0"
-            style={{ gridTemplateColumns: `${railCollapsed ? 56 : railWidth}px minmax(0,1fr)${drawer ? " 360px" : ""}` }}
+            style={{ gridTemplateColumns: view === "people" ? `minmax(0,1fr)${drawer ? " 360px" : ""}` : `${railWidth}px minmax(0,1fr)${drawer ? " 360px" : ""}` }}
           >
             {/* ── Left rail: docked, collapsible, one clear number hierarchy ── */}
+            {view !== "people" && (
             <aside className="sticky top-[57px] z-10 h-[calc(100vh-57px)] self-start overflow-y-auto overflow-x-hidden border-r border-slate-200 bg-white">
               {railCollapsed ? (
                 /* Collapsed — a slim icon strip; the room gets its width back. */
@@ -852,13 +853,6 @@ export default function StudioPage() {
                   <span className="flex shrink-0 items-center gap-0.5">
                     <button onClick={() => logoInputRef.current?.click()} title={logo ? "Replace client logo" : "Upload client logo"} className="flex h-6 w-6 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"><Upload className="h-3.5 w-3.5" /></button>
                     <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleLogoFile(file); e.target.value = "" }} />
-                    <button
-                      onClick={toggleRailCollapsed}
-                      title="Collapse"
-                      className="flex h-6 w-6 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                    >
-                      <ChevronsLeft className="h-3.5 w-3.5" />
-                    </button>
                   </span>
                 </div>
                 {/* Identity as stat cells, not a sentence */}
@@ -882,7 +876,7 @@ export default function StudioPage() {
                 <p className="mt-2 text-xs text-slate-400">{d.daysInOffice} days/wk</p>
               </div>
 
-              <div className="space-y-1 border-b border-slate-100 px-3 py-3 text-xs font-semibold text-slate-500">
+              <div className="grid grid-cols-5 border-b border-slate-100 text-[9px] font-semibold text-slate-400">
                 {([
                   ["dashboard", LayoutGrid, "Dashboard"],
                   ["kpis", Gauge, "KPIs"],
@@ -893,11 +887,11 @@ export default function StudioPage() {
                   <button
                     key={id}
                     onClick={() => setRailTab(id)}
-                    className={`flex w-full items-center gap-3 rounded-lg border-l-2 px-3 py-2.5 text-left transition-colors ${
-                      railTab === id ? "border-blue-600 bg-blue-50/70 text-slate-900" : "border-transparent hover:bg-slate-50 hover:text-slate-700"
+                    className={`flex min-h-12 flex-col items-center justify-center gap-1 border-b-2 px-1 py-2 transition-colors ${
+                      railTab === id ? "border-blue-600 bg-blue-50/40 text-slate-900" : "border-transparent hover:bg-slate-50 hover:text-slate-700"
                     }`}
                   >
-                    <Icon className={`h-4 w-4 ${railTab === id ? "text-blue-600" : "text-slate-400"}`} /> {label}
+                    <Icon className={`h-3.5 w-3.5 ${railTab === id ? "text-blue-600" : "text-slate-400"}`} /> {label}
                   </button>
                 ))}
               </div>
@@ -1176,6 +1170,7 @@ export default function StudioPage() {
                 </button>
               )}
             </aside>
+            )}
 
             {/* ── Center: the spaces (Workbench cards / Focus table / Briefing) ─ */}
             <section className="min-w-0 bg-[#f3f7fa]">
@@ -1753,10 +1748,10 @@ function DepartmentManager({
 }) {
   const [activeDept, setActiveDept] = useState(result.people.departments[0]?.id ?? "")
   const [search, setSearch] = useState("")
-  const [leadersOnly, setLeadersOnly] = useState(false)
+  const [rosterLens, setRosterLens] = useState<"all" | "leaders" | "staff">("all")
   const active = result.people.departments.find((department) => department.id === activeDept) ?? result.people.departments[0]
   const activeRows = (active ? seating.byDept[active.id] ?? [] : []).filter((person) =>
-    (!leadersOnly || person.isLeader) && person.name.toLowerCase().includes(search.toLowerCase()),
+    (rosterLens === "all" || (rosterLens === "leaders" ? person.isLeader : !person.isLeader)) && person.name.toLowerCase().includes(search.toLowerCase()),
   )
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   useEffect(() => {
@@ -1764,10 +1759,11 @@ function DepartmentManager({
     setSelectedIds(ids)
   // Selection resets when the department or roster lens changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDept, leadersOnly])
+  }, [activeDept, rosterLens])
   const selected = rosterPeople.filter((person) => selectedIds.includes(person.id))
   const selectedCount = selected.length
-  const assignedCount = selected.filter((person) => person.assignment !== "flex").length
+  const exactSeatKeys = new Set(seatOptions.map((option) => option.key))
+  const assignedCount = selected.filter((person) => exactSeatKeys.has(person.assignment)).length
   const namedPct = selectedCount ? Math.round((assignedCount / selectedCount) * 100) : 0
   const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id])
   const changeAssignmentCount = (key: string | "flex", delta: number) => {
@@ -1789,7 +1785,7 @@ function DepartmentManager({
         <div className="divide-y divide-slate-100">
           {result.people.departments.map((department) => {
             const roster = seating.byDept[department.id] ?? []
-            const planned = roster.filter((person) => rosterPeople.find((item) => item.id === person.id)?.assignment !== "flex").length
+            const planned = roster.filter((person) => exactSeatKeys.has(rosterPeople.find((item) => item.id === person.id)?.assignment ?? "flex")).length
             return <button key={department.id} onClick={() => setActiveDept(department.id)} className={`w-full border-l-2 px-4 py-3 text-left ${active?.id === department.id ? "border-blue-600 bg-blue-50" : "border-transparent hover:bg-white"}`}><span className="flex items-center justify-between gap-3"><span><b className="block text-xs text-slate-800">{department.name}</b><span className="mt-0.5 block text-[10px] text-slate-400">{department.headcount} people</span></span><b className="text-xs tabular-nums text-slate-700">{planned}</b></span></button>
           })}
         </div>
@@ -1797,29 +1793,32 @@ function DepartmentManager({
       </aside>
 
       <section className="min-w-0 border-r border-slate-200">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><h3 className="font-bold text-slate-900">{active?.name ?? "People"}</h3><p className="text-[10px] text-slate-400">{activeRows.length} named people</p></div><div className="flex items-center gap-2"><button onClick={() => setLeadersOnly(false)} className={`rounded-md border px-2.5 py-1.5 text-[10px] font-bold ${!leadersOnly ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>Full roster</button><button onClick={() => setLeadersOnly(true)} className={`rounded-md border px-2.5 py-1.5 text-[10px] font-bold ${leadersOnly ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>Leaders only</button></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><h3 className="font-bold text-slate-900">{active?.name ?? "People"}</h3><p className="text-[10px] text-slate-400">{activeRows.length} named people</p></div><div className="flex overflow-hidden rounded-md border border-slate-200 bg-white p-0.5">{([['all','Full roster'],['leaders','Leaders'],['staff','Staff']] as const).map(([lens,label]) => <button key={lens} onClick={() => setRosterLens(lens)} className={`rounded px-2.5 py-1.5 text-[10px] font-bold ${rosterLens === lens ? "bg-blue-50 text-blue-700" : "text-slate-500"}`}>{label}</button>)}</div></div>
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3"><button onClick={() => setSelectedIds(selectedIds.length === activeRows.length ? [] : activeRows.map((person) => person.id))} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600"><span className={`flex h-4 w-4 items-center justify-center rounded border ${selectedIds.length === activeRows.length && activeRows.length ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"}`}>{selectedIds.length === activeRows.length && activeRows.length > 0 && <Check className="h-3 w-3" />}</span>Select all</button><select value="" onChange={(event) => { if (!event.target.value) return; selectedIds.forEach((id) => onMoveDept(id, event.target.value)) }} className="rounded-md border border-slate-200 px-2 py-1.5 text-[10px] font-semibold text-slate-500"><option value="">Move selected…</option>{result.people.departments.filter((department) => department.id !== active?.id).map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select><span className="ml-auto text-[10px] text-slate-400">{selectedCount} selected</span></div>
         <div className="grid max-h-[590px] grid-cols-2 gap-2 overflow-y-auto p-4 2xl:grid-cols-3">
           {activeRows.map((person) => {
             const checked = selectedIds.includes(person.id)
-            return <button key={person.id} onClick={() => toggleSelected(person.id)} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left ${checked ? "border-blue-200 bg-blue-50/40" : "border-slate-200 bg-white"}`}><GripVertical className="h-3.5 w-3.5 text-slate-300" /><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-3 w-3" />}</span>{person.isLeader && <Crown className="h-3 w-3 text-amber-500" />}<span className="min-w-0 truncate text-xs font-medium text-slate-700">{person.name}</span></button>
+            const assignment = rosterPeople.find((item) => item.id === person.id)?.assignment ?? "flex"
+            const assignmentLabel = seatOptions.find((option) => option.key === assignment)?.label ?? (assignment === "remote" ? "Remote" : assignment === "remote-flex" ? "Remote flex" : "Flexible / shared")
+            return <button key={person.id} onClick={() => toggleSelected(person.id)} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left ${checked ? "border-blue-200 bg-blue-50/40" : "border-slate-200 bg-white"}`}><GripVertical className="h-3.5 w-3.5 text-slate-300" /><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-3 w-3" />}</span>{person.isLeader && <Crown className="h-3 w-3 text-amber-500" />}<span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-slate-700">{person.name}</span><span className="mt-0.5 block truncate text-[9px] text-slate-400">{assignmentLabel}</span></span></button>
           })}
           {!activeRows.length && <p className="col-span-full p-8 text-center text-sm text-slate-400">No named roster was captured for this department.</p>}
         </div>
       </section>
 
       <aside className="min-w-0 p-5">
-        <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Exact space assignment</h3><p className="mt-1 text-[10px] text-slate-400">Assign the selected roster to actual program types.</p></div><span className="text-[10px] font-semibold text-slate-400">{selectedCount} selected</span></div>
+        <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Exact space assignment</h3><p className="mt-1 text-[10px] text-slate-400">Assign the selected roster to actual program types or work modes.</p></div><span className="text-[10px] font-semibold text-slate-400">{selectedCount} selected</span></div>
+        <label className="mt-4 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wide text-slate-400">Assign all selected</span><select disabled={!selectedCount} defaultValue="" onChange={(event) => { if (!event.target.value) return; selectedIds.forEach((id) => onAssign(id, event.target.value)); event.currentTarget.value = "" }} className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-semibold text-blue-800 focus:border-blue-500 focus:outline-none disabled:opacity-40"><option value="">Choose a destination…</option><optgroup label="Workstation types">{seatOptions.filter((option) => option.category === "Workstations").map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</optgroup><optgroup label="Private office types">{seatOptions.filter((option) => option.category === "Offices").map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</optgroup><optgroup label="Flexible and remote"><option value="flex">Flexible / shared</option><option value="remote-flex">Remote flex</option><option value="remote">Fully remote</option></optgroup></select></label>
         <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
           {seatOptions.map((option, index) => {
             const count = selected.filter((person) => person.assignment === option.key).length
             const color = option.category === "Workstations" ? "#2563eb" : "#8b5cf6"
             return <div key={option.key} className="flex items-center gap-3 px-4 py-3"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{option.label}</b><span className="text-[9px] text-slate-400">{option.category === "Offices" ? "Enclosed" : "Workstation"} · exact program type</span></span><button onClick={() => changeAssignmentCount(option.key, -1)} className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-400"><Minus className="h-3 w-3" /></button><b className="w-7 text-center text-xs tabular-nums">{count}</b><button onClick={() => changeAssignmentCount(option.key, 1)} className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-400"><Plus className="h-3 w-3" /></button></div>
           })}
-          <div className="flex items-center gap-3 px-4 py-3"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" /><span className="min-w-0 flex-1"><b className="block text-xs text-slate-800">Unassigned / shared</b><span className="text-[9px] text-slate-400">Not assigned to a specific space</span></span><b className="w-7 text-center text-xs tabular-nums">{selected.filter((person) => person.assignment === "flex").length}</b></div>
+          {([{ key: "flex", label: "Flexible / shared", detail: "Shared-seat pool; no exact desk" }, { key: "remote-flex", label: "Remote flex", detail: "Primarily remote with bookable access" }, { key: "remote", label: "Fully remote", detail: "Captured in headcount; no planned seat" }] as const).map((mode) => <button key={mode.key} onClick={() => selectedIds.forEach((id) => onAssign(id, mode.key))} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"><span className={`h-2.5 w-2.5 rounded-full ${mode.key === "flex" ? "bg-slate-400" : mode.key === "remote-flex" ? "bg-cyan-500" : "bg-indigo-500"}`} /><span className="min-w-0 flex-1"><b className="block text-xs text-slate-800">{mode.label}</b><span className="text-[9px] text-slate-400">{mode.detail}</span></span><b className="w-7 text-center text-xs tabular-nums">{selected.filter((person) => person.assignment === mode.key).length}</b></button>)}
         </div>
-        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-700">Total assigned <span className="float-right tabular-nums">{assignedCount} of {selectedCount}</span></div>
-        <div className="mt-5 grid grid-cols-[1fr_132px] items-center gap-4 rounded-xl border border-slate-200 p-4"><div><h4 className="text-xs font-bold text-slate-800">{active?.name} allocation summary</h4><div className="mt-4 space-y-2 text-[10px]"><p className="flex justify-between text-slate-500"><span>Named</span><b className="text-slate-700">{assignedCount} · {namedPct}%</b></p><p className="flex justify-between text-slate-500"><span>Unassigned</span><b className="text-slate-700">{selectedCount - assignedCount} · {100 - namedPct}%</b></p></div></div><div className="relative h-28 w-28 rounded-full" style={{ background: `conic-gradient(#10b981 ${namedPct}%, #dbeafe 0)` }}><div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-white"><b className="text-2xl tabular-nums">{selectedCount}</b><span className="text-[9px] text-slate-400">people</span></div></div></div>
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-700">Exact seats assigned <span className="float-right tabular-nums">{assignedCount} of {selectedCount}</span></div>
+        <div className="mt-5 grid grid-cols-[1fr_132px] items-center gap-4 rounded-xl border border-slate-200 p-4"><div><h4 className="text-xs font-bold text-slate-800">{active?.name} allocation summary</h4><div className="mt-4 space-y-2 text-[10px]"><p className="flex justify-between text-slate-500"><span>Exact workspace</span><b className="text-slate-700">{assignedCount} · {namedPct}%</b></p><p className="flex justify-between text-slate-500"><span>Flex / remote</span><b className="text-slate-700">{selectedCount - assignedCount} · {100 - namedPct}%</b></p></div></div><div className="relative h-28 w-28 rounded-full" style={{ background: `conic-gradient(#10b981 ${namedPct}%, #dbeafe 0)` }}><div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-white"><b className="text-2xl tabular-nums">{selectedCount}</b><span className="text-[9px] text-slate-400">people</span></div></div></div>
       </aside>
     </div>
   )

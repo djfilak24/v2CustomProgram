@@ -81,11 +81,14 @@ describe("demos seed real hierarchy", () => {
     expect(desk.some((e) => e.isLeader)).toBe(false)
   })
 
-  it("law demo (leaders mode) flags every named person as a leader", () => {
+  it("law demo names the full roster and preserves a leader subset", () => {
     const s = demoState("law")!
     const named = s.departments.flatMap((d) => d.employees ?? [])
-    expect(named.length).toBeGreaterThan(0)
-    expect(named.every((e) => e.isLeader)).toBe(true)
+    expect(named.length).toBe(60)
+    expect(named.some((e) => e.isLeader)).toBe(true)
+    expect(named.some((e) => !e.isLeader)).toBe(true)
+    const officeIds = new Set(Object.keys(s.officeByEmployee).filter((id) => s.officeByEmployee[id]))
+    expect(named.filter((e) => officeIds.has(e.id)).every((e) => e.isLeader)).toBe(true)
   })
 
   it("tech demo (full mode) names everyone but flags only a subset as leaders", () => {

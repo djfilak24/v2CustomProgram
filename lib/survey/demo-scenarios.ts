@@ -206,6 +206,6 @@ const enterprise: SurveyResult = {
 
 export const DEMO_SCENARIOS: Record<string, DemoScenario> = {
   tech: { label: "Tech Startup · 120", blurb: "High collaboration, hybrid, fast growth", peopleMode: "full", result: tech },
-  law: { label: "Law Firm · 60", blurb: "Office-dense, privacy, stable", peopleMode: "leaders", result: law },
+  law: { label: "Law Firm · 60", blurb: "Office-dense, privacy, stable", peopleMode: "full", result: law },
   enterprise: { label: "Enterprise · 400", blurb: "Mixed hybrid, large floorplate", peopleMode: "full", result: enterprise },
 }

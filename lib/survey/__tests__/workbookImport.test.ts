@@ -38,7 +38,7 @@ describe("workbook round-trip (Door 3)", () => {
     const origNames = original.people.departments.flatMap((d) => d.employees ?? [])
     const impNames = imported.people.departments.flatMap((d) => d.employees ?? [])
     expect(impNames.map((e) => e.name)).toEqual(origNames.map((e) => e.name))
-    expect(impNames.every((e) => e.isLeader)).toBe(true) // law demo: all named are leaders
+    expect(impNames.map((e) => !!e.isLeader)).toEqual(origNames.map((e) => !!e.isLeader))
   })
 
   it("carries goals, posture, placement, and narrative", () => {

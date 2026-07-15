@@ -53,6 +53,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   if (nelsonCodeOk(req.headers.get("x-nelson-code"))) return NextResponse.json(e)
 
   const profile = e.result ? computeProfile(surveyStateFromResult(e.result)) : undefined
+  // Shared client surfaces read the protected finalized snapshot. The active
+  // Studio session may continue evolving without silently changing what was published.
+  const publicSession = e.session?.finalized
+    ? { ...e.session.finalized, finalized: e.session.finalized, updatedAt: e.session.finalized.at }
+    : e.session
   return NextResponse.json({
     token: e.token,
     clientName: e.clientName,
@@ -67,7 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     // NELSON has audited it and flipped share. The Studio session rides along
     // so the client's deck IS the session's program.
     ...(e.shared && e.result
-      ? { result: e.result, overrides: e.overrides ?? {}, ...(e.session ? { session: e.session } : {}) }
+      ? { result: e.result, overrides: e.overrides ?? {}, ...(publicSession ? { session: publicSession } : {}) }
       : {}),
   })
 }

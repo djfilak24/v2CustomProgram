@@ -21,6 +21,27 @@ export interface SubmissionMeta {
   at: string
 }
 
+/** Immutable Studio configuration captured when a designer finalizes the program. */
+export interface FinalizedProgramSnapshot {
+  at: string
+  overrides?: Record<string, number>
+  counts?: Record<string, number>
+  additions?: { key: string; label: string; category: string; unitSF: number; proposedCount: number; ratio?: string }[]
+  notes?: Record<string, string>
+  resolvedGaps?: Record<string, boolean>
+  factors?: { circIndividual?: number; circCollab?: number; circSupport?: number; rentable?: number }
+  people?: { officeEmployeeIds?: string[]; deskEmployeeIds?: string[] }
+  deptMoves?: Record<string, string>
+  labels?: Record<string, string>
+  deptAlloc?: Record<string, Record<string, number>>
+  lineNotes?: Record<string, string>
+  seatAssignments?: Record<string, string>
+  alignmentQueue?: string[]
+  confirmedDecisions?: Record<string, string>
+  logo?: string
+  beats?: Record<string, boolean>
+}
+
 /**
  * The Studio's working state — every live-session edit, persisted so a refresh
  * never loses a meeting and the deliverable renders the session's program.
@@ -59,10 +80,14 @@ export interface EngagementSession {
   seatAssignments?: Record<string, string>
   /** Card keys deliberately added to the facilitated alignment path. */
   alignmentQueue?: string[]
+  /** Alignment item key → confirmation timestamp. Changes remain a separate automatic log. */
+  confirmedDecisions?: Record<string, string>
   /** The client's mark — a small data URL, shown on the rail, briefing, and deck cover. */
   logo?: string
   /** Deliverable beat composer — slide id → included (absent = included). */
   beats?: Record<string, boolean>
+  /** Protected client/export source. Active session edits remain a separate draft. */
+  finalized?: FinalizedProgramSnapshot
   updatedAt: string
 }
 

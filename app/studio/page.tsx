@@ -24,13 +24,15 @@ import { resolveSeating, applyDeptMoves, type SeatPlacement, type SeatingPatch, 
 import { MAP_DEPT_COLORS } from "@/lib/survey/programMap"
 import { isNelsonMode, nelsonCode } from "@/lib/nelsonMode"
 import { loadSurveySeed } from "@/lib/survey/seedStorage"
-import { demoResult } from "@/lib/survey/demo-scenarios"
+import { DEMO_SCENARIOS, demoResult } from "@/lib/survey/demo-scenarios"
 import type { SurveyResult } from "@/lib/survey/types"
+import type { FinalizedProgramSnapshot } from "@/lib/server/engagementStore"
 
 interface EngRow { token: string; clientName: string; status: string; hasResult: boolean }
 interface SeatGroup { dept: string; names: string[]; extra: number }
-type View = "workbench" | "focus" | "briefing" | "people"
-type Drawer = "gaps" | "decisions" | "survey" | null
+type View = "program" | "briefing" | "people"
+type ProgramLayout = "cards" | "table"
+type Drawer = "gaps" | "alignment" | "decisions" | "survey" | null
 type LayerPreset = "working" | "client" | "numbers"
 type LayerKey = "engine" | "survey" | "today" | "departments" | "allocations" | "dimensions" | "notes"
 type RailTab = "dashboard" | "kpis" | "allocation" | "profile" | "session"
@@ -71,10 +73,14 @@ export default function StudioPage() {
   const [seatAssignments, setSeatAssignments] = useState<SeatAssignments>({})
   /** Cards the facilitator has deliberately put on the team alignment path. */
   const [alignmentQueue, setAlignmentQueue] = useState<string[]>([])
+  const [confirmedDecisions, setConfirmedDecisions] = useState<Record<string, string>>({})
+  /** Protected output snapshot; the active workbench remains an editable draft. */
+  const [finalized, setFinalized] = useState<FinalizedProgramSnapshot | undefined>(undefined)
   /** The client's mark — a small data URL. */
   const [logo, setLogo] = useState<string | undefined>(undefined)
 
-  const [view, setView] = useState<View>("workbench")
+  const [view, setView] = useState<View>("program")
+  const [programLayout, setProgramLayout] = useState<ProgramLayout>("cards")
   const [drawer, setDrawer] = useState<Drawer>(null)
   const [surveyTab, setSurveyTab] = useState<"people" | "answers" | "existing">("people")
   const [filter, setFilter] = useState("")
@@ -96,8 +102,6 @@ export default function StudioPage() {
   const [showNotesLayer, setShowNotesLayer] = useState(true)
   /** Workbench detail layers: full = every connected data point; compact = the numbers. */
   const [compactCards, setCompactCards] = useState(false)
-  /** Per-category card ↔ table pivot in the Workbench. */
-  const [tableCats, setTableCats] = useState<Record<string, boolean>>({})
   /** Left rail: which readout leads the hero — designers vary on this. */
   const [heroKpi, setHeroKpi] = useState<"gross" | "rentable">("gross")
   /** Left rail tab — the docked Studio summary system. */
@@ -119,21 +123,21 @@ export default function StudioPage() {
     notes: Record<string, string>; resolvedGaps: Record<string, boolean>; factors: DeliverableFactors
     peoplePatch: SeatingPatch; deptMoves: Record<string, string>; labelOverrides: Record<string, string>
     deptAlloc: Record<string, Record<string, number>>; lineNotes: Record<string, string>
-    seatAssignments: SeatAssignments; alignmentQueue: string[]
+    seatAssignments: SeatAssignments; alignmentQueue: string[]; confirmedDecisions: Record<string, string>
   }
   const history = useRef<{ past: Snap[]; future: Snap[]; skip: boolean }>({ past: [], future: [], skip: false })
   const [histVer, setHistVer] = useState(0) // re-render hook for disabled states
   useEffect(() => {
     const h = history.current
     if (h.skip) { h.skip = false; return }
-    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue }
+    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions }
     const last = h.past[h.past.length - 1]
     if (last && JSON.stringify(last) === JSON.stringify(snap)) return
     h.past.push(snap)
     if (h.past.length > 60) h.past.shift()
     h.future = []
     setHistVer((v) => v + 1)
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions])
   const applySnap = (s: Snap) => {
     history.current.skip = true
     setOverrides(s.overrides); setCounts(s.counts); setAdditions(s.additions)
@@ -141,7 +145,7 @@ export default function StudioPage() {
     setPeoplePatch(s.peoplePatch ?? {})
     setDeptMoves(s.deptMoves ?? {}); setLabelOverrides(s.labelOverrides ?? {})
     setDeptAlloc(s.deptAlloc ?? {}); setLineNotes(s.lineNotes ?? {})
-    setSeatAssignments(s.seatAssignments ?? {}); setAlignmentQueue(s.alignmentQueue ?? [])
+    setSeatAssignments(s.seatAssignments ?? {}); setAlignmentQueue(s.alignmentQueue ?? []); setConfirmedDecisions(s.confirmedDecisions ?? {})
     setHistVer((v) => v + 1)
   }
   const undo = () => {
@@ -233,14 +237,17 @@ export default function StudioPage() {
     sessionToken.current = null
     history.current = { past: [], future: [], skip: false }
     setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({}); setPeoplePatch({})
-    setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setAlignmentQueue([]); setLogo(undefined)
+    setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setAlignmentQueue([]); setConfirmedDecisions({}); setFinalized(undefined); setLogo(undefined)
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
       if (seed) { setResult(seed); setSource("seed"); return }
-      setResult(demoResult("law")); setSource("demo")
+      setResult(demoResult("law")); setSource("demo:law")
       return
     }
-    if (source === "demo") { setResult(demoResult("law")); return }
+    if (source.startsWith("demo:")) {
+      setResult(demoResult(source.slice(5)) ?? demoResult("law"))
+      return
+    }
     fetch(`/api/engagements/${source}`, { headers: { "x-nelson-code": nelsonCode() ?? "" } })
       .then(async (r) => {
         if (!r.ok) return
@@ -263,6 +270,8 @@ export default function StudioPage() {
           setLineNotes(s?.lineNotes ?? {})
           setSeatAssignments(s?.seatAssignments ?? {})
           setAlignmentQueue(s?.alignmentQueue ?? [])
+          setConfirmedDecisions(s?.confirmedDecisions ?? {})
+          setFinalized(s?.finalized)
           setLogo(s?.logo)
           sessionToken.current = source
         }
@@ -285,7 +294,7 @@ export default function StudioPage() {
         body: JSON.stringify({
           session: {
             overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch, deptMoves,
-            labels: labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, logo,
+            labels: labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions, finalized, logo,
           },
         }),
       })
@@ -293,7 +302,7 @@ export default function StudioPage() {
         .catch(() => setSaveState("idle"))
     }, 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, logo])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions, finalized, logo])
 
   // The Department Manager's dept-to-dept moves apply on top of the intake,
   // never mutating it — everything downstream (program math, seating, map,
@@ -452,6 +461,10 @@ export default function StudioPage() {
       return [...current, key]
     })
   }
+  const confirmAlignmentDecision = (key: string) => {
+    setConfirmedDecisions((current) => ({ ...current, [key]: new Date().toISOString() }))
+    setAlignmentQueue((current) => current.filter((item) => item !== key))
+  }
   const assignPerson = (personId: string, target: string | "flex") => {
     setSeatAssignments((current) => ({ ...current, [personId]: target }))
     if (!viewResult) return
@@ -566,6 +579,31 @@ export default function StudioPage() {
   const openGaps = gaps.filter((g) => !resolvedGaps[g.id]).length
 
   const editedCount = decisions.length
+  const canFinalize = gaps.every((gap) => resolvedGaps[gap.id]) && alignmentQueue.length === 0
+  const finalizeProgram = () => {
+    if (!canFinalize) return
+    setFinalized({
+      at: new Date().toISOString(), overrides, counts, additions, notes, resolvedGaps, factors,
+      people: peoplePatch, deptMoves, labels: labelOverrides, deptAlloc, lineNotes,
+      seatAssignments, alignmentQueue: [], confirmedDecisions, logo,
+    })
+  }
+  const [publishState, setPublishState] = useState<"idle" | "publishing" | "published">("idle")
+  const publishFinalized = () => {
+    if (!finalized || source === "seed" || source.startsWith("demo:")) return
+    setPublishState("publishing")
+    fetch(`/api/engagements/${source}`, {
+      method: "PATCH",
+      headers: { "x-nelson-code": nelsonCode() ?? "" },
+      body: JSON.stringify({
+        shared: true,
+        session: {
+          overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch, deptMoves,
+          labels: labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions, finalized, logo,
+        },
+      }),
+    }).then(() => setPublishState("published")).catch(() => setPublishState("idle"))
+  }
 
   if (nelson === false) {
     return (
@@ -597,9 +635,9 @@ export default function StudioPage() {
               <Image src="/NELSON_color.png" alt="NELSON" width={140} height={33} className="h-5 w-auto 2xl:h-6" priority />
               <span className="text-sm text-slate-400">·</span>
               <span className="text-sm font-medium text-slate-700">Studio</span>
-              {/* View presets — Advisory #6.10 */}
+              {/* One workspace, three jobs. Cards/table are Program layouts, not separate products. */}
               <div className="ml-3 flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-                {([["workbench", LayoutGrid, "Workbench"], ["focus", Table2, "Focus"], ["people", Users, "People"], ["briefing", Presentation, "Briefing"]] as const).map(([id, Icon, label]) => (
+                {([["program", LayoutGrid, "Program"], ["people", Users, "People"], ["briefing", Presentation, "Briefing"]] as const).map(([id, Icon, label]) => (
                   <button
                     key={id}
                     onClick={() => { setView(id); if (id === "briefing") setDrawer(null) }}
@@ -608,7 +646,7 @@ export default function StudioPage() {
                       view === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    <Icon className="h-3.5 w-3.5" /> <span className={id === "workbench" ? "" : "hidden 2xl:inline"}>{label}</span>
+                    <Icon className="h-3.5 w-3.5" /> <span className={id === "program" ? "" : "hidden 2xl:inline"}>{label}</span>
                   </button>
                 ))}
               </div>
@@ -633,10 +671,12 @@ export default function StudioPage() {
               <DrawerBtn label="Program map" active={showMap} onClick={() => setShowMap(!showMap)} icon={<MapIcon className="h-3.5 w-3.5" />}>
                 <span className="hidden 2xl:inline">Map</span>
               </DrawerBtn>
-              {!briefing && (
-                <>
+              <>
                   <DrawerBtn label="Gaps" active={drawer === "gaps"} onClick={() => setDrawer(drawer === "gaps" ? null : "gaps")} icon={<AlertTriangle className="h-3.5 w-3.5" />}>
                     <span className="hidden 2xl:inline">Gaps</span>{openGaps > 0 && <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-700">{openGaps}</span>}
+                  </DrawerBtn>
+                  <DrawerBtn label="Alignment" active={drawer === "alignment"} onClick={() => setDrawer(drawer === "alignment" ? null : "alignment")} icon={<ClipboardCheck className="h-3.5 w-3.5" />}>
+                    <span className="hidden 2xl:inline">Alignment</span>{alignmentQueue.length > 0 && <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-700">{alignmentQueue.length}</span>}
                   </DrawerBtn>
                   <DrawerBtn label="Decisions" active={drawer === "decisions"} onClick={() => setDrawer(drawer === "decisions" ? null : "decisions")} icon={<ClipboardList className="h-3.5 w-3.5" />}>
                     <span className="hidden 2xl:inline">Decisions</span>{editedCount > 0 && <span className="ml-1 rounded-full bg-[#00badc]/15 px-1.5 text-[10px] font-bold text-[#0089a3]">{editedCount}</span>}
@@ -645,8 +685,7 @@ export default function StudioPage() {
                     <span className="hidden 2xl:inline">Survey</span>
                   </DrawerBtn>
                   <span className="mx-1 h-5 w-px bg-slate-200" />
-                </>
-              )}
+              </>
               {sessionToken.current === source && source && (
                 <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${saveState === "saved" ? "text-emerald-600" : "text-slate-400"}`}>
                   {saveState === "saving" ? (
@@ -662,8 +701,14 @@ export default function StudioPage() {
                 className="w-44 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-[#00badc] focus:outline-none 2xl:w-56"
               >
                 <option value="seed">Local seed / last reviewed</option>
-                <option value="demo">Demo — Law Firm</option>
-                {rows.map((r) => <option key={r.token} value={r.token}>{r.clientName}</option>)}
+                <optgroup label="Demo environments">
+                  {Object.entries(DEMO_SCENARIOS).map(([key, scenario]) => (
+                    <option key={key} value={`demo:${key}`}>{scenario.label.replace(" · ", " — ")}</option>
+                  ))}
+                </optgroup>
+                {rows.length > 0 && <optgroup label="Client engagements">
+                  {rows.map((r) => <option key={r.token} value={r.token}>{r.clientName}</option>)}
+                </optgroup>}
               </select>
               <button
                 onClick={() => viewResult && d && exportFitPlanningPackage(viewResult, d, {
@@ -728,7 +773,7 @@ export default function StudioPage() {
                       <Dial label="Load factor (rentable ×)" value={factors.rentable ?? DEFAULT_FACTORS.rentable}
                         onChange={(v) => setFactors((p) => ({ ...p, rentable: v }))} />
                       <p className="mt-2 border-t border-slate-100 px-2 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Open elsewhere</p>
-                      {source !== "seed" && source !== "demo" && (
+                      {source !== "seed" && !source.startsWith("demo:") && (
                         <>
                           <MenuLink href={`/command/${source}`}>Command Center</MenuLink>
                           <MenuLink href={`/d/${source}`}>Client deliverable</MenuLink>
@@ -740,7 +785,7 @@ export default function StudioPage() {
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
                           <button
-                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setAlignmentQueue([]); setMenuOpen(false) }}
+                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setAlignmentQueue([]); setConfirmedDecisions({}); setMenuOpen(false) }}
                             className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                           >
                             <Undo2 className="h-3 w-3" /> Reset program edits
@@ -759,7 +804,7 @@ export default function StudioPage() {
         ) : (
           <main
             className="grid min-h-[calc(100vh-57px)] w-full gap-0"
-            style={{ gridTemplateColumns: `${railCollapsed ? 56 : railWidth}px minmax(0,1fr)${drawer && !briefing ? " 360px" : ""}` }}
+            style={{ gridTemplateColumns: `${railCollapsed ? 56 : railWidth}px minmax(0,1fr)${drawer ? " 360px" : ""}` }}
           >
             {/* ── Left rail: docked, collapsible, one clear number hierarchy ── */}
             <aside className="sticky top-[57px] z-10 h-[calc(100vh-57px)] self-start overflow-y-auto overflow-x-hidden border-r border-slate-200 bg-white">
@@ -1154,7 +1199,31 @@ export default function StudioPage() {
                   </div>
                 </div>
               )}
-              {view === "people" ? (
+              {briefing ? (
+                <BriefingWorkspace
+                  d={d} result={viewResult} configuredProfile={configuredProfile}
+                  sessionImpact={sessionImpact} decisions={decisions}
+                  gaps={gaps} resolvedGaps={resolvedGaps}
+                  alignmentQueue={alignmentQueue}
+                  finalized={finalized}
+                  canFinalize={canFinalize}
+                  publishState={publishState}
+                  onFinalize={finalizeProgram}
+                  onPublish={publishFinalized}
+                  onOpenMap={() => setShowMap(true)}
+                  onOpenGaps={() => setDrawer("gaps")}
+                  onOpenDecisions={() => setDrawer("decisions")}
+                  onExport={() => exportFitPlanningPackage(viewResult, d, {
+                    decisions: decisions.map((item) => ({ text: item.text, note: notes[item.id] })),
+                    gaps: gaps.map((gap) => ({ line: gap.line, message: gap.message, resolved: !!resolvedGaps[gap.id], note: notes[`gapnote:${gap.id}`] })),
+                    spaceNotes: Object.entries(lineNotes).filter(([, note]) => note.trim()).map(([key, note]) => ({
+                      line: baseline.find((line) => line.key === key)?.label ?? additions.find((addition) => addition.key === key)?.label ?? key,
+                      note,
+                    })),
+                  })}
+                  deliverableHref={source !== "seed" && !source.startsWith("demo:") ? `/d/${source}` : undefined}
+                />
+              ) : view === "people" ? (
                 <>
                   <div className="mb-4 flex items-center justify-between gap-4">
                     <h2 className="text-xl font-bold tracking-tight">People</h2>
@@ -1196,6 +1265,10 @@ export default function StudioPage() {
                   onPreset={applyLayerPreset}
                   cardMode={cardMode}
                   onCardMode={setCardMode}
+                  programLayout={programLayout}
+                  onProgramLayout={setProgramLayout}
+                  compact={compactCards}
+                  onCompact={() => setCompactCards((value) => !value)}
                 />
               )}
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -1231,8 +1304,14 @@ export default function StudioPage() {
                 </div>
               )}
 
-              {view === "focus" ? (
-                <FocusTable d={d} baseOf={baseOf} onSf={(k, n) => setSf(k, n)} onQty={(k, n) => setQty(k, n)} filter={filter} showRatios={showRatios} />
+              {programLayout === "table" && !briefing ? (
+                <FocusTable
+                  d={d} result={viewResult} baseOf={baseOf}
+                  onSf={(k, n) => setSf(k, n)} onQty={(k, n) => setQty(k, n)}
+                  filter={filter} showRatios={showRatios}
+                  deptAlloc={deptAlloc} rosterPeople={rosterPeople}
+                  lineNotes={lineNotes} alignmentQueue={alignmentQueue}
+                />
               ) : (
                 d.categories.map((cat) => {
                   const visible = cat.lines.filter(
@@ -1241,7 +1320,6 @@ export default function StudioPage() {
                   )
                   if (!visible.length) return null
                   const cc = CATEGORY_COLORS[cat.name]
-                  const asTable = !briefing && !!tableCats[cat.name]
                   // Configured vs. what the engine recommends, at the category level —
                   // the same triangle the cards show, aggregated to a glance.
                   const engineQty = cat.lines.reduce((s, l) => s + (baseOf(l.key)?.proposedCount ?? 0), 0)
@@ -1255,15 +1333,6 @@ export default function StudioPage() {
                         <span className="ml-1 font-medium normal-case tracking-normal text-slate-400">
                           {cat.proposedTotalSF.toLocaleString()} SF incl. circulation
                         </span>
-                        {!briefing && (
-                          <button
-                            onClick={() => setTableCats((p) => ({ ...p, [cat.name]: !asTable }))}
-                            title={asTable ? "Back to cards" : "Pivot this category to a table"}
-                            className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                          >
-                            {asTable ? <LayoutGrid className="h-3.5 w-3.5" /> : <Table2 className="h-3.5 w-3.5" />}
-                          </button>
-                        )}
                       </h3>
                       {!briefing && engineQty > 0 && (
                         <div className="mb-3 flex items-center gap-2.5">
@@ -1279,18 +1348,6 @@ export default function StudioPage() {
                           </span>
                         </div>
                       )}
-                      {asTable ? (
-                        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                          <table className="w-full text-sm">
-                            <tbody className="divide-y divide-slate-100 tabular-nums">
-                              <FocusRows
-                                name={cat.name} colors={cc} circ={cat.circulationSF} lines={visible}
-                                baseOf={baseOf} onSf={(k, n) => setSf(k, n)} onQty={(k, n) => setQty(k, n)} showRatios={showRatios}
-                              />
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
                       <div className="grid justify-start gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),640px))]">
                         {visible.map((l) => (
                           <SpaceCard
@@ -1357,7 +1414,6 @@ export default function StudioPage() {
                           </button>
                         )}
                       </div>
-                      )}
                     </div>
                   )
                 })
@@ -1368,7 +1424,7 @@ export default function StudioPage() {
             </section>
 
             {/* ── Right drawer ──────────────────────────────────────────────── */}
-            {drawer && !briefing && (
+            {drawer && (
               <aside className="sticky top-[57px] h-[calc(100vh-57px)] space-y-3 overflow-y-auto border-l border-slate-200 bg-white p-5">
                 {drawer === "gaps" && (
                   <>
@@ -1404,10 +1460,57 @@ export default function StudioPage() {
                   </>
                 )}
 
+                {drawer === "alignment" && (
+                  <>
+                    <DrawerTitle icon={<ClipboardCheck className="h-4 w-4 text-amber-500" />} title={`Alignment · ${alignmentQueue.length} queued`} onClose={() => setDrawer(null)} />
+                    <p className="text-xs text-slate-400">A facilitated queue chosen by the designer. Evidence is reference, not a score; confirmation is always human.</p>
+                    {alignmentQueue.length > 0 && (
+                      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-1">
+                        <button onClick={() => navigateAlignment(-1)} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-500"><ChevronLeft className="h-3.5 w-3.5" /> Previous</button>
+                        <span className="text-[10px] font-bold text-slate-400">{activeAlignment + 1} of {alignmentQueue.length}</span>
+                        <button onClick={() => navigateAlignment(1)} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-500">Next <ChevronRight className="h-3.5 w-3.5" /></button>
+                      </div>
+                    )}
+                    {alignmentQueue.map((key, index) => {
+                      const line = d.lines.find((item) => item.key === key)
+                      const base = baseOf(key)
+                      if (!line) return null
+                      const survey = line.key === "workstations"
+                        ? Object.values(viewResult.work.dedicatedByDept ?? {}).reduce((sum, count) => sum + count, 0)
+                        : line.key === "offices"
+                          ? Object.values(viewResult.spaces.privateOfficesByDept).reduce((sum, count) => sum + count, 0)
+                          : undefined
+                      const active = index === activeAlignment
+                      return (
+                        <div key={key} className={`rounded-xl border p-3 ${active ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
+                          <button onClick={() => { setActiveAlignment(index); document.getElementById(`space-${key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }) }} className="flex w-full items-start justify-between gap-2 text-left">
+                            <span><b className="block text-xs text-slate-800">{line.label}</b><span className="mt-0.5 block text-[10px] text-slate-400">Team alignment requested</span></span>
+                            {active && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-700">Current</span>}
+                          </button>
+                          <div className="mt-3 grid grid-cols-2 gap-1.5 text-[10px]">
+                            <span className="rounded-lg bg-white px-2 py-1.5 text-slate-500">Today <b className="float-right text-slate-700">{line.existingCount || "—"}</b></span>
+                            <span className="rounded-lg bg-white px-2 py-1.5 text-slate-500">Survey <b className="float-right text-slate-700">{survey ?? "—"}</b></span>
+                            <span className="rounded-lg bg-white px-2 py-1.5 text-slate-500">Engine <b className="float-right text-slate-700">{base?.proposedCount ?? line.proposedCount}</b></span>
+                            <span className="rounded-lg bg-white px-2 py-1.5 text-slate-500">Configured <b className="float-right text-slate-700">{line.proposedCount}</b></span>
+                          </div>
+                          <textarea value={notes[`alignment:${key}`] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [`alignment:${key}`]: event.target.value }))} placeholder="Rationale or context for the room…" className="mt-3 min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs focus:border-[#00badc] focus:outline-none" />
+                          <div className="mt-2 grid grid-cols-2 gap-2"><button onClick={() => toggleAlignment(key)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-500">Remove</button><button onClick={() => confirmAlignmentDecision(key)} className="rounded-lg bg-[#0e1a2e] px-2 py-1.5 text-xs font-semibold text-white">Confirm decision</button></div>
+                        </div>
+                      )
+                    })}
+                    {alignmentQueue.length === 0 && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-400">No items are waiting for alignment.</p>}
+                  </>
+                )}
+
                 {drawer === "decisions" && (
                   <>
-                    <DrawerTitle icon={<ClipboardList className="h-4 w-4 text-[#0089a3]" />} title={`Decisions · ${decisions.length}`} onClose={() => setDrawer(null)} />
-                    <p className="text-xs text-slate-400">Derived from your edits — every deviation from the ratio baseline, every added space, every gap closed. Notes ride into the handoff.</p>
+                    <DrawerTitle icon={<ClipboardList className="h-4 w-4 text-[#0089a3]" />} title={`Decisions · ${Object.keys(confirmedDecisions).length} confirmed`} onClose={() => setDrawer(null)} />
+                    <p className="text-xs text-slate-400">Confirmed outcomes lead; the automatic change log remains below as supporting context.</p>
+                    {Object.entries(confirmedDecisions).map(([key, at]) => {
+                      const line = d.lines.find((item) => item.key === key)
+                      return <div key={key} className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3"><p className="flex items-center gap-2 text-xs font-semibold text-slate-800"><CheckCircle2 className="h-4 w-4 text-emerald-600" />{line?.label ?? key}</p><p className="mt-1 text-[10px] text-slate-400">Confirmed {new Date(at).toLocaleString()}</p>{notes[`alignment:${key}`] && <p className="mt-2 text-xs leading-relaxed text-slate-600">{notes[`alignment:${key}`]}</p>}</div>
+                    })}
+                    <p className="border-t border-slate-100 pt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">Change log · {decisions.length}</p>
                     {decisions.length === 0 && <p className="pt-4 text-sm text-slate-400">No deviations yet — the program is pure ratio baseline.</p>}
                     {decisions.map((x) => (
                       <div key={x.id} className="rounded-xl border border-slate-200 p-3">
@@ -1550,6 +1653,102 @@ function StudioSummaryMasthead({
   )
 }
 
+function BriefingWorkspace({
+  d, result, configuredProfile, sessionImpact, decisions, gaps, resolvedGaps, alignmentQueue,
+  finalized, canFinalize, publishState, onFinalize, onPublish,
+  onOpenMap, onOpenGaps, onOpenDecisions, onExport, deliverableHref,
+}: {
+  d: Deliverable
+  result: SurveyResult
+  configuredProfile?: ProfileScores
+  sessionImpact: { category: string; delta: number }[]
+  decisions: { id: string; text: string }[]
+  gaps: { id: string; line: string; message: string }[]
+  resolvedGaps: Record<string, boolean>
+  alignmentQueue: string[]
+  finalized?: FinalizedProgramSnapshot
+  canFinalize: boolean
+  publishState: "idle" | "publishing" | "published"
+  onFinalize: () => void
+  onPublish: () => void
+  onOpenMap: () => void
+  onOpenGaps: () => void
+  onOpenDecisions: () => void
+  onExport: () => void
+  deliverableHref?: string
+}) {
+  const resolved = gaps.filter((gap) => resolvedGaps[gap.id]).length
+  const grossDelta = d.totals.grossUsableSF - d.totals.existingSF
+  const checks = [
+    { label: "Survey reviewed", detail: `${result.people.departments.length} departments · ${result.deferred.length} deferred`, done: true },
+    { label: "Gaps resolved", detail: `${resolved} of ${gaps.length} closed`, done: gaps.length === 0 || resolved === gaps.length, action: onOpenGaps },
+    { label: "Alignment reviewed", detail: `${alignmentQueue.length} item${alignmentQueue.length === 1 ? "" : "s"} in queue`, done: alignmentQueue.length === 0 },
+    { label: "Decisions documented", detail: `${decisions.length} change${decisions.length === 1 ? "" : "s"} on the record`, done: decisions.every((decision) => !!decision.text), action: onOpenDecisions },
+  ]
+  return (
+    <div>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#0089a3]">Live program story</p>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Briefing &amp; closeout</h2>
+          <p className="mt-1 text-sm text-slate-500">Review the program, alignment, and session impact before client delivery.</p>
+        </div>
+        <span className={`rounded-full border px-3 py-1.5 text-xs font-bold ${finalized ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-blue-200 bg-blue-50 text-blue-700"}`}>{finalized ? `Finalized · ${new Date(finalized.at).toLocaleDateString()}` : "Draft · private"}</span>
+      </div>
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-5">
+          <div className="grid gap-4 xl:grid-cols-3">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Gross usable area</p>
+              <p className="mt-6 text-4xl font-bold tabular-nums tracking-tight text-slate-900">{d.totals.grossUsableSF.toLocaleString()}<span className="ml-1 text-base text-slate-400">SF</span></p>
+              <p className="mt-2 text-xs font-semibold text-[#0089a3]">{grossDelta >= 0 ? "+" : ""}{grossDelta.toLocaleString()} SF vs today</p>
+              <div className="mt-6 flex justify-between border-t border-slate-100 pt-3 text-[11px] text-slate-400"><span>{d.totals.existingSF.toLocaleString()} SF today</span><span>{d.totals.estimatedRentableSF.toLocaleString()} SF rentable</span></div>
+            </section>
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Program by category</p>
+              <div className="grid grid-cols-[1fr_112px] items-center gap-3">
+                <div className="space-y-2 text-[11px]">{d.categories.map((category) => <div key={category.name} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[category.name].accent }} /><span className="text-slate-500">{category.name}</span><b className="ml-auto tabular-nums text-slate-700">{Math.round(category.proposedTotalSF / (d.totals.grossUsableSF || 1) * 100)}%</b></div>)}</div>
+                <DonutChart categories={d.categories} total={d.totals.grossUsableSF} />
+              </div>
+            </section>
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">People + place profile</p>
+              <StudioProfileRadar scores={d.profile} configured={configuredProfile} />
+              <div className="flex items-center justify-center gap-4 text-[9px] text-slate-400"><span className="flex items-center gap-1"><span className="h-0.5 w-4 bg-slate-400" /> Survey profile</span><span className="flex items-center gap-1"><span className="h-0.5 w-4 bg-[#00badc]" /> Program expression</span></div>
+            </section>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-[minmax(300px,0.8fr)_minmax(420px,1.2fr)]">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Program map</p><button onClick={onOpenMap} className="text-[10px] font-bold text-[#0089a3]">Open full map</button></div>
+              <div className="mt-3 max-h-[280px] overflow-hidden rounded-xl border border-slate-100"><ProgramMapView map={d.map} /></div>
+            </section>
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Session impact</p>
+              <p className="mt-1 text-xs text-slate-400">How the configured program moved from the engine reference.</p>
+              <SessionImpactChart data={sessionImpact} />
+            </section>
+          </div>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">What we aligned on</p><p className="mt-1 text-xs text-slate-400">The meeting record, ready to ride into the handoff.</p></div><button onClick={onOpenDecisions} className="text-[10px] font-bold text-[#0089a3]">Review record</button></div>
+            <div className="mt-4 grid gap-2 md:grid-cols-2">{decisions.slice(0, 8).map((decision) => <div key={decision.id} className="flex gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#00badc]" /><span>{decision.text}</span></div>)}{decisions.length === 0 && <p className="text-sm text-slate-400">No session changes have been documented yet.</p>}</div>
+          </section>
+        </div>
+        <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm 2xl:sticky 2xl:top-[77px]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Finalization checklist</p>
+          <div className="mt-3 divide-y divide-slate-100">{checks.map((check) => <button key={check.label} onClick={check.action} className="flex w-full items-start gap-3 py-3 text-left"><span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${check.done ? "bg-emerald-500 text-white" : "border border-slate-300 text-transparent"}`}>{check.done && <Check className="h-3 w-3" />}</span><span><b className="block text-xs text-slate-700">{check.label}</b><span className="mt-0.5 block text-[10px] text-slate-400">{check.detail}</span></span></button>)}</div>
+          <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
+            <button onClick={onFinalize} disabled={!canFinalize} className={`w-full rounded-lg px-3 py-2.5 text-sm font-bold ${canFinalize ? "bg-[#0e1a2e] text-white hover:bg-slate-700" : "bg-slate-200 text-slate-500"}`} title={canFinalize ? "Capture the protected client and export snapshot" : "Resolve or accept every gap and clear the alignment queue first"}>{finalized ? "Update finalized program" : "Finalize program"}</button>
+            {deliverableHref ? <a href={deliverableHref} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-600 hover:border-[#00badc]/40"><Eye className="h-4 w-4" /> Preview client deliverable</a> : <button disabled className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-300">Preview client deliverable</button>}
+            <button onClick={onExport} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-600 hover:border-[#00badc]/40"><FileSpreadsheet className="h-4 w-4" /> Export fit-planning package</button>
+            <button onClick={onPublish} disabled={!finalized || !deliverableHref || publishState === "publishing"} className={`w-full rounded-lg border px-3 py-2.5 text-sm font-semibold ${finalized && deliverableHref ? "border-[#00badc]/40 text-[#0089a3] hover:bg-[#00badc]/10" : "border-slate-200 text-slate-300"}`}>{publishState === "publishing" ? "Publishing…" : publishState === "published" ? "Published to client home" : "Publish to client home"}</button>
+          </div>
+          <p className="mt-4 rounded-xl bg-blue-50 px-3 py-2.5 text-[10px] leading-relaxed text-blue-700">Drafts remain editable and private. Publishing will use a protected finalized snapshot.</p>
+        </aside>
+      </div>
+    </div>
+  )
+}
+
 function SummaryStat({
   label, value, detail, tone = "muted",
 }: {
@@ -1568,13 +1767,17 @@ function SummaryStat({
 }
 
 function LayerVisibilityBar({
-  layers, onToggle, onPreset, cardMode, onCardMode,
+  layers, onToggle, onPreset, cardMode, onCardMode, programLayout, onProgramLayout, compact, onCompact,
 }: {
   layers: Record<LayerKey, boolean>
   onToggle: (layer: LayerKey) => void
   onPreset: (preset: LayerPreset) => void
   cardMode: CardMode
   onCardMode: (mode: CardMode) => void
+  programLayout: ProgramLayout
+  onProgramLayout: (layout: ProgramLayout) => void
+  compact: boolean
+  onCompact: () => void
 }) {
   const labels: Record<LayerKey, string> = {
     engine: "Engine",
@@ -1589,13 +1792,23 @@ function LayerVisibilityBar({
   return (
     <div className="mb-5 border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
-        <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700"><LayoutGrid className="h-3.5 w-3.5" /> Card view</span>
+        <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700"><LayoutGrid className="h-3.5 w-3.5" /> Program view</span>
         <span className="flex overflow-hidden rounded-md border border-slate-200 text-[10px] font-bold">
-          {(["program", "allocation", "roster", "alignment"] as CardMode[]).map((mode) => (
-            <button key={mode} onClick={() => onCardMode(mode)} className={`px-2.5 py-1.5 capitalize ${cardMode === mode ? "bg-slate-900 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}>{mode}</button>
+          {(["cards", "table"] as ProgramLayout[]).map((layout) => (
+            <button key={layout} onClick={() => onProgramLayout(layout)} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 capitalize ${programLayout === layout ? "bg-slate-900 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}>
+              {layout === "cards" ? <LayoutGrid className="h-3 w-3" /> : <Table2 className="h-3 w-3" />}{layout}
+            </button>
           ))}
         </span>
-        <span className="ml-auto text-[10px] text-slate-400">One configuration, four working views</span>
+        {programLayout === "cards" && <span className="flex overflow-hidden rounded-md border border-slate-200 text-[10px] font-bold">
+          {(["program", "allocation", "roster", "alignment"] as CardMode[]).map((mode) => (
+            <button key={mode} onClick={() => onCardMode(mode)} className={`px-2.5 py-1.5 capitalize ${cardMode === mode ? "bg-[#00badc]/15 text-[#007c94]" : "bg-white text-slate-500 hover:bg-slate-50"}`}>{mode}</button>
+          ))}
+        </span>}
+        <span className="ml-auto flex items-center gap-2 text-[10px] text-slate-400">
+          <span>Density</span>
+          <button onClick={onCompact} className={`rounded-md border px-2 py-1 font-bold ${compact ? "border-[#00badc]/35 bg-[#00badc]/10 text-[#007c94]" : "border-slate-200 bg-white text-slate-500"}`}>Focus</button>
+        </span>
       </div>
       <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
       <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700"><Settings2 className="h-3.5 w-3.5" /> Visible data</span>
@@ -2201,28 +2414,37 @@ function EvidenceCell({
 /* ── Focus view: the dense table ───────────────────────────────────────── */
 
 function FocusTable({
-  d, baseOf, onSf, onQty, filter, showRatios,
+  d, result, baseOf, onSf, onQty, filter, showRatios, deptAlloc, rosterPeople, lineNotes, alignmentQueue,
 }: {
   d: NonNullable<ReturnType<typeof buildDeliverable>>
+  result: SurveyResult
   baseOf: (k: string) => ComparisonLine | undefined
   onSf: (k: string, n: number | null) => void
   onQty: (k: string, n: number) => void
   filter: string
   showRatios: boolean
+  deptAlloc: Record<string, Record<string, number>>
+  rosterPeople: { id: string; name: string; department: string; assignment: string | "flex" }[]
+  lineNotes: Record<string, string>
+  alignmentQueue: string[]
 }) {
-  const cols = showRatios ? 7 : 6
+  const cols = showRatios ? 11 : 10
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+      <table className="min-w-[1180px] w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wide text-slate-400">
             <th className="px-4 py-2.5 font-semibold">Space</th>
             {showRatios && <th className="px-3 py-2.5 font-semibold">Ratio</th>}
             <th className="px-3 py-2.5 text-right font-semibold">Today</th>
-            <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
+            <th className="px-3 py-2.5 text-right font-semibold">Survey</th>
+            <th className="px-3 py-2.5 text-right font-semibold">Engine</th>
+            <th className="px-3 py-2.5 text-right font-semibold">Configured</th>
             <th className="px-3 py-2.5 text-right font-semibold">Unit SF</th>
             <th className="px-3 py-2.5 font-semibold">Footprint</th>
-            <th className="px-4 py-2.5 text-right font-semibold">Total SF</th>
+            <th className="px-3 py-2.5 text-right font-semibold">Planned SF</th>
+            <th className="px-3 py-2.5 font-semibold">Allocation / roster</th>
+            <th className="px-4 py-2.5 font-semibold">Record</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 tabular-nums">
@@ -2230,7 +2452,7 @@ function FocusTable({
             const visible = c.lines.filter((l) => (l.proposedCount > 0 || l.existingCount > 0 || l.key.startsWith("studio:")) && l.label.toLowerCase().includes(filter.toLowerCase()))
             if (!visible.length) return null
             return (
-              <FocusRows key={c.name} name={c.name} colors={CATEGORY_COLORS[c.name]} circ={c.circulationSF} lines={visible} baseOf={baseOf} onSf={onSf} onQty={onQty} showRatios={showRatios} />
+              <FocusRows key={c.name} name={c.name} colors={CATEGORY_COLORS[c.name]} circ={c.circulationSF} lines={visible} result={result} baseOf={baseOf} onSf={onSf} onQty={onQty} showRatios={showRatios} deptAlloc={deptAlloc} rosterPeople={rosterPeople} lineNotes={lineNotes} alignmentQueue={alignmentQueue} />
             )
           })}
           <tr className="bg-slate-50 font-semibold">
@@ -2244,18 +2466,33 @@ function FocusTable({
 }
 
 function FocusRows({
-  name, colors, circ, lines, baseOf, onSf, onQty, showRatios,
+  name, colors, circ, lines, result, baseOf, onSf, onQty, showRatios, deptAlloc, rosterPeople, lineNotes, alignmentQueue,
 }: {
   name: string
   colors: { accent: string; text: string; tint: string }
   circ: number
   lines: ComparisonLine[]
+  result: SurveyResult
   baseOf: (k: string) => ComparisonLine | undefined
   onSf: (k: string, n: number | null) => void
   onQty: (k: string, n: number) => void
   showRatios: boolean
+  deptAlloc: Record<string, Record<string, number>>
+  rosterPeople: { id: string; name: string; department: string; assignment: string | "flex" }[]
+  lineNotes: Record<string, string>
+  alignmentQueue: string[]
 }) {
-  const cols = showRatios ? 7 : 6
+  const cols = showRatios ? 11 : 10
+  const surveyCount = (line: ComparisonLine) => {
+    if (line.key === "workstations") return Object.values(result.work.dedicatedByDept ?? {}).reduce((sum, count) => sum + count, 0)
+    if (line.key === "offices") return Object.values(result.spaces.privateOfficesByDept).reduce((sum, count) => sum + count, 0)
+    if (line.category === "Collaboration") {
+      const match = result.spaces.collaboration.find((item) => item.type === line.label)
+      return match ? Object.values(match.byDept).reduce((sum, count) => sum + count, 0) : undefined
+    }
+    if (line.category === "Support") return result.spaces.support.includes(line.label) ? 1 : undefined
+    return undefined
+  }
   return (
     <>
       <tr style={{ backgroundColor: colors.tint }}>
@@ -2266,6 +2503,10 @@ function FocusRows({
       </tr>
       {lines.map((l) => {
         const b = baseOf(l.key)
+        const survey = surveyCount(l)
+        const allocated = Object.values(deptAlloc[l.key] ?? {}).reduce((sum, count) => sum + count, 0)
+        const named = rosterPeople.filter((person) => person.assignment === l.key).length
+        const changed = !!b && (l.unitSF !== b.unitSF || l.proposedCount !== b.proposedCount)
         return (
           <tr key={l.key}>
             <td className="px-4 py-1.5 font-medium text-slate-900">
@@ -2277,6 +2518,8 @@ function FocusRows({
             </td>
             {showRatios && <td className="px-3 py-1.5 text-xs text-slate-500">{l.ratio ?? "—"}</td>}
             <td className="px-3 py-1.5 text-right text-slate-500">{l.existingCount || "—"}</td>
+            <td className="px-3 py-1.5 text-right text-slate-500">{survey ?? "—"}</td>
+            <td className="px-3 py-1.5 text-right text-slate-500">{b?.proposedCount ?? l.proposedCount}</td>
             <td className="px-3 py-1.5 text-right">
               <input type="number" min={0} value={l.proposedCount} onChange={(e) => onQty(l.key, Math.max(0, Number(e.target.value)))}
                 className="w-14 rounded-md border border-[#00badc]/30 bg-[#e9f7fb]/40 px-1.5 py-0.5 text-right tabular-nums focus:border-[#00badc] focus:outline-none" />
@@ -2286,7 +2529,18 @@ function FocusRows({
                 className="w-[70px] rounded-md border border-[#00badc]/30 bg-[#e9f7fb]/40 px-1.5 py-0.5 text-right tabular-nums focus:border-[#00badc] focus:outline-none" />
             </td>
             <td className="px-3 py-1.5 text-xs text-[#0089a3]">{dims(l.unitSF) ?? ""}</td>
-            <td className="px-4 py-1.5 text-right font-semibold">{(l.proposedCount * l.unitSF).toLocaleString()}</td>
+            <td className="px-3 py-1.5 text-right font-semibold">{(l.proposedCount * l.unitSF).toLocaleString()}</td>
+            <td className="px-3 py-1.5 text-xs text-slate-500">
+              {allocated > 0 || named > 0 ? <><b className="text-slate-700">{allocated || "—"}</b> allocated · <b className="text-slate-700">{named}</b> named</> : "—"}
+            </td>
+            <td className="px-4 py-1.5 text-xs">
+              <span className="flex flex-wrap items-center gap-1.5">
+                {changed && <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-600">Changed</span>}
+                {alignmentQueue.includes(l.key) && <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">Alignment</span>}
+                {lineNotes[l.key]?.trim() && <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-500">Note</span>}
+                {!changed && !alignmentQueue.includes(l.key) && !lineNotes[l.key]?.trim() && <span className="text-slate-300">—</span>}
+              </span>
+            </td>
           </tr>
         )
       })}

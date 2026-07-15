@@ -7,7 +7,7 @@ import {
   ArrowLeft, KeyRound, RefreshCw, Users, Radar, Target, MonitorPlay, LayoutGrid, Map as MapIcon,
   FileText, ExternalLink, Send, Check, Clock, Quote, Copy, MessagesSquare, FileSpreadsheet, Share2,
 } from "lucide-react"
-import { buildDeliverable, CATEGORY_COLORS, type DeliverableAddition } from "@/lib/survey/deliverable"
+import { buildDeliverable, CATEGORY_COLORS, type DeliverableAddition, type DeliverableFactors } from "@/lib/survey/deliverable"
 import { lineGaps } from "@/lib/survey/comparison"
 import { GOAL_MOTIVATORS, SURVEY_STEPS } from "@/lib/survey/sections"
 import { isNelsonMode, nelsonCode } from "@/lib/nelsonMode"
@@ -34,6 +34,7 @@ interface Eng {
     additions?: DeliverableAddition[]
     notes?: Record<string, string>
     resolvedGaps?: Record<string, boolean>
+    factors?: DeliverableFactors
     people?: { officeEmployeeIds?: string[]; deskEmployeeIds?: string[] }
     labels?: Record<string, string>
     updatedAt?: string
@@ -69,7 +70,7 @@ export default function CommandPage({ params }: { params: Promise<{ token: strin
   const d = useMemo(
     () =>
       e?.result
-        ? buildDeliverable(e.result, e.session?.overrides ?? e.overrides ?? {}, e.session?.counts ?? {}, e.session?.additions ?? [], {}, e.session?.people, e.session?.labels)
+        ? buildDeliverable(e.result, e.session?.overrides ?? e.overrides ?? {}, e.session?.counts ?? {}, e.session?.additions ?? [], e.session?.factors ?? {}, e.session?.people, e.session?.labels)
         : null,
     [e],
   )

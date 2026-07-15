@@ -32,6 +32,7 @@ interface EngRow { token: string; clientName: string; status: string; hasResult:
 interface SeatGroup { dept: string; names: string[]; extra: number }
 type View = "program" | "briefing" | "people"
 type ProgramLayout = "cards" | "table"
+type CardDensity = "compact" | "standard" | "comfortable"
 type Drawer = "gaps" | "alignment" | "decisions" | "survey" | null
 type LayerPreset = "working" | "client" | "numbers"
 type LayerKey = "engine" | "survey" | "today" | "departments" | "allocations" | "dimensions" | "notes"
@@ -101,7 +102,8 @@ export default function StudioPage() {
   const [showDimensions, setShowDimensions] = useState(true)
   const [showNotesLayer, setShowNotesLayer] = useState(true)
   /** Workbench detail layers: full = every connected data point; compact = the numbers. */
-  const [compactCards, setCompactCards] = useState(false)
+  const [cardDensity, setCardDensity] = useState<CardDensity>("standard")
+  const compactCards = cardDensity === "compact"
   /** Left rail: which readout leads the hero — designers vary on this. */
   const [heroKpi, setHeroKpi] = useState<"gross" | "rentable">("gross")
   /** Left rail tab — the docked Studio summary system. */
@@ -115,7 +117,7 @@ export default function StudioPage() {
   const [notesOpen, setNotesOpen] = useState<Record<string, boolean>>({})
   const [cardMode, setCardMode] = useState<CardMode>("program")
   const [activeAlignment, setActiveAlignment] = useState(0)
-  const [railWidth, setRailWidth] = useState(300)
+  const [railWidth, setRailWidth] = useState(260)
 
   // ── Undo / redo — the session's working state, time-travelable ────────────
   type Snap = {
@@ -168,7 +170,7 @@ export default function StudioPage() {
   useEffect(() => { setRailCollapsed(localStorage.getItem("nelson:studioRailCollapsed") === "1") }, [])
   useEffect(() => {
     const saved = Number(localStorage.getItem("nelson:studioRailWidth"))
-    if (Number.isFinite(saved) && saved >= 260) setRailWidth(Math.min(420, saved))
+    if (Number.isFinite(saved) && saved >= 230) setRailWidth(Math.min(420, saved))
   }, [])
   const toggleRailCollapsed = () => {
     setRailCollapsed((v) => {
@@ -178,7 +180,7 @@ export default function StudioPage() {
   }
   const resizeRail = (next: number) => {
     const viewportMax = Math.max(280, Math.min(420, window.innerWidth * 0.34))
-    const width = Math.round(Math.max(260, Math.min(viewportMax, next)))
+    const width = Math.round(Math.max(230, Math.min(viewportMax, next)))
     setRailWidth(width)
     localStorage.setItem("nelson:studioRailWidth", String(width))
   }
@@ -199,18 +201,18 @@ export default function StudioPage() {
     if (preset === "working") {
       setShowRatios(true); setShowSurveyEvidence(true); setShowTodayEvidence(true)
       setShowDeptChips(true); setShowAllocations(true); setShowDimensions(true); setShowNotesLayer(true)
-      setCompactCards(false)
+      setCardDensity("standard")
       return
     }
     if (preset === "client") {
       setShowRatios(true); setShowSurveyEvidence(true); setShowTodayEvidence(true)
       setShowDeptChips(true); setShowAllocations(false); setShowDimensions(true); setShowNotesLayer(false)
-      setCompactCards(false)
+      setCardDensity("standard")
       return
     }
     setShowRatios(false); setShowSurveyEvidence(false); setShowTodayEvidence(false)
     setShowDeptChips(false); setShowAllocations(false); setShowDimensions(false); setShowNotesLayer(false)
-    setCompactCards(true)
+    setCardDensity("compact")
   }
 
   // Close the settings menu on any click outside it. (A fixed backdrop can't
@@ -646,7 +648,7 @@ export default function StudioPage() {
                       view === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
-                    <Icon className="h-3.5 w-3.5" /> <span className={id === "program" ? "" : "hidden 2xl:inline"}>{label}</span>
+                    <Icon className="h-3.5 w-3.5" /> <span>{label}</span>
                   </button>
                 ))}
               </div>
@@ -703,7 +705,7 @@ export default function StudioPage() {
                 <option value="seed">Local seed / last reviewed</option>
                 <optgroup label="Demo environments">
                   {Object.entries(DEMO_SCENARIOS).map(([key, scenario]) => (
-                    <option key={key} value={`demo:${key}`}>{scenario.label.replace(" · ", " — ")}</option>
+                    <option key={key} value={`demo:${key}`}>Demo — {scenario.label.split(" · ")[0]}</option>
                   ))}
                 </optgroup>
                 {rows.length > 0 && <optgroup label="Client engagements">
@@ -748,7 +750,7 @@ export default function StudioPage() {
                       <MenuToggle on={showAllocations} onClick={() => setShowAllocations((v) => !v)}>Allocation controls</MenuToggle>
                       <MenuToggle on={showDimensions} onClick={() => setShowDimensions((v) => !v)}>Dimension language</MenuToggle>
                       <MenuToggle on={showNotesLayer} onClick={() => setShowNotesLayer((v) => !v)}>Space notes</MenuToggle>
-                      <MenuToggle on={compactCards} onClick={() => setCompactCards((v) => !v)}>Compact cards</MenuToggle>
+                      <MenuToggle on={compactCards} onClick={() => setCardDensity(compactCards ? "standard" : "compact")}>Compact cards</MenuToggle>
                       <div className="flex items-center justify-between px-2 py-1.5 text-xs font-medium text-slate-700">
                         <span>Rail hero KPI</span>
                         <span className="flex overflow-hidden rounded-lg border border-slate-200 text-[11px] font-semibold">
@@ -880,7 +882,7 @@ export default function StudioPage() {
                 <p className="mt-2 text-xs text-slate-400">{d.daysInOffice} days/wk</p>
               </div>
 
-              <div className="grid grid-cols-5 border-b border-slate-100 text-[10px] font-bold text-slate-400">
+              <div className="space-y-1 border-b border-slate-100 px-3 py-3 text-xs font-semibold text-slate-500">
                 {([
                   ["dashboard", LayoutGrid, "Dashboard"],
                   ["kpis", Gauge, "KPIs"],
@@ -891,11 +893,11 @@ export default function StudioPage() {
                   <button
                     key={id}
                     onClick={() => setRailTab(id)}
-                    className={`flex min-h-12 flex-col items-center justify-center gap-1 border-r border-slate-100 px-1 transition-colors last:border-r-0 ${
-                      railTab === id ? "bg-slate-50 text-slate-900" : "hover:bg-slate-50 hover:text-slate-700"
+                    className={`flex w-full items-center gap-3 rounded-lg border-l-2 px-3 py-2.5 text-left transition-colors ${
+                      railTab === id ? "border-blue-600 bg-blue-50/70 text-slate-900" : "border-transparent hover:bg-slate-50 hover:text-slate-700"
                     }`}
                   >
-                    <Icon className="h-3.5 w-3.5" /> {label}
+                    <Icon className={`h-4 w-4 ${railTab === id ? "text-blue-600" : "text-slate-400"}`} /> {label}
                   </button>
                 ))}
               </div>
@@ -923,7 +925,7 @@ export default function StudioPage() {
                         />
                         {allocationView === "mix" && (
                           <>
-                            <DonutChart categories={d.categories} total={d.totals.grossUsableSF} logo={logo} />
+                            <DonutChart categories={d.categories} total={d.totals.grossUsableSF} />
                             <div className="mt-3 space-y-2 text-[13px] tabular-nums">
                               {d.categories.map((category) => (
                                 <CategoryDistributionRow key={category.name} category={category} total={d.totals.grossUsableSF} />
@@ -1163,7 +1165,7 @@ export default function StudioPage() {
                 <button
                   type="button"
                   onPointerDown={startRailResize}
-                  onDoubleClick={() => resizeRail(300)}
+                  onDoubleClick={() => resizeRail(260)}
                   aria-label="Resize Studio summary rail"
                   title="Drag left or right to resize. Double-click to reset."
                   className="group absolute right-0 top-0 z-20 flex h-full w-3 cursor-col-resize items-center justify-center border-0 bg-transparent"
@@ -1177,7 +1179,6 @@ export default function StudioPage() {
 
             {/* ── Center: the spaces (Workbench cards / Focus table / Briefing) ─ */}
             <section className="min-w-0 bg-[#f3f7fa]">
-              {briefing && <StudioSummaryMasthead d={d} result={viewResult} openGaps={openGaps} editedCount={editedCount} />}
               <div className="px-6 py-5">
               {showMap && (
                 <div className="mb-8">
@@ -1267,8 +1268,8 @@ export default function StudioPage() {
                   onCardMode={setCardMode}
                   programLayout={programLayout}
                   onProgramLayout={setProgramLayout}
-                  compact={compactCards}
-                  onCompact={() => setCompactCards((value) => !value)}
+                  density={cardDensity}
+                  onDensity={setCardDensity}
                 />
               )}
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -1348,7 +1349,7 @@ export default function StudioPage() {
                           </span>
                         </div>
                       )}
-                      <div className="grid justify-start gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),640px))]">
+                      <div className={`grid justify-start gap-3.5 ${cardDensity === "compact" ? "[grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))]" : cardDensity === "comfortable" ? "[grid-template-columns:repeat(auto-fill,minmax(min(100%,620px),760px))]" : "[grid-template-columns:repeat(auto-fill,minmax(min(100%,480px),620px))]"}`}>
                         {visible.map((l) => (
                           <SpaceCard
                             key={l.key} line={l} base={baseOf(l.key)} result={viewResult} briefing={briefing}
@@ -1462,43 +1463,20 @@ export default function StudioPage() {
 
                 {drawer === "alignment" && (
                   <>
-                    <DrawerTitle icon={<ClipboardCheck className="h-4 w-4 text-amber-500" />} title={`Alignment · ${alignmentQueue.length} queued`} onClose={() => setDrawer(null)} />
-                    <p className="text-xs text-slate-400">A facilitated queue chosen by the designer. Evidence is reference, not a score; confirmation is always human.</p>
-                    {alignmentQueue.length > 0 && (
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-1">
-                        <button onClick={() => navigateAlignment(-1)} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-500"><ChevronLeft className="h-3.5 w-3.5" /> Previous</button>
-                        <span className="text-[10px] font-bold text-slate-400">{activeAlignment + 1} of {alignmentQueue.length}</span>
-                        <button onClick={() => navigateAlignment(1)} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-500">Next <ChevronRight className="h-3.5 w-3.5" /></button>
-                      </div>
-                    )}
-                    {alignmentQueue.map((key, index) => {
+                    <DrawerTitle icon={<ClipboardCheck className="h-4 w-4 text-amber-500" />} title="Alignment" onClose={() => setDrawer(null)} />
+                    <div className="-mx-5 flex border-b border-slate-200 px-5 text-[10px] font-semibold text-slate-500"><button onClick={() => setDrawer("decisions")} className="px-2 py-2.5">Change log</button><button onClick={() => setDrawer("gaps")} className="px-2 py-2.5">Gaps <b className="text-amber-600">{openGaps}</b></button><button className="border-b-2 border-slate-900 px-2 py-2.5 text-slate-900">Alignment queue <b className="text-amber-600">{alignmentQueue.length}</b></button><button onClick={() => setDrawer("decisions")} className="px-2 py-2.5">Decisions <b className="text-amber-600">{Object.keys(confirmedDecisions).length}</b></button></div>
+                    <p className="pt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Facilitation queue</p>
+                    {alignmentQueue.length > 0 && <div className="flex items-center justify-between rounded-lg bg-slate-50 p-1"><button onClick={() => navigateAlignment(-1)} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-500"><ChevronLeft className="h-3.5 w-3.5" /> Previous</button><span className="text-[10px] font-bold text-slate-400">{activeAlignment + 1} of {alignmentQueue.length}</span><button onClick={() => navigateAlignment(1)} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-500">Next <ChevronRight className="h-3.5 w-3.5" /></button></div>}
+                    {(() => {
+                      const key = alignmentQueue[activeAlignment]
                       const line = d.lines.find((item) => item.key === key)
-                      const base = baseOf(key)
-                      if (!line) return null
-                      const survey = line.key === "workstations"
-                        ? Object.values(viewResult.work.dedicatedByDept ?? {}).reduce((sum, count) => sum + count, 0)
-                        : line.key === "offices"
-                          ? Object.values(viewResult.spaces.privateOfficesByDept).reduce((sum, count) => sum + count, 0)
-                          : undefined
-                      const active = index === activeAlignment
-                      return (
-                        <div key={key} className={`rounded-xl border p-3 ${active ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
-                          <button onClick={() => { setActiveAlignment(index); document.getElementById(`space-${key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }) }} className="flex w-full items-start justify-between gap-2 text-left">
-                            <span><b className="block text-xs text-slate-800">{line.label}</b><span className="mt-0.5 block text-[10px] text-slate-400">Team alignment requested</span></span>
-                            {active && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-700">Current</span>}
-                          </button>
-                          <div className="mt-3 grid grid-cols-2 gap-1.5 text-[10px]">
-                            <span className="rounded-lg bg-white px-2 py-1.5 text-slate-500">Today <b className="float-right text-slate-700">{line.existingCount || "—"}</b></span>
-                            <span className="rounded-lg bg-white px-2 py-1.5 text-slate-500">Survey <b className="float-right text-slate-700">{survey ?? "—"}</b></span>
-                            <span className="rounded-lg bg-white px-2 py-1.5 text-slate-500">Engine <b className="float-right text-slate-700">{base?.proposedCount ?? line.proposedCount}</b></span>
-                            <span className="rounded-lg bg-white px-2 py-1.5 text-slate-500">Configured <b className="float-right text-slate-700">{line.proposedCount}</b></span>
-                          </div>
-                          <textarea value={notes[`alignment:${key}`] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [`alignment:${key}`]: event.target.value }))} placeholder="Rationale or context for the room…" className="mt-3 min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs focus:border-[#00badc] focus:outline-none" />
-                          <div className="mt-2 grid grid-cols-2 gap-2"><button onClick={() => toggleAlignment(key)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-500">Remove</button><button onClick={() => confirmAlignmentDecision(key)} className="rounded-lg bg-[#0e1a2e] px-2 py-1.5 text-xs font-semibold text-white">Confirm decision</button></div>
-                        </div>
-                      )
-                    })}
+                      const base = key ? baseOf(key) : undefined
+                      if (!key || !line) return null
+                      const survey = line.key === "workstations" ? Object.values(viewResult.work.dedicatedByDept ?? {}).reduce((sum, count) => sum + count, 0) : line.key === "offices" ? Object.values(viewResult.spaces.privateOfficesByDept).reduce((sum, count) => sum + count, 0) : undefined
+                      return <div className="rounded-xl border border-slate-200 p-4"><div className="flex items-start gap-3"><span className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 text-xs font-bold">{activeAlignment + 1}</span><span><b className="block text-sm text-slate-800">{line.label}</b><span className="text-[10px] text-slate-400">Quantity or area needs team alignment</span></span></div><p className="mt-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">Evidence</p><div className="mt-2 grid grid-cols-2 gap-2 text-[10px]"><span className="rounded-lg bg-slate-50 px-2 py-2 text-slate-500">Today <b className="float-right text-slate-800">{line.existingCount || "—"}</b></span><span className="rounded-lg bg-slate-50 px-2 py-2 text-slate-500">Survey <b className="float-right text-slate-800">{survey ?? "—"}</b></span><span className="rounded-lg bg-slate-50 px-2 py-2 text-slate-500">Engine <b className="float-right text-slate-800">{base?.proposedCount ?? line.proposedCount}</b></span><span className="rounded-lg bg-blue-50 px-2 py-2 text-blue-700">Configured <b className="float-right">{line.proposedCount}</b></span></div><button onClick={() => document.getElementById(`space-${key}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} className="mt-2 text-[10px] font-bold text-blue-600">Open program card <ExternalLink className="ml-1 inline h-3 w-3" /></button><p className="mt-4 text-[10px] font-bold uppercase tracking-wide text-slate-400">Rationale</p><textarea value={notes[`alignment:${key}`] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [`alignment:${key}`]: event.target.value }))} placeholder="Add context, assumptions, or notes to support alignment…" className="mt-2 min-h-28 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:border-blue-500 focus:outline-none" /><div className="mt-3 grid grid-cols-2 gap-2"><button onClick={() => toggleAlignment(key)} className="rounded-lg border border-slate-300 px-2 py-2 text-xs font-semibold text-slate-600">Keep in alignment</button><button onClick={() => confirmAlignmentDecision(key)} className="rounded-lg bg-[#0e1a2e] px-2 py-2 text-xs font-semibold text-white">Confirm decision</button></div></div>
+                    })()}
                     {alignmentQueue.length === 0 && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-400">No items are waiting for alignment.</p>}
+                    {Object.keys(confirmedDecisions).length > 0 && <div className="border-t border-slate-100 pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Confirmed decisions</p><div className="mt-2 space-y-2">{Object.entries(confirmedDecisions).slice(0, 4).map(([key]) => <div key={key} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{d.lines.find((line) => line.key === key)?.label ?? key}<span className="ml-auto text-[9px] text-slate-400">Today</span></div>)}</div></div>}
                   </>
                 )}
 
@@ -1594,65 +1572,6 @@ export default function StudioPage() {
   }
 }
 
-/* ── Canvas chrome: fixed summary + explicit data-layer controls ─────────── */
-
-function StudioSummaryMasthead({
-  d, result, openGaps, editedCount,
-}: {
-  d: NonNullable<ReturnType<typeof buildDeliverable>>
-  result: SurveyResult
-  openGaps: number
-  editedCount: number
-}) {
-  const gross = d.totals.grossUsableSF
-  const existing = d.totals.existingSF
-  const delta = existing > 0 ? gross - existing : null
-  const target = result.goals?.targetSF
-  const targetGap = target ? target - gross : null
-
-  return (
-    <div className="sticky top-[57px] z-20 border-b border-slate-200 bg-white shadow-sm">
-      <div className="grid min-h-[104px] grid-cols-[minmax(300px,1.4fr)_repeat(3,minmax(150px,1fr))]">
-        <div className="bg-[#0e1a2e] px-6 py-4 text-white">
-          <p className="truncate text-[9px] font-bold uppercase tracking-[0.15em] text-[#00badc]">{d.clientName} / session program</p>
-          <p className="mt-1.5 text-3xl font-bold tabular-nums tracking-tight">
-            {gross.toLocaleString()} <span className="text-sm font-semibold text-white/45">SF gross usable</span>
-          </p>
-          {delta !== null ? (
-            <p className={`mt-1 text-[11px] font-semibold ${delta >= 0 ? "text-emerald-300" : "text-amber-300"}`}>
-              {delta >= 0 ? "+" : ""}{delta.toLocaleString()} SF vs today ({existing.toLocaleString()} SF)
-            </p>
-          ) : (
-            <p className="mt-1 text-[11px] text-white/40">No existing footprint captured</p>
-          )}
-        </div>
-        <SummaryStat
-          label="Client target"
-          value={target ? `${target.toLocaleString()} SF` : "Not captured"}
-          detail={targetGap === null ? "Set in intake or live" : `${targetGap >= 0 ? "+" : ""}${targetGap.toLocaleString()} SF ${targetGap >= 0 ? "room" : "over"}`}
-          tone={targetGap === null ? "muted" : targetGap >= 0 ? "good" : "warn"}
-        />
-        <SummaryStat label="Planning density" value={`${d.totals.sfPerPerson} SF / person`} detail={`${d.future} people at plan / ${d.daysInOffice} days in`} />
-        <SummaryStat
-          label="Session record"
-          value={`${editedCount} edit${editedCount === 1 ? "" : "s"}`}
-          detail={`${openGaps} gap${openGaps === 1 ? "" : "s"} open`}
-          tone={openGaps > 0 ? "warn" : "good"}
-        />
-      </div>
-      <div className="flex h-1.5 w-full overflow-hidden bg-slate-100" aria-label="Program area by category">
-        {d.categories.map((category) => (
-          <span
-            key={category.name}
-            title={`${category.name}: ${category.proposedTotalSF.toLocaleString()} SF`}
-            style={{ width: `${(category.proposedTotalSF / (gross || 1)) * 100}%`, backgroundColor: CATEGORY_COLORS[category.name].accent }}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function BriefingWorkspace({
   d, result, configuredProfile, sessionImpact, decisions, gaps, resolvedGaps, alignmentQueue,
   finalized, canFinalize, publishState, onFinalize, onPublish,
@@ -1689,11 +1608,10 @@ function BriefingWorkspace({
     <div>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#0089a3]">Live program story</p>
-          <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Briefing &amp; closeout</h2>
-          <p className="mt-1 text-sm text-slate-500">Review the program, alignment, and session impact before client delivery.</p>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Briefing &amp; closeout</h2>
+          <p className="mt-1 text-sm text-slate-500">Review alignment, confirm decisions, and finalize the program.</p>
         </div>
-        <span className={`rounded-full border px-3 py-1.5 text-xs font-bold ${finalized ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-blue-200 bg-blue-50 text-blue-700"}`}>{finalized ? `Finalized · ${new Date(finalized.at).toLocaleDateString()}` : "Draft · private"}</span>
+        <div className="text-right"><span className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-bold"><span className={`rounded-md px-3 py-1.5 ${!finalized ? "bg-blue-600 text-white" : "text-slate-400"}`}>Draft</span><span className={`rounded-md px-3 py-1.5 ${finalized ? "bg-emerald-600 text-white" : "text-slate-400"}`}>Finalized</span></span><p className="mt-1.5 text-[10px] text-slate-400">{finalized ? `Protected snapshot · ${new Date(finalized.at).toLocaleDateString()}` : "Work in progress · Not shared with client"}</p></div>
       </div>
       <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
@@ -1733,8 +1651,8 @@ function BriefingWorkspace({
             <div className="mt-4 grid gap-2 md:grid-cols-2">{decisions.slice(0, 8).map((decision) => <div key={decision.id} className="flex gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#00badc]" /><span>{decision.text}</span></div>)}{decisions.length === 0 && <p className="text-sm text-slate-400">No session changes have been documented yet.</p>}</div>
           </section>
         </div>
-        <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm 2xl:sticky 2xl:top-[77px]">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Finalization checklist</p>
+        <aside className="h-fit 2xl:sticky 2xl:top-[77px]"><div className="mb-4"><h3 className="text-xl font-bold tracking-tight text-slate-900">Closeout</h3><p className="mt-1 text-xs text-slate-500">Finalize the program and prepare client delivery.</p></div><div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-bold text-slate-800">Finalization checklist</p>
           <div className="mt-3 divide-y divide-slate-100">{checks.map((check) => <button key={check.label} onClick={check.action} className="flex w-full items-start gap-3 py-3 text-left"><span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${check.done ? "bg-emerald-500 text-white" : "border border-slate-300 text-transparent"}`}>{check.done && <Check className="h-3 w-3" />}</span><span><b className="block text-xs text-slate-700">{check.label}</b><span className="mt-0.5 block text-[10px] text-slate-400">{check.detail}</span></span></button>)}</div>
           <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
             <button onClick={onFinalize} disabled={!canFinalize} className={`w-full rounded-lg px-3 py-2.5 text-sm font-bold ${canFinalize ? "bg-[#0e1a2e] text-white hover:bg-slate-700" : "bg-slate-200 text-slate-500"}`} title={canFinalize ? "Capture the protected client and export snapshot" : "Resolve or accept every gap and clear the alignment queue first"}>{finalized ? "Update finalized program" : "Finalize program"}</button>
@@ -1742,32 +1660,15 @@ function BriefingWorkspace({
             <button onClick={onExport} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-600 hover:border-[#00badc]/40"><FileSpreadsheet className="h-4 w-4" /> Export fit-planning package</button>
             <button onClick={onPublish} disabled={!finalized || !deliverableHref || publishState === "publishing"} className={`w-full rounded-lg border px-3 py-2.5 text-sm font-semibold ${finalized && deliverableHref ? "border-[#00badc]/40 text-[#0089a3] hover:bg-[#00badc]/10" : "border-slate-200 text-slate-300"}`}>{publishState === "publishing" ? "Publishing…" : publishState === "published" ? "Published to client home" : "Publish to client home"}</button>
           </div>
-          <p className="mt-4 rounded-xl bg-blue-50 px-3 py-2.5 text-[10px] leading-relaxed text-blue-700">Drafts remain editable and private. Publishing will use a protected finalized snapshot.</p>
+          </div><p className="mt-4 rounded-xl bg-blue-50 px-3 py-3 text-[10px] leading-relaxed text-blue-700">Only finalized programs are shared with clients. Drafts remain editable and private.</p>
         </aside>
       </div>
     </div>
   )
 }
 
-function SummaryStat({
-  label, value, detail, tone = "muted",
-}: {
-  label: string
-  value: string
-  detail: string
-  tone?: "muted" | "good" | "warn"
-}) {
-  return (
-    <div className="border-r border-slate-200 px-5 py-4 last:border-r-0">
-      <p className="text-[9px] font-bold uppercase tracking-[0.13em] text-slate-400">{label}</p>
-      <p className="mt-2 text-xl font-bold tabular-nums text-slate-900">{value}</p>
-      <p className={`mt-1 text-[11px] font-medium ${tone === "good" ? "text-emerald-700" : tone === "warn" ? "text-amber-700" : "text-slate-400"}`}>{detail}</p>
-    </div>
-  )
-}
-
 function LayerVisibilityBar({
-  layers, onToggle, onPreset, cardMode, onCardMode, programLayout, onProgramLayout, compact, onCompact,
+  layers, onToggle, onPreset, cardMode, onCardMode, programLayout, onProgramLayout, density, onDensity,
 }: {
   layers: Record<LayerKey, boolean>
   onToggle: (layer: LayerKey) => void
@@ -1776,8 +1677,8 @@ function LayerVisibilityBar({
   onCardMode: (mode: CardMode) => void
   programLayout: ProgramLayout
   onProgramLayout: (layout: ProgramLayout) => void
-  compact: boolean
-  onCompact: () => void
+  density: CardDensity
+  onDensity: (density: CardDensity) => void
 }) {
   const labels: Record<LayerKey, string> = {
     engine: "Engine",
@@ -1790,9 +1691,8 @@ function LayerVisibilityBar({
   }
 
   return (
-    <div className="mb-5 border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
-        <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700"><LayoutGrid className="h-3.5 w-3.5" /> Program view</span>
+    <div className="mb-5 rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
         <span className="flex overflow-hidden rounded-md border border-slate-200 text-[10px] font-bold">
           {(["cards", "table"] as ProgramLayout[]).map((layout) => (
             <button key={layout} onClick={() => onProgramLayout(layout)} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 capitalize ${programLayout === layout ? "bg-slate-900 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}>
@@ -1805,19 +1705,20 @@ function LayerVisibilityBar({
             <button key={mode} onClick={() => onCardMode(mode)} className={`px-2.5 py-1.5 capitalize ${cardMode === mode ? "bg-[#00badc]/15 text-[#007c94]" : "bg-white text-slate-500 hover:bg-slate-50"}`}>{mode}</button>
           ))}
         </span>}
-        <span className="ml-auto flex items-center gap-2 text-[10px] text-slate-400">
-          <span>Density</span>
-          <button onClick={onCompact} className={`rounded-md border px-2 py-1 font-bold ${compact ? "border-[#00badc]/35 bg-[#00badc]/10 text-[#007c94]" : "border-slate-200 bg-white text-slate-500"}`}>Focus</button>
+        <span className="ml-2 text-[10px] font-bold text-slate-400">Focus</span>
+        <span className="flex overflow-hidden rounded-md bg-slate-50 p-0.5 text-[10px] font-bold">
+          {(["compact", "standard", "comfortable"] as CardDensity[]).map((option) => (
+            <button key={option} onClick={() => onDensity(option)} className={`rounded px-2.5 py-1.5 capitalize ${density === option ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}>{option}</button>
+          ))}
         </span>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-      <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700"><Settings2 className="h-3.5 w-3.5" /> Visible data</span>
-      {(Object.keys(labels) as LayerKey[]).map((layer) => (
+        <span className="ml-auto flex items-center gap-1.5">
+        {(Object.keys(labels) as LayerKey[]).map((layer) => (
         <button
           key={layer}
           onClick={() => onToggle(layer)}
           aria-pressed={layers[layer]}
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+          title={`${labels[layer]} ${layers[layer] ? "visible" : "hidden"}`}
+          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] font-semibold transition-colors ${
             layers[layer]
               ? "border-[#00badc]/35 bg-[#00badc]/10 text-[#007c94]"
               : "border-slate-200 bg-white text-slate-400 hover:text-slate-600"
@@ -1826,12 +1727,13 @@ function LayerVisibilityBar({
           <span className={`h-1.5 w-1.5 rounded-full ${layers[layer] ? "bg-[#00badc]" : "bg-slate-300"}`} />
           {labels[layer]}
         </button>
-      ))}
-      <div className="ml-auto flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500">
-        <button onClick={() => onPreset("working")} className="px-2.5 py-1.5 hover:bg-white hover:text-slate-900">Working session</button>
-        <button onClick={() => onPreset("client")} className="border-l border-slate-200 px-2.5 py-1.5 hover:bg-white hover:text-slate-900">Client review</button>
-        <button onClick={() => onPreset("numbers")} className="border-l border-slate-200 px-2.5 py-1.5 hover:bg-white hover:text-slate-900">Numbers only</button>
-      </div>
+        ))}
+        </span>
+        <select onChange={(event) => onPreset(event.target.value as LayerPreset)} defaultValue="working" aria-label="Visible data preset" className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-bold text-slate-500">
+          <option value="working">Working session</option>
+          <option value="client">Client review</option>
+          <option value="numbers">Numbers only</option>
+        </select>
       </div>
     </div>
   )
@@ -1849,91 +1751,76 @@ function DepartmentManager({
   onAssign: (id: string, target: string | "flex") => void
   onMoveDept: (id: string, toDeptId: string) => void
 }) {
+  const [activeDept, setActiveDept] = useState(result.people.departments[0]?.id ?? "")
+  const [search, setSearch] = useState("")
+  const [leadersOnly, setLeadersOnly] = useState(false)
+  const active = result.people.departments.find((department) => department.id === activeDept) ?? result.people.departments[0]
+  const activeRows = (active ? seating.byDept[active.id] ?? [] : []).filter((person) =>
+    (!leadersOnly || person.isLeader) && person.name.toLowerCase().includes(search.toLowerCase()),
+  )
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  useEffect(() => {
+    const ids = activeRows.map((person) => person.id)
+    setSelectedIds(ids)
+  // Selection resets when the department or roster lens changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDept, leadersOnly])
+  const selected = rosterPeople.filter((person) => selectedIds.includes(person.id))
+  const selectedCount = selected.length
+  const assignedCount = selected.filter((person) => person.assignment !== "flex").length
+  const namedPct = selectedCount ? Math.round((assignedCount / selectedCount) * 100) : 0
+  const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id])
+  const changeAssignmentCount = (key: string | "flex", delta: number) => {
+    if (delta > 0) {
+      const candidate = selected.find((person) => person.assignment !== key)
+      if (candidate) onAssign(candidate.id, key)
+    } else {
+      const candidate = [...selected].reverse().find((person) => person.assignment === key)
+      if (candidate) onAssign(candidate.id, "flex")
+    }
+  }
   return (
-    <div className="space-y-5">
-      {result.people.departments.map((dep) => {
-        const rows = seating.byDept[dep.id] ?? []
-        const depPeople = rosterPeople.filter((person) => person.department === dep.name)
-        const categoryOf = (assignment: string) => seatOptions.find((option) => option.key === assignment)?.category
-        const offCount = depPeople.filter((person) => categoryOf(person.assignment) === "Offices").length
-        const deskCount = depPeople.filter((person) => categoryOf(person.assignment) === "Workstations").length
-        const flexCount = depPeople.filter((person) => person.assignment === "flex").length
-        const growth = dep.futureHeadcount !== undefined && dep.futureHeadcount !== dep.headcount
-        return (
-          <div key={dep.id} className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">{dep.name}</h3>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  {dep.headcount} people today
-                  {growth && (
-                    <> · <span className={dep.futureHeadcount! > dep.headcount ? "text-emerald-600" : "text-amber-600"}>
-                      → {dep.futureHeadcount} at plan
-                    </span></>
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] font-medium">
-                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700" title="Named people assigned to an office type">
-                  {offCount} offices
-                </span>
-                <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-cyan-700" title="Named people assigned to a workstation type">
-                  {deskCount} workstations
-                </span>
-                {flexCount > 0 && (
-                  <span className="rounded-full bg-slate-50 px-2.5 py-1 text-slate-500">{flexCount} shared</span>
-                )}
-              </div>
-            </div>
-            {rows.length === 0 ? (
-              <p className="mt-3 text-xs text-slate-400">
-                No roster captured for this department. Its program remains managed through department allocation counts.
-              </p>
-            ) : (
-              <div className="mt-4 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-                {rows.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-1.5 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
-                    <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-slate-800">
-                      {r.isLeader && <Crown className="h-3 w-3 shrink-0 text-amber-500" />}
-                      <span className="truncate">{r.name}</span>
-                    </span>
-                      <span className="flex shrink-0 items-center gap-1">
-                      <select
-                        value={rosterPeople.find((person) => person.id === r.id)?.assignment ?? "flex"}
-                        onChange={(e) => onAssign(r.id, e.target.value)}
-                        aria-label={`Assign ${r.name} to a space type`}
-                        className="max-w-44 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 focus:border-[#00badc] focus:outline-none"
-                      >
-                        <option value="flex">Flexible / unassigned</option>
-                        <optgroup label="Workstations">
-                          {seatOptions.filter((option) => option.category === "Workstations").map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-                        </optgroup>
-                        <optgroup label="Offices">
-                          {seatOptions.filter((option) => option.category === "Offices").map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-                        </optgroup>
-                      </select>
-                      <span className="relative shrink-0">
-                        <select
-                          value=""
-                          onChange={(e) => { if (e.target.value) onMoveDept(r.id, e.target.value) }}
-                          title="Move to a different department"
-                          aria-label={`Move ${r.name} to a different department`}
-                          className="appearance-none rounded-lg border border-slate-200 bg-white p-1 text-slate-400 hover:border-[#00badc]/50 hover:text-[#0089a3] focus:border-[#00badc] focus:outline-none"
-                        >
-                          <option value="">···</option>
-                          {result.people.departments.filter((other) => other.id !== dep.id).map((other) => (
-                            <option key={other.id} value={other.id}>→ {other.name}</option>
-                          ))}
-                        </select>
-                      </span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
+    <div className="grid min-h-[690px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:grid-cols-[260px_minmax(420px,1fr)_minmax(360px,500px)]">
+      <aside className="border-r border-slate-200 bg-slate-50/40">
+        <div className="border-b border-slate-200 p-3">
+          <label className="relative block"><Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search people…" className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs focus:border-blue-500 focus:outline-none" /></label>
+        </div>
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 text-[10px] font-semibold text-slate-400"><span>People</span><span>Planned seats</span></div>
+        <div className="divide-y divide-slate-100">
+          {result.people.departments.map((department) => {
+            const roster = seating.byDept[department.id] ?? []
+            const planned = roster.filter((person) => rosterPeople.find((item) => item.id === person.id)?.assignment !== "flex").length
+            return <button key={department.id} onClick={() => setActiveDept(department.id)} className={`w-full border-l-2 px-4 py-3 text-left ${active?.id === department.id ? "border-blue-600 bg-blue-50" : "border-transparent hover:bg-white"}`}><span className="flex items-center justify-between gap-3"><span><b className="block text-xs text-slate-800">{department.name}</b><span className="mt-0.5 block text-[10px] text-slate-400">{department.headcount} people</span></span><b className="text-xs tabular-nums text-slate-700">{planned}</b></span></button>
+          })}
+        </div>
+        <div className="m-3 mt-8 rounded-lg border border-slate-200 bg-white p-3"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Total headcount</p><p className="mt-1 text-2xl font-bold tabular-nums">{result.people.totalHeadcount}</p><p className="mt-3 text-[9px] font-bold uppercase tracking-wide text-slate-400">Named roster</p><p className="mt-1 text-xl font-bold tabular-nums">{rosterPeople.length}</p></div>
+      </aside>
+
+      <section className="min-w-0 border-r border-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><h3 className="font-bold text-slate-900">{active?.name ?? "People"}</h3><p className="text-[10px] text-slate-400">{activeRows.length} named people</p></div><div className="flex items-center gap-2"><button onClick={() => setLeadersOnly(false)} className={`rounded-md border px-2.5 py-1.5 text-[10px] font-bold ${!leadersOnly ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>Full roster</button><button onClick={() => setLeadersOnly(true)} className={`rounded-md border px-2.5 py-1.5 text-[10px] font-bold ${leadersOnly ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"}`}>Leaders only</button></div></div>
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3"><button onClick={() => setSelectedIds(selectedIds.length === activeRows.length ? [] : activeRows.map((person) => person.id))} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600"><span className={`flex h-4 w-4 items-center justify-center rounded border ${selectedIds.length === activeRows.length && activeRows.length ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"}`}>{selectedIds.length === activeRows.length && activeRows.length > 0 && <Check className="h-3 w-3" />}</span>Select all</button><select value="" onChange={(event) => { if (!event.target.value) return; selectedIds.forEach((id) => onMoveDept(id, event.target.value)) }} className="rounded-md border border-slate-200 px-2 py-1.5 text-[10px] font-semibold text-slate-500"><option value="">Move selected…</option>{result.people.departments.filter((department) => department.id !== active?.id).map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select><span className="ml-auto text-[10px] text-slate-400">{selectedCount} selected</span></div>
+        <div className="grid max-h-[590px] grid-cols-2 gap-2 overflow-y-auto p-4 2xl:grid-cols-3">
+          {activeRows.map((person) => {
+            const checked = selectedIds.includes(person.id)
+            return <button key={person.id} onClick={() => toggleSelected(person.id)} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left ${checked ? "border-blue-200 bg-blue-50/40" : "border-slate-200 bg-white"}`}><GripVertical className="h-3.5 w-3.5 text-slate-300" /><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-3 w-3" />}</span>{person.isLeader && <Crown className="h-3 w-3 text-amber-500" />}<span className="min-w-0 truncate text-xs font-medium text-slate-700">{person.name}</span></button>
+          })}
+          {!activeRows.length && <p className="col-span-full p-8 text-center text-sm text-slate-400">No named roster was captured for this department.</p>}
+        </div>
+      </section>
+
+      <aside className="min-w-0 p-5">
+        <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Exact space assignment</h3><p className="mt-1 text-[10px] text-slate-400">Assign the selected roster to actual program types.</p></div><span className="text-[10px] font-semibold text-slate-400">{selectedCount} selected</span></div>
+        <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
+          {seatOptions.map((option, index) => {
+            const count = selected.filter((person) => person.assignment === option.key).length
+            const color = option.category === "Workstations" ? "#2563eb" : "#8b5cf6"
+            return <div key={option.key} className="flex items-center gap-3 px-4 py-3"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{option.label}</b><span className="text-[9px] text-slate-400">{option.category === "Offices" ? "Enclosed" : "Workstation"} · exact program type</span></span><button onClick={() => changeAssignmentCount(option.key, -1)} className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-400"><Minus className="h-3 w-3" /></button><b className="w-7 text-center text-xs tabular-nums">{count}</b><button onClick={() => changeAssignmentCount(option.key, 1)} className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-400"><Plus className="h-3 w-3" /></button></div>
+          })}
+          <div className="flex items-center gap-3 px-4 py-3"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" /><span className="min-w-0 flex-1"><b className="block text-xs text-slate-800">Unassigned / shared</b><span className="text-[9px] text-slate-400">Not assigned to a specific space</span></span><b className="w-7 text-center text-xs tabular-nums">{selected.filter((person) => person.assignment === "flex").length}</b></div>
+        </div>
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-700">Total assigned <span className="float-right tabular-nums">{assignedCount} of {selectedCount}</span></div>
+        <div className="mt-5 grid grid-cols-[1fr_132px] items-center gap-4 rounded-xl border border-slate-200 p-4"><div><h4 className="text-xs font-bold text-slate-800">{active?.name} allocation summary</h4><div className="mt-4 space-y-2 text-[10px]"><p className="flex justify-between text-slate-500"><span>Named</span><b className="text-slate-700">{assignedCount} · {namedPct}%</b></p><p className="flex justify-between text-slate-500"><span>Unassigned</span><b className="text-slate-700">{selectedCount - assignedCount} · {100 - namedPct}%</b></p></div></div><div className="relative h-28 w-28 rounded-full" style={{ background: `conic-gradient(#10b981 ${namedPct}%, #dbeafe 0)` }}><div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-white"><b className="text-2xl tabular-nums">{selectedCount}</b><span className="text-[9px] text-slate-400">people</span></div></div></div>
+      </aside>
     </div>
   )
 }
@@ -2921,7 +2808,7 @@ function SessionImpactChart({ data }: { data: { category: string; delta: number 
   )
 }
 
-function DonutChart({ categories, total, logo }: { categories: DeliverableCategory[]; total: number; logo?: string }) {
+function DonutChart({ categories, total }: { categories: DeliverableCategory[]; total: number }) {
   const R = 38
   const C = 2 * Math.PI * R
   let offset = 0
@@ -2945,12 +2832,9 @@ function DonutChart({ categories, total, logo }: { categories: DeliverableCatego
           return el
         })}
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        {logo ? (
-          <img src={logo} alt="" className="h-14 w-14 rounded-full object-contain" />
-        ) : (
-          <Image src="/NELSON_color.png" alt="" width={56} height={56} className="h-8 w-auto opacity-40" />
-        )}
+      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+        <span className="text-base font-bold tabular-nums text-slate-800">{Math.round(total / 100) / 10}K</span>
+        <span className="mt-1 text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">gross SF</span>
       </div>
     </div>
   )

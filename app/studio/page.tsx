@@ -29,6 +29,7 @@ type View = "workbench" | "focus" | "briefing" | "people"
 type Drawer = "gaps" | "decisions" | "survey" | null
 type LayerPreset = "working" | "client" | "numbers"
 type LayerKey = "engine" | "survey" | "today" | "departments" | "allocations" | "dimensions" | "notes"
+type RailTab = "dashboard" | "kpis" | "allocation" | "profile" | "session"
 
 /**
  * The Studio v2 — the NELSON engagement workbench, rebuilt to the founder's
@@ -89,8 +90,8 @@ export default function StudioPage() {
   const [tableCats, setTableCats] = useState<Record<string, boolean>>({})
   /** Left rail: which readout leads the hero — designers vary on this. */
   const [heroKpi, setHeroKpi] = useState<"gross" | "rentable">("gross")
-  /** Left rail tab — KPIs (default) or the allocation chart. */
-  const [railTab, setRailTab] = useState<"kpis" | "allocation">("kpis")
+  /** Left rail tab — the docked Studio summary system. */
+  const [railTab, setRailTab] = useState<RailTab>("dashboard")
   /** Left rail collapse — a slim icon strip when the room needs the width back. */
   const [railCollapsed, setRailCollapsed] = useState(false)
   /** Which cards have their dept-allocation panel open (Workstations/Offices only). */
@@ -693,9 +694,12 @@ export default function StudioPage() {
               <>
               <div className="border-b border-slate-100 px-5 py-4">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">Studio summary</p>
+                    <div className="mt-1 flex min-w-0 items-center gap-2">
                     {logo && <img src={logo} alt="" className="h-7 w-7 shrink-0 rounded-lg object-contain" />}
                     <h2 className={`truncate ${briefing ? "text-xl font-bold" : "text-lg font-bold"}`}>{d.clientName}</h2>
+                    </div>
                   </div>
                   <button
                     onClick={toggleRailCollapsed}
@@ -726,14 +730,19 @@ export default function StudioPage() {
                 <p className="mt-2 text-xs text-slate-400">{d.daysInOffice} days/wk</p>
               </div>
 
-              {/* Rail tabs — KPIs (today's read) / Allocation (the donut) */}
-              <div className="flex gap-1 border-b border-slate-100 px-3 py-2">
-                {([["kpis", Gauge, "KPIs"], ["allocation", PieChart, "Allocation"]] as const).map(([id, Icon, label]) => (
+              <div className="grid grid-cols-5 border-b border-slate-100 text-[10px] font-bold text-slate-400">
+                {([
+                  ["dashboard", LayoutGrid, "Dashboard"],
+                  ["kpis", Gauge, "KPIs"],
+                  ["allocation", PieChart, "Allocation"],
+                  ["profile", Activity, "Profile"],
+                  ["session", ClipboardList, "Session"],
+                ] as const).map(([id, Icon, label]) => (
                   <button
                     key={id}
                     onClick={() => setRailTab(id)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                      railTab === id ? "bg-slate-100 text-slate-900" : "text-slate-400 hover:text-slate-700"
+                    className={`flex min-h-12 flex-col items-center justify-center gap-1 border-r border-slate-100 px-1 transition-colors last:border-r-0 ${
+                      railTab === id ? "bg-slate-50 text-slate-900" : "hover:bg-slate-50 hover:text-slate-700"
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" /> {label}
@@ -741,183 +750,208 @@ export default function StudioPage() {
                 ))}
               </div>
 
-              {railTab === "kpis" ? (
-                <div className="p-5">
-                  {(() => {
-                    const primary = heroKpi === "gross" ? d.totals.grossUsableSF : d.totals.estimatedRentableSF
-                    const secondary = heroKpi === "gross" ? d.totals.estimatedRentableSF : d.totals.grossUsableSF
-                    const primaryLabel = heroKpi === "gross" ? "Gross usable" : "Est. rentable"
-                    const secondaryLabel = heroKpi === "gross" ? "Est. rentable" : "Gross usable"
-                    const hasToday = d.totals.existingSF > 0
-                    const grossDelta = hasToday ? d.totals.grossUsableSF - d.totals.existingSF : null
-                    const grossPct = hasToday ? Math.round(((d.totals.grossUsableSF - d.totals.existingSF) / d.totals.existingSF) * 100) : null
-                    const barMax = Math.max(d.totals.existingSF, primary) || 1
+              <div className="p-5">
+                {(() => {
+                  const primary = heroKpi === "gross" ? d.totals.grossUsableSF : d.totals.estimatedRentableSF
+                  const secondary = heroKpi === "gross" ? d.totals.estimatedRentableSF : d.totals.grossUsableSF
+                  const primaryLabel = heroKpi === "gross" ? "Gross usable area" : "Estimated rentable area"
+                  const secondaryLabel = heroKpi === "gross" ? "Rentable estimate" : "Gross usable"
+                  const hasToday = d.totals.existingSF > 0
+                  const grossDelta = hasToday ? d.totals.grossUsableSF - d.totals.existingSF : 0
+                  const grossPct = hasToday ? Math.round((grossDelta / d.totals.existingSF) * 100) : 0
+                  const barMax = Math.max(d.totals.existingSF, primary) || 1
+
+                  if (railTab === "allocation") {
                     return (
                       <>
-                        {/* Tier 1 — before → after → change; the baseline is never invisible */}
-                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0089a3]">{primaryLabel}</p>
-                        {hasToday && (
-                          <p className="mt-0.5 text-xs text-slate-400">
-                            Today <b className="tabular-nums text-slate-600">{d.totals.existingSF.toLocaleString()}</b> SF
-                          </p>
-                        )}
-                        <div className="mt-0.5 flex flex-wrap items-baseline gap-2">
-                          <p className={`${briefing ? "text-5xl" : "text-4xl"} font-bold tabular-nums tracking-tight`}>
-                            {primary.toLocaleString()}<span className="ml-1 text-base font-medium text-slate-400">SF</span>
-                          </p>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Program balance</h3>
+                          <span className="text-[9px] font-semibold text-slate-400">Net + circulation</span>
                         </div>
-                        {heroKpi === "gross" && grossDelta !== null && (
-                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-                            {grossDelta >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                            {grossDelta >= 0 ? "+" : ""}{grossDelta.toLocaleString()} SF{grossPct !== null ? ` (${grossPct >= 0 ? "+" : ""}${grossPct}%)` : ""} vs today
-                          </span>
-                        )}
-                        {/* the comparison, drawn — muted "today" bar over the hero's own bar */}
-                        {hasToday && (
-                          <div className="mt-3">
-                            <div className="h-2 w-full rounded-full bg-slate-100">
-                              <div className="h-2 rounded-full bg-slate-300" style={{ width: `${(d.totals.existingSF / barMax) * 100}%` }} />
-                            </div>
-                            <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-[#00badc]/10">
-                              <div className="h-2 rounded-full bg-[#00badc]" style={{ width: `${(primary / barMax) * 100}%` }} />
-                            </div>
-                          </div>
-                        )}
-                        {/* right next to it — the counterpart KPI, not buried */}
-                        <p className="mt-2.5 text-sm text-slate-500">
-                          {secondaryLabel} <b className="tabular-nums text-slate-700">{secondary.toLocaleString()}</b> SF
-                          {heroKpi === "gross" && <span className="text-slate-400"> · ×{(1 + d.totals.rentableFactor).toFixed(2)} load</span>}
-                        </p>
-
-                        {result?.goals?.targetSF ? (
-                          <p className="mt-3 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-800">
-                            Their number: {result.goals.targetSF.toLocaleString()} SF
-                            {result.goals.targetSource ? ` (${result.goals.targetSource})` : ""} ·{" "}
-                            <span className={result.goals.targetSF - d.totals.grossUsableSF >= 0 ? "text-emerald-700" : "text-rose-700"}>
-                              {result.goals.targetSF - d.totals.grossUsableSF >= 0 ? "+" : ""}
-                              {(result.goals.targetSF - d.totals.grossUsableSF).toLocaleString()} SF
-                            </span>
-                          </p>
-                        ) : null}
-
-                        {/* Tier 2 — SF/person outranks circulation; it's the number a
-                            client actually reasons about, so it gets real size. */}
-                        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">SF / person</p>
-                            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">{d.totals.sfPerPerson}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">People at plan</p>
-                            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">{d.future}</p>
-                          </div>
+                        <DonutChart categories={d.categories} total={d.totals.grossUsableSF} logo={logo} />
+                        <div className="mt-2 flex justify-center">
+                          <button
+                            onClick={() => logoInputRef.current?.click()}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:border-[#00badc]/40 hover:text-[#0089a3]"
+                          >
+                            <Upload className="h-3 w-3" /> {logo ? "Replace logo" : "Upload logo"}
+                          </button>
+                          <input
+                            ref={logoInputRef} type="file" accept="image/*" className="hidden"
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = "" }}
+                          />
                         </div>
-
-                        {/* Tier 3 — the technical breakdown, demoted to small rows */}
-                        <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-[13px] tabular-nums text-slate-500">
-                          <Row k="Net program" v={`${d.totals.proposedNetSF.toLocaleString()}`} />
-                          <Row k="Circulation" v={`${d.totals.circulationSF.toLocaleString()}`} />
-                          {Object.keys(factors).length > 0 && (
-                            <p className="pt-1 text-[11px] font-medium text-[#0089a3]">planning dials tuned — on the decision log</p>
-                          )}
+                        <div className="mt-4 space-y-2 text-[13px] tabular-nums">
+                          {d.categories.map((c) => (
+                            <div key={c.name}>
+                              <div className="flex items-center gap-2">
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: CATEGORY_COLORS[c.name].accent }} />
+                                <span className="text-slate-600">{c.name}</span>
+                                <span className="ml-auto font-medium text-slate-800">{c.proposedTotalSF.toLocaleString()} SF</span>
+                                <span className="w-9 shrink-0 text-right text-[11px] text-slate-400">
+                                  {Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%
+                                </span>
+                              </div>
+                              <div className="mt-1 h-1.5 rounded-full bg-slate-100">
+                                <div className="h-1.5 rounded-full" style={{ width: `${Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%`, backgroundColor: CATEGORY_COLORS[c.name].accent }} />
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </>
                     )
-                  })()}
-                </div>
-              ) : (
-                <div className="p-5">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Space allocation</h3>
-                  <DonutChart categories={d.categories} total={d.totals.grossUsableSF} logo={logo} />
-                  <div className="mt-2 flex justify-center">
-                    <button
-                      onClick={() => logoInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:border-[#00badc]/40 hover:text-[#0089a3]"
-                    >
-                      <Upload className="h-3 w-3" /> {logo ? "Replace logo" : "Upload logo"}
-                    </button>
-                    <input
-                      ref={logoInputRef} type="file" accept="image/*" className="hidden"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = "" }}
-                    />
-                  </div>
-                  <div className="mt-4 space-y-2 text-[13px] tabular-nums">
-                    {d.categories.map((c) => (
-                      <div key={c.name} className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: CATEGORY_COLORS[c.name].accent }} />
-                        <span className="text-slate-600">{c.name}</span>
-                        <span className="ml-auto font-medium text-slate-800">{c.proposedTotalSF.toLocaleString()} SF</span>
-                        <span className="w-9 shrink-0 text-right text-[11px] text-slate-400">
-                          {Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  }
 
-              {/* Program status — configured vs. engine, the whole program, one glance */}
-              {programStatusBars.length > 0 && (
-                <div className="border-t border-slate-100 p-5">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Program status</h3>
-                  <div className="mt-3 space-y-3">
-                    {programStatusBars.map((b) => {
-                      const pct = b.goal > 0 ? Math.min(100, (b.configured / b.goal) * 100) : 0
-                      const diff = b.goal - b.configured
-                      return (
-                        <div key={b.label}>
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-medium text-slate-600">{b.label}</span>
-                            <span className="tabular-nums text-slate-500">
-                              {b.configured} / {b.goal}{diff > 0 ? ` (${diff} short)` : diff < 0 ? ` (${-diff} over)` : " (matched)"}
-                            </span>
+                  if (railTab === "profile") {
+                    return (
+                      <>
+                        <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Profile movement</h3>
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div className="rounded-xl bg-[#00badc]/10 p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-[#0089a3]">Density</p>
+                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{d.totals.sfPerPerson}</p>
+                            <p className="text-[10px] text-slate-500">SF / person</p>
                           </div>
-                          <div className="mt-1 h-1.5 rounded-full bg-slate-100">
-                            <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: diff > 0 ? "#f59e0b" : diff < 0 ? "#f43f5e" : "#10b981" }} />
+                          <div className="rounded-xl bg-slate-50 p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">People</p>
+                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{d.future}</p>
+                            <p className="text-[10px] text-slate-500">at plan</p>
                           </div>
                         </div>
-                      )
-                    })}
-                    {result?.goals?.targetSF && (() => {
-                      const goal = result.goals!.targetSF!
-                      const configured = d.totals.grossUsableSF
-                      const pct = goal > 0 ? Math.min(100, (configured / goal) * 100) : 0
-                      const diff = goal - configured
-                      return (
+                        <div className="mt-4 space-y-2">
+                          {programStatusBars.map((b) => {
+                            const pct = b.goal > 0 ? Math.min(100, (b.configured / b.goal) * 100) : 0
+                            const diff = b.configured - b.goal
+                            return (
+                              <div key={b.label}>
+                                <div className="flex justify-between text-[11px]">
+                                  <span className="font-medium text-slate-600">{b.label}</span>
+                                  <span className="tabular-nums text-slate-500">{b.configured} / {b.goal}{diff === 0 ? " matched" : ` (${diff > 0 ? "+" : ""}${diff})`}</span>
+                                </div>
+                                <div className="mt-1 h-2 rounded-full bg-slate-100">
+                                  <div className="h-2 rounded-full bg-[#00badc]" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )
+                  }
+
+                  if (railTab === "session") {
+                    return (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Session record</h3>
+                          <span className="text-[9px] font-bold text-[#0089a3]">Live</span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-xl bg-slate-200">
+                          <button onClick={() => setDrawer("decisions")} className="bg-slate-50 p-3 text-left">
+                            <p className="text-2xl font-bold tabular-nums text-slate-900">{editedCount}</p>
+                            <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Edits</p>
+                          </button>
+                          <button onClick={() => setDrawer("gaps")} className="bg-slate-50 p-3 text-left">
+                            <p className="text-2xl font-bold tabular-nums text-slate-900">{gaps.filter((g) => resolvedGaps[g.id]).length}/{gaps.length}</p>
+                            <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Gaps closed</p>
+                          </button>
+                          <button onClick={() => setView("people")} className="bg-slate-50 p-3 text-left">
+                            <p className="text-2xl font-bold tabular-nums text-slate-900">{decisions.filter((x) => x.id.startsWith("seat:") || x.id.startsWith("dept:")).length}</p>
+                            <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">People moved</p>
+                          </button>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          {(decisions.length ? decisions : [{ id: "empty", text: "No session decisions yet. Adjust counts, area, allocation, or gaps and they will appear here." }]).slice(0, 5).map((x) => (
+                            <p key={x.id} className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] leading-snug text-slate-600">{x.text}</p>
+                          ))}
+                        </div>
+                      </>
+                    )
+                  }
+
+                  return (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-medium text-slate-600">Target SF</span>
-                            <span className="tabular-nums text-slate-500">
-                              {configured.toLocaleString()} / {goal.toLocaleString()}{diff > 0 ? ` (${diff.toLocaleString()} short)` : diff < 0 ? ` (${(-diff).toLocaleString()} over)` : " (matched)"}
-                            </span>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0089a3]">{primaryLabel}</p>
+                          {hasToday && <p className="mt-0.5 text-xs text-slate-400">Today {d.totals.existingSF.toLocaleString()} SF</p>}
+                        </div>
+                        <div className="flex rounded-lg bg-slate-100 p-0.5 text-[9px] font-bold">
+                          {(["gross", "rentable"] as const).map((mode) => (
+                            <button key={mode} onClick={() => setHeroKpi(mode)} className={`rounded-md px-2 py-1 capitalize ${heroKpi === mode ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"}`}>{mode}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-end justify-between gap-3">
+                        <p className="text-4xl font-bold tabular-nums tracking-tight text-slate-900">
+                          {primary.toLocaleString()}<span className="ml-1 text-base font-medium text-slate-400">SF</span>
+                        </p>
+                        <p className="text-right text-2xl font-bold tabular-nums text-slate-900">
+                          {d.totals.sfPerPerson}
+                          <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">SF / person</span>
+                        </p>
+                      </div>
+                      {heroKpi === "gross" && hasToday && (
+                        <p className="mt-1.5 text-[11px] font-bold text-[#0089a3]">
+                          {grossDelta >= 0 ? "+" : ""}{grossDelta.toLocaleString()} SF ({grossPct >= 0 ? "+" : ""}{grossPct}%) vs today
+                        </p>
+                      )}
+                      {hasToday && (
+                        <div className="mt-4 space-y-1">
+                          <div className="h-2 rounded-full bg-slate-100">
+                            <div className="h-2 rounded-full bg-slate-300" style={{ width: `${(d.totals.existingSF / barMax) * 100}%` }} />
                           </div>
-                          <div className="mt-1 h-1.5 rounded-full bg-slate-100">
-                            <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: diff > 0 ? "#f59e0b" : diff < 0 ? "#f43f5e" : "#10b981" }} />
+                          <div className="h-2 rounded-full bg-[#00badc]/10">
+                            <div className="h-2 rounded-full bg-[#00badc]" style={{ width: `${(primary / barMax) * 100}%` }} />
                           </div>
                         </div>
-                      )
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {/* In this session — the live aggregate of what's being worked */}
-              <div className="border-t border-slate-100 p-5">
-                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">In this session</h3>
-                <div className="mt-3 space-y-2 text-[13px]">
-                  <button onClick={() => setDrawer("decisions")} className="flex w-full items-center justify-between text-slate-600 transition-colors hover:text-slate-900">
-                    <span className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5 text-slate-400" /> Edits made</span>
-                    <b className="tabular-nums">{editedCount}</b>
-                  </button>
-                  <button onClick={() => setDrawer("gaps")} className="flex w-full items-center justify-between text-slate-600 transition-colors hover:text-slate-900">
-                    <span className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-slate-400" /> Gaps closed</span>
-                    <b className="tabular-nums">{gaps.filter((g) => resolvedGaps[g.id]).length} / {gaps.length}</b>
-                  </button>
-                  <button onClick={() => setView("people")} className="flex w-full items-center justify-between text-slate-600 transition-colors hover:text-slate-900">
-                    <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-slate-400" /> People moved</span>
-                    <b className="tabular-nums">{decisions.filter((x) => x.id.startsWith("seat:") || x.id.startsWith("dept:")).length}</b>
-                  </button>
-                </div>
+                      )}
+                      <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-xl bg-slate-200">
+                        <button onClick={() => setRailTab("session")} className="bg-slate-50 p-3 text-left">
+                          <p className="text-xl font-bold tabular-nums text-slate-900">{editedCount}</p>
+                          <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Edits</p>
+                        </button>
+                        <button onClick={() => setDrawer("gaps")} className="bg-slate-50 p-3 text-left">
+                          <p className="text-xl font-bold tabular-nums text-slate-900">{gaps.filter((g) => resolvedGaps[g.id]).length}/{gaps.length}</p>
+                          <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Gaps</p>
+                        </button>
+                        <button onClick={() => setView("people")} className="bg-slate-50 p-3 text-left">
+                          <p className="text-xl font-bold tabular-nums text-slate-900">{decisions.filter((x) => x.id.startsWith("seat:") || x.id.startsWith("dept:")).length}</p>
+                          <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Moves</p>
+                        </button>
+                      </div>
+                      {railTab === "kpis" && (
+                        <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-[13px] tabular-nums text-slate-500">
+                          <Row k={secondaryLabel} v={`${secondary.toLocaleString()} SF`} />
+                          <Row k="Net program" v={`${d.totals.proposedNetSF.toLocaleString()} SF`} />
+                          <Row k="Circulation" v={`${d.totals.circulationSF.toLocaleString()} SF`} />
+                        </div>
+                      )}
+                      {railTab === "dashboard" && (
+                        <>
+                          <div className="mt-5">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Program balance</h3>
+                              <button onClick={() => setRailTab("allocation")} className="text-[10px] font-bold text-[#0089a3]">View charts</button>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                              {d.categories.map((c) => (
+                                <div key={c.name} className="grid grid-cols-[86px_minmax(0,1fr)_34px] items-center gap-2 text-[10px]">
+                                  <span className="truncate text-slate-500">{c.name}</span>
+                                  <div className="h-2 rounded-full bg-slate-100">
+                                    <div className="h-2 rounded-full" style={{ width: `${Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%`, backgroundColor: CATEGORY_COLORS[c.name].accent }} />
+                                  </div>
+                                  <span className="text-right tabular-nums text-slate-400">{Math.round((c.proposedTotalSF / (d.totals.grossUsableSF || 1)) * 100)}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {Object.keys(factors).length > 0 && <p className="mt-4 rounded-lg bg-[#00badc]/10 px-3 py-2 text-[11px] font-medium text-[#0089a3]">Planning dials tuned on the session record.</p>}
+                        </>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
 
               {/* Briefing: the session's story rides the summary column */}
@@ -940,7 +974,7 @@ export default function StudioPage() {
 
             {/* ── Center: the spaces (Workbench cards / Focus table / Briefing) ─ */}
             <section className="min-w-0 bg-[#f3f7fa]">
-              <StudioSummaryMasthead d={d} result={viewResult} openGaps={openGaps} editedCount={editedCount} />
+              {briefing && <StudioSummaryMasthead d={d} result={viewResult} openGaps={openGaps} editedCount={editedCount} />}
               <div className="px-6 py-5">
               {showMap && (
                 <div className="mb-8">

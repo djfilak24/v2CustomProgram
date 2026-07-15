@@ -32,8 +32,10 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
   const [importError, setImportError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const [liveRequested, setLiveRequested] = useState(false)
+  const [forceLanding, setForceLanding] = useState(false)
 
   useEffect(() => {
+    setForceLanding(new URLSearchParams(window.location.search).get("preview") === "landing")
     fetch(`/api/engagements/${token}`)
       .then(async (r) => {
         if (!r.ok) { setMissing((await r.json()).error ?? "Unknown link"); return }
@@ -80,7 +82,7 @@ export default function ClientLanding({ params }: { params: Promise<{ token: str
 
   // ── The client command center: submitted = this page becomes home base ────
   const profile = submitted ?? (meta?.status === "submitted" ? meta.profile : undefined)
-  if (profile) {
+  if (profile && !forceLanding) {
     const shared = !!meta?.shared
     return (
       <div className="min-h-screen bg-[#f3f7fa] bg-[radial-gradient(1200px_600px_at_70%_-10%,rgba(0,186,220,0.10),transparent)] text-slate-900">

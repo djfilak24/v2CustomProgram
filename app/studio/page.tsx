@@ -72,6 +72,8 @@ export default function StudioPage() {
   const [lineNotes, setLineNotes] = useState<Record<string, string>>({})
   /** Named person → exact workstation/office card key. Supports multiple standards. */
   const [seatAssignments, setSeatAssignments] = useState<SeatAssignments>({})
+  /** Named person → leader status override. The intake remains the source until a designer changes it. */
+  const [leaderOverrides, setLeaderOverrides] = useState<Record<string, boolean>>({})
   /** Cards the facilitator has deliberately put on the team alignment path. */
   const [alignmentQueue, setAlignmentQueue] = useState<string[]>([])
   const [confirmedDecisions, setConfirmedDecisions] = useState<Record<string, string>>({})
@@ -125,21 +127,21 @@ export default function StudioPage() {
     notes: Record<string, string>; resolvedGaps: Record<string, boolean>; factors: DeliverableFactors
     peoplePatch: SeatingPatch; deptMoves: Record<string, string>; labelOverrides: Record<string, string>
     deptAlloc: Record<string, Record<string, number>>; lineNotes: Record<string, string>
-    seatAssignments: SeatAssignments; alignmentQueue: string[]; confirmedDecisions: Record<string, string>
+    seatAssignments: SeatAssignments; leaderOverrides: Record<string, boolean>; alignmentQueue: string[]; confirmedDecisions: Record<string, string>
   }
   const history = useRef<{ past: Snap[]; future: Snap[]; skip: boolean }>({ past: [], future: [], skip: false })
   const [histVer, setHistVer] = useState(0) // re-render hook for disabled states
   useEffect(() => {
     const h = history.current
     if (h.skip) { h.skip = false; return }
-    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions }
+    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, leaderOverrides, alignmentQueue, confirmedDecisions }
     const last = h.past[h.past.length - 1]
     if (last && JSON.stringify(last) === JSON.stringify(snap)) return
     h.past.push(snap)
     if (h.past.length > 60) h.past.shift()
     h.future = []
     setHistVer((v) => v + 1)
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, leaderOverrides, alignmentQueue, confirmedDecisions])
   const applySnap = (s: Snap) => {
     history.current.skip = true
     setOverrides(s.overrides); setCounts(s.counts); setAdditions(s.additions)
@@ -147,7 +149,7 @@ export default function StudioPage() {
     setPeoplePatch(s.peoplePatch ?? {})
     setDeptMoves(s.deptMoves ?? {}); setLabelOverrides(s.labelOverrides ?? {})
     setDeptAlloc(s.deptAlloc ?? {}); setLineNotes(s.lineNotes ?? {})
-    setSeatAssignments(s.seatAssignments ?? {}); setAlignmentQueue(s.alignmentQueue ?? []); setConfirmedDecisions(s.confirmedDecisions ?? {})
+    setSeatAssignments(s.seatAssignments ?? {}); setLeaderOverrides(s.leaderOverrides ?? {}); setAlignmentQueue(s.alignmentQueue ?? []); setConfirmedDecisions(s.confirmedDecisions ?? {})
     setHistVer((v) => v + 1)
   }
   const undo = () => {
@@ -239,7 +241,7 @@ export default function StudioPage() {
     sessionToken.current = null
     history.current = { past: [], future: [], skip: false }
     setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({}); setPeoplePatch({})
-    setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setAlignmentQueue([]); setConfirmedDecisions({}); setFinalized(undefined); setLogo(undefined)
+    setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setLeaderOverrides({}); setAlignmentQueue([]); setConfirmedDecisions({}); setFinalized(undefined); setLogo(undefined)
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
       if (seed) { setResult(seed); setSource("seed"); return }
@@ -271,6 +273,7 @@ export default function StudioPage() {
           setDeptAlloc(s?.deptAlloc ?? {})
           setLineNotes(s?.lineNotes ?? {})
           setSeatAssignments(s?.seatAssignments ?? {})
+          setLeaderOverrides(s?.leaderOverrides ?? {})
           setAlignmentQueue(s?.alignmentQueue ?? [])
           setConfirmedDecisions(s?.confirmedDecisions ?? {})
           setFinalized(s?.finalized)
@@ -296,7 +299,7 @@ export default function StudioPage() {
         body: JSON.stringify({
           session: {
             overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch, deptMoves,
-            labels: labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions, finalized, logo,
+            labels: labelOverrides, deptAlloc, lineNotes, seatAssignments, leaderOverrides, alignmentQueue, confirmedDecisions, finalized, logo,
           },
         }),
       })
@@ -304,7 +307,7 @@ export default function StudioPage() {
         .catch(() => setSaveState("idle"))
     }, 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions, finalized, logo])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, leaderOverrides, alignmentQueue, confirmedDecisions, finalized, logo])
 
   // The Department Manager's dept-to-dept moves apply on top of the intake,
   // never mutating it — everything downstream (program math, seating, map,
@@ -421,22 +424,31 @@ export default function StudioPage() {
   }, [d])
 
   const rosterPeople = useMemo(() => {
-    if (!viewResult) return [] as { id: string; name: string; department: string; assignment: string | "flex" }[]
+    if (!viewResult) return [] as { id: string; name: string; department: string; assignment: string | "flex"; isLeader: boolean }[]
     const firstOffice = seatCardOptions.find((line) => line.category === "Offices")?.key
     const firstWorkstation = seatCardOptions.find((line) => line.category === "Workstations")?.key
+    const allPeople = viewResult.people.departments.flatMap((department) =>
+      (department.employees ?? []).map((person) => ({ ...person, department: department.name })),
+    )
+    const flexPeople = allPeople.filter((person) => (resolved.byId[person.id] ?? "flex") === "flex")
+    const remoteCount = viewResult.meta.completedBy === "Demo" ? Math.min(viewResult.work.fullyRemote, flexPeople.length) : 0
+    const remoteFlexCount = viewResult.meta.completedBy === "Demo" ? Math.min(Math.max(1, Math.round(allPeople.length * 0.05)), Math.max(0, flexPeople.length - remoteCount)) : 0
+    const remoteIds = new Set(flexPeople.slice(-remoteCount).map((person) => person.id))
+    const remoteFlexIds = new Set(flexPeople.slice(-(remoteCount + remoteFlexCount), remoteCount ? -remoteCount : undefined).map((person) => person.id))
     return viewResult.people.departments.flatMap((department) =>
       (department.employees ?? []).map((person) => {
         const placement = resolved.byId[person.id] ?? "flex"
-        const fallback = placement === "office" ? firstOffice : placement === "desk" ? firstWorkstation : undefined
+        const fallback = placement === "office" ? firstOffice : placement === "desk" ? firstWorkstation : remoteIds.has(person.id) ? "remote" : remoteFlexIds.has(person.id) ? "remote-flex" : undefined
         return {
           id: person.id,
           name: person.name,
           department: department.name,
           assignment: seatAssignments[person.id] ?? fallback ?? "flex",
+          isLeader: leaderOverrides[person.id] ?? !!person.isLeader,
         }
       }),
     )
-  }, [viewResult, resolved, seatAssignments, seatCardOptions])
+  }, [viewResult, resolved, seatAssignments, leaderOverrides, seatCardOptions])
 
   const engineDeliverable = useMemo(() => (viewResult ? buildDeliverable(viewResult) : null), [viewResult])
   const configuredProfile = useMemo(
@@ -557,14 +569,19 @@ export default function StudioPage() {
     for (const [personId, lineKey] of Object.entries(seatAssignments)) {
       const person = rosterPeople.find((row) => row.id === personId)
       const line = seatCardOptions.find((row) => row.key === lineKey)
+      const modeLabel: Record<string, string> = { flex: "flexible / shared seating", "remote-flex": "remote flex", remote: "fully remote" }
       if (person) out.push({
         id: `assignment:${personId}`,
-        text: `${person.name} (${person.department}) assigned to ${line?.label ?? "flex seating"}`,
+        text: `${person.name} (${person.department}) assigned to ${line?.label ?? modeLabel[lineKey] ?? "flexible / shared seating"}`,
       })
+    }
+    for (const [personId, isLeader] of Object.entries(leaderOverrides)) {
+      const person = rosterPeople.find((row) => row.id === personId)
+      if (person) out.push({ id: `leader:${personId}`, text: `${person.name} (${person.department}) marked as ${isLeader ? "leader" : "staff"}` })
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d, overrides, counts, additions, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, resolved, viewResult, result, baseline, seatAssignments, rosterPeople, seatCardOptions])
+  }, [d, overrides, counts, additions, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, resolved, viewResult, result, baseline, seatAssignments, leaderOverrides, rosterPeople, seatCardOptions])
 
   // ── Derived: gaps (intake holes + deferred questions) ──────────────────────
   const gaps = useMemo(() => {
@@ -587,7 +604,7 @@ export default function StudioPage() {
     setFinalized({
       at: new Date().toISOString(), overrides, counts, additions, notes, resolvedGaps, factors,
       people: peoplePatch, deptMoves, labels: labelOverrides, deptAlloc, lineNotes,
-      seatAssignments, alignmentQueue: [], confirmedDecisions, logo,
+      seatAssignments, leaderOverrides, alignmentQueue: [], confirmedDecisions, logo,
     })
   }
   const [publishState, setPublishState] = useState<"idle" | "publishing" | "published">("idle")
@@ -601,7 +618,7 @@ export default function StudioPage() {
         shared: true,
         session: {
           overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch, deptMoves,
-          labels: labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, confirmedDecisions, finalized, logo,
+          labels: labelOverrides, deptAlloc, lineNotes, seatAssignments, leaderOverrides, alignmentQueue, confirmedDecisions, finalized, logo,
         },
       }),
     }).then(() => setPublishState("published")).catch(() => setPublishState("idle"))
@@ -787,7 +804,7 @@ export default function StudioPage() {
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
                           <button
-                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setAlignmentQueue([]); setConfirmedDecisions({}); setMenuOpen(false) }}
+                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setLeaderOverrides({}); setAlignmentQueue([]); setConfirmedDecisions({}); setMenuOpen(false) }}
                             className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                           >
                             <Undo2 className="h-3 w-3" /> Reset program edits
@@ -1232,6 +1249,7 @@ export default function StudioPage() {
                       result={viewResult} seating={resolved}
                       rosterPeople={rosterPeople} seatOptions={seatCardOptions}
                       onAssign={assignPerson}
+                      onToggleLeader={(id, current) => setLeaderOverrides((value) => ({ ...value, [id]: !current }))}
                       onMoveDept={moveDept}
                     />
                   )}
@@ -1737,26 +1755,26 @@ function LayerVisibilityBar({
 /* ── Department Manager: every person, where they sit, one click to move ── */
 
 function DepartmentManager({
-  result, seating, rosterPeople, seatOptions, onAssign, onMoveDept,
+  result, seating, rosterPeople, seatOptions, onAssign, onToggleLeader, onMoveDept,
 }: {
   result: SurveyResult
   seating: ResolvedSeating
-  rosterPeople: { id: string; name: string; department: string; assignment: string | "flex" }[]
+  rosterPeople: { id: string; name: string; department: string; assignment: string | "flex"; isLeader: boolean }[]
   seatOptions: { key: string; label: string; category: "Workstations" | "Offices" }[]
   onAssign: (id: string, target: string | "flex") => void
+  onToggleLeader: (id: string, current: boolean) => void
   onMoveDept: (id: string, toDeptId: string) => void
 }) {
   const [activeDept, setActiveDept] = useState(result.people.departments[0]?.id ?? "")
   const [search, setSearch] = useState("")
   const [rosterLens, setRosterLens] = useState<"all" | "leaders" | "staff">("all")
   const active = result.people.departments.find((department) => department.id === activeDept) ?? result.people.departments[0]
-  const activeRows = (active ? seating.byDept[active.id] ?? [] : []).filter((person) =>
+  const activeRows = (active ? seating.byDept[active.id] ?? [] : []).map((person) => ({ ...person, isLeader: rosterPeople.find((item) => item.id === person.id)?.isLeader ?? !!person.isLeader })).filter((person) =>
     (rosterLens === "all" || (rosterLens === "leaders" ? person.isLeader : !person.isLeader)) && person.name.toLowerCase().includes(search.toLowerCase()),
   )
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   useEffect(() => {
-    const ids = activeRows.map((person) => person.id)
-    setSelectedIds(ids)
+    setSelectedIds([])
   // Selection resets when the department or roster lens changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDept, rosterLens])
@@ -1799,8 +1817,7 @@ function DepartmentManager({
           {activeRows.map((person) => {
             const checked = selectedIds.includes(person.id)
             const assignment = rosterPeople.find((item) => item.id === person.id)?.assignment ?? "flex"
-            const assignmentLabel = seatOptions.find((option) => option.key === assignment)?.label ?? (assignment === "remote" ? "Remote" : assignment === "remote-flex" ? "Remote flex" : "Flexible / shared")
-            return <button key={person.id} onClick={() => toggleSelected(person.id)} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left ${checked ? "border-blue-200 bg-blue-50/40" : "border-slate-200 bg-white"}`}><GripVertical className="h-3.5 w-3.5 text-slate-300" /><span className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-3 w-3" />}</span>{person.isLeader && <Crown className="h-3 w-3 text-amber-500" />}<span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-slate-700">{person.name}</span><span className="mt-0.5 block truncate text-[9px] text-slate-400">{assignmentLabel}</span></span></button>
+            return <div key={person.id} className={`rounded-lg border p-2.5 ${checked ? "border-blue-200 bg-blue-50/40" : "border-slate-200 bg-white"}`}><div className="flex items-center gap-2"><GripVertical className="h-3.5 w-3.5 text-slate-300" /><button onClick={() => toggleSelected(person.id)} aria-label={`${checked ? "Deselect" : "Select"} ${person.name}`} className={`flex h-4 w-4 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"}`}>{checked && <Check className="h-3 w-3" />}</button><button onClick={() => onToggleLeader(person.id, !!person.isLeader)} title={person.isLeader ? "Remove leader status" : "Make leader"} className={`flex h-5 w-5 items-center justify-center rounded-full ${person.isLeader ? "bg-amber-50 text-amber-500" : "text-slate-300 hover:bg-amber-50 hover:text-amber-500"}`}><Crown className="h-3 w-3" /></button><span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{person.name}</span></div><select value={assignment} onChange={(event) => onAssign(person.id, event.target.value)} aria-label={`Assign ${person.name}`} className="mt-2 w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold text-slate-600 focus:border-blue-500 focus:bg-white focus:outline-none"><optgroup label="Workstation types">{seatOptions.filter((option) => option.category === "Workstations").map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</optgroup><optgroup label="Private office types">{seatOptions.filter((option) => option.category === "Offices").map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</optgroup><optgroup label="Flexible and remote"><option value="flex">Flexible / shared</option><option value="remote-flex">Remote flex</option><option value="remote">Fully remote</option></optgroup></select></div>
           })}
           {!activeRows.length && <p className="col-span-full p-8 text-center text-sm text-slate-400">No named roster was captured for this department.</p>}
         </div>
@@ -1813,7 +1830,7 @@ function DepartmentManager({
           {seatOptions.map((option, index) => {
             const count = selected.filter((person) => person.assignment === option.key).length
             const color = option.category === "Workstations" ? "#2563eb" : "#8b5cf6"
-            return <div key={option.key} className="flex items-center gap-3 px-4 py-3"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{option.label}</b><span className="text-[9px] text-slate-400">{option.category === "Offices" ? "Enclosed" : "Workstation"} · exact program type</span></span><button onClick={() => changeAssignmentCount(option.key, -1)} className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-400"><Minus className="h-3 w-3" /></button><b className="w-7 text-center text-xs tabular-nums">{count}</b><button onClick={() => changeAssignmentCount(option.key, 1)} className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-400"><Plus className="h-3 w-3" /></button></div>
+            return <div key={option.key} className="flex items-center gap-3 px-4 py-3"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="min-w-0 flex-1"><b className="block truncate text-xs text-slate-800">{option.label}</b><span className="text-[9px] text-slate-400">{option.category === "Offices" ? "Enclosed" : "Workstation"} · exact program type</span></span>{selectedCount > 1 && <button onClick={() => changeAssignmentCount(option.key, -1)} className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-400"><Minus className="h-3 w-3" /></button>}<b className="w-7 text-center text-xs tabular-nums">{count}</b>{selectedCount > 1 && <button onClick={() => changeAssignmentCount(option.key, 1)} className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-400"><Plus className="h-3 w-3" /></button>}</div>
           })}
           {([{ key: "flex", label: "Flexible / shared", detail: "Shared-seat pool; no exact desk" }, { key: "remote-flex", label: "Remote flex", detail: "Primarily remote with bookable access" }, { key: "remote", label: "Fully remote", detail: "Captured in headcount; no planned seat" }] as const).map((mode) => <button key={mode.key} onClick={() => selectedIds.forEach((id) => onAssign(id, mode.key))} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"><span className={`h-2.5 w-2.5 rounded-full ${mode.key === "flex" ? "bg-slate-400" : mode.key === "remote-flex" ? "bg-cyan-500" : "bg-indigo-500"}`} /><span className="min-w-0 flex-1"><b className="block text-xs text-slate-800">{mode.label}</b><span className="text-[9px] text-slate-400">{mode.detail}</span></span><b className="w-7 text-center text-xs tabular-nums">{selected.filter((person) => person.assignment === mode.key).length}</b></button>)}
         </div>

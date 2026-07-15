@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { engagementStore, storeConfigured, nelsonCodeOk } from "@/lib/server/engagementStore"
+import { DEMO_SCENARIOS } from "@/lib/survey/demo-scenarios"
 
 const unconfigured = () =>
   NextResponse.json(
@@ -20,7 +21,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const clientName = typeof body.clientName === "string" ? body.clientName.trim() : ""
   if (!clientName) return NextResponse.json({ error: "clientName required" }, { status: 400 })
-  const e = await engagementStore().create(clientName)
+  const demoKey = typeof body.demoKey === "string" && DEMO_SCENARIOS[body.demoKey] ? body.demoKey : undefined
+  const demoTargetSF = typeof body.demoTargetSF === "number" && body.demoTargetSF > 0 ? Math.round(body.demoTargetSF) : undefined
+  const demoTargetSource = ["lease", "building", "budget"].includes(body.demoTargetSource) ? body.demoTargetSource : undefined
+  const e = await engagementStore().create(clientName, { demoKey, demoTargetSF, demoTargetSource })
   await engagementStore().addEvent(e.token, { kind: "created", at: new Date().toISOString() })
   return NextResponse.json(e)
 }

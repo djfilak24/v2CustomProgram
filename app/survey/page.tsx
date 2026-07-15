@@ -126,9 +126,25 @@ export default function SurveyPage() {
       fetch(`/api/engagements/${eng}`)
         .then(async (r) => {
           if (!r.ok) return
-          const remote = (await r.json()).draft as SurveyDraft | undefined
-          if (!remote?.state || remote.v !== DRAFT_VERSION) return
-          if (!local || new Date(remote.savedAt).getTime() > new Date(local.savedAt).getTime()) setDraft(remote)
+          const m = await r.json()
+          const remote = m.draft as SurveyDraft | undefined
+          if (remote?.state && remote.v === DRAFT_VERSION) {
+            if (!local || new Date(remote.savedAt).getTime() > new Date(local.savedAt).getTime()) setDraft(remote)
+            return
+          }
+          // A fresh presenter engagement is seeded, but deliberately not
+          // submitted. Opening its survey starts with a complete scenario and
+          // preserves the real submit → review → Studio handoff.
+          if (typeof m.demoKey === "string" && DEMO_SCENARIOS[m.demoKey]) {
+            const seeded = demoState(m.demoKey)
+            if (!seeded) return
+            if (typeof m.demoTargetSF === "number") seeded.targetSF = m.demoTargetSF
+            if (["lease", "building", "budget"].includes(m.demoTargetSource)) seeded.targetSource = m.demoTargetSource
+            setState(seeded)
+            setLanes(allLanes("detailed"))
+            setDeferred(new Set())
+            setDemoKey(m.demoKey)
+          }
         })
         .catch(() => {})
     }
@@ -1099,4 +1115,3 @@ function Hero({ onBegin, onDemo, draft, onResume, onDiscardDraft, onImport, impo
     </div>
   )
 }
-

@@ -63,6 +63,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     clientName: e.clientName,
     status: e.status,
     shared: !!e.shared,
+    ...(e.demoKey ? { demoKey: e.demoKey } : {}),
+    ...(e.demoTargetSF ? { demoTargetSF: e.demoTargetSF } : {}),
+    ...(e.demoTargetSource ? { demoTargetSource: e.demoTargetSource } : {}),
     ...(profile ? { profile } : {}),
     // Their own in-progress draft rides back on their own token — this is
     // what makes "start on the phone, finish on the laptop" real.

@@ -44,23 +44,21 @@ export default function MissionControl() {
     } catch { /* fine */ }
   }, [])
 
-  /** Pick a client type → a returned engagement with a target, ready to demo end-to-end. */
+  /** Pick a client type → a clean engagement seeded for the full demo journey. */
   const spinUpDemo = async (key: string) => {
     setSpinning(key)
     try {
       const result = demoResult(key)
       if (!result) throw new Error()
       const t = DEMO_TARGETS[key]
-      if (t) result.goals = { ...(result.goals ?? { motivators: [] }), targetSF: t.sf, targetSource: t.src }
       const clientName = `${result.meta.clientName || DEMO_SCENARIOS[key]?.label || "Demo Client"} (demo)`
       const res = await fetch("/api/engagements", {
         method: "POST",
         headers: { "x-nelson-code": nelsonCode() ?? "", "content-type": "application/json" },
-        body: JSON.stringify({ clientName }),
+        body: JSON.stringify({ clientName, demoKey: key, demoTargetSF: t?.sf, demoTargetSource: t?.src }),
       })
       if (!res.ok) throw new Error()
       const { token } = await res.json()
-      await fetch(`/api/engagements/${token}?source=survey`, { method: "POST", body: JSON.stringify(result) })
       localStorage.setItem("nelson:demoToken", token)
       localStorage.setItem("nelson:demoName", clientName)
       setDemoToken(token)
@@ -193,7 +191,7 @@ export default function MissionControl() {
         {/* ── Journey 1: the client experience ─────────────────────────────── */}
         <JourneyTitle n={1} title="The client experience" note="what they see — friction engineered out, judgment kept in" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Card icon={Home} title="Their home page" note="the cinematic landing — three doors in" href={t ? `/s/${t}` : "/engagements"} step="1" />
+          <Card icon={Home} title="Their home page" note="the cinematic landing — three doors in" href={t ? `/s/${t}?preview=landing` : "/engagements"} step="1" />
           <Card icon={ClipboardCheck} title="The survey" note="never blocked · target question · autosaves across devices" href={t ? `/survey?e=${t}` : "/survey"} step="2" />
           <Card icon={FileText} title="The prep sheet" note="gaps as the agenda, printable" href={t ? `/prep/${t}` : "/engagements"} step="3" />
           <Card icon={Presentation} title="The deliverable" note="8–12 beats, gated until pushed" href={t ? `/d/${t}` : "/engagements"} step="4" />

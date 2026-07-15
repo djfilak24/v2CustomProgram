@@ -36,6 +36,7 @@ export interface FinalizedProgramSnapshot {
   deptAlloc?: Record<string, Record<string, number>>
   lineNotes?: Record<string, string>
   seatAssignments?: Record<string, string>
+  leaderOverrides?: Record<string, boolean>
   alignmentQueue?: string[]
   confirmedDecisions?: Record<string, string>
   logo?: string
@@ -76,8 +77,10 @@ export interface EngagementSession {
   deptAlloc?: Record<string, Record<string, number>>
   /** Per-card notes from the room — comparison line key → text. Rides into the designer brief and the fit-planning package. */
   lineNotes?: Record<string, string>
-  /** Named person → exact workstation/office card key, or flex when no dedicated seat is assigned. */
+  /** Named person → exact workstation/office card key, or a flex/remote work mode. */
   seatAssignments?: Record<string, string>
+  /** Named person → current leader status when Studio changes the intake. */
+  leaderOverrides?: Record<string, boolean>
   /** Card keys deliberately added to the facilitated alignment path. */
   alignmentQueue?: string[]
   /** Alignment item key → confirmation timestamp. Changes remain a separate automatic log. */
@@ -102,6 +105,10 @@ export interface Engagement {
   token: string
   clientName: string
   status: "sent" | "submitted"
+  /** Presenter seed for a clean, unsubmitted demo engagement. */
+  demoKey?: string
+  demoTargetSF?: number
+  demoTargetSource?: "lease" | "building" | "budget"
   /** Latest result — what the deliverable and review read. */
   result?: SurveyResult
   progress?: EngagementProgress
@@ -126,7 +133,7 @@ export interface Engagement {
 }
 
 export interface EngagementStore {
-  create(clientName: string): Promise<Engagement>
+  create(clientName: string, seed?: Pick<Engagement, "demoKey" | "demoTargetSF" | "demoTargetSource">): Promise<Engagement>
   get(token: string): Promise<Engagement | null>
   list(): Promise<Engagement[]>
   submit(token: string, result: SurveyResult, source?: SubmissionMeta["source"]): Promise<Engagement | null>
@@ -164,11 +171,17 @@ function postgresStore(): EngagementStore {
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS session JSONB`
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS events JSONB`
     await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS draft JSONB`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS demo_key TEXT`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS demo_target_sf INTEGER`
+    await sql`ALTER TABLE engagements ADD COLUMN IF NOT EXISTS demo_target_source TEXT`
     return sql
   })()
 
   const fromRow = (r: any): Engagement => ({
     token: r.token, clientName: r.client_name, status: r.status,
+    ...(r.demo_key ? { demoKey: r.demo_key as string } : {}),
+    ...(r.demo_target_sf ? { demoTargetSF: Number(r.demo_target_sf) } : {}),
+    ...(r.demo_target_source ? { demoTargetSource: r.demo_target_source as Engagement["demoTargetSource"] } : {}),
     ...(r.result ? { result: r.result as SurveyResult } : {}),
     ...(r.progress ? { progress: r.progress as EngagementProgress } : {}),
     ...(r.overrides ? { overrides: r.overrides as Record<string, number> } : {}),
@@ -181,11 +194,13 @@ function postgresStore(): EngagementStore {
   })
 
   return {
-    async create(clientName) {
+    async create(clientName, seed = {}) {
       const sql = await ready
       const token = newToken()
       const { rows } = await sql`
-        INSERT INTO engagements (token, client_name) VALUES (${token}, ${clientName}) RETURNING *`
+        INSERT INTO engagements (token, client_name, demo_key, demo_target_sf, demo_target_source)
+        VALUES (${token}, ${clientName}, ${seed.demoKey ?? null}, ${seed.demoTargetSF ?? null}, ${seed.demoTargetSource ?? null})
+        RETURNING *`
       return fromRow(rows[0])
     },
     async get(token) {
@@ -263,10 +278,10 @@ function fileStore(): EngagementStore {
     await fs.writeFile(FILE, JSON.stringify(all, null, 2))
   }
   return {
-    async create(clientName) {
+    async create(clientName, seed = {}) {
       const all = await load()
       const now = new Date().toISOString()
-      const e: Engagement = { token: newToken(), clientName, status: "sent", createdAt: now, updatedAt: now }
+      const e: Engagement = { token: newToken(), clientName, status: "sent", ...seed, createdAt: now, updatedAt: now }
       all.unshift(e); await save(all)
       return e
     },

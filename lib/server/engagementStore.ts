@@ -55,6 +55,10 @@ export interface EngagementSession {
   deptAlloc?: Record<string, Record<string, number>>
   /** Per-card notes from the room — comparison line key → text. Rides into the designer brief and the fit-planning package. */
   lineNotes?: Record<string, string>
+  /** Named person → exact workstation/office card key, or flex when no dedicated seat is assigned. */
+  seatAssignments?: Record<string, string>
+  /** Card keys deliberately added to the facilitated alignment path. */
+  alignmentQueue?: string[]
   /** The client's mark — a small data URL, shown on the rail, briefing, and deck cover. */
   logo?: string
   /** Deliverable beat composer — slide id → included (absent = included). */

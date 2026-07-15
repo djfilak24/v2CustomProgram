@@ -7,15 +7,19 @@ import {
   Crown, AlertTriangle, ClipboardList, Users, LayoutGrid, Table2, Presentation, CheckCircle2, X,
   Map as MapIcon, Settings2, Plus, Minus, TrendingUp, TrendingDown, PieChart, Gauge,
   ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Check, StickyNote, Upload, Image as ImageIcon,
-  Activity,
+  Activity, GripVertical, ClipboardCheck, Sparkles, UserRound, ChevronLeft,
 } from "lucide-react"
+import {
+  Bar, BarChart, CartesianGrid, Cell, PolarAngleAxis, PolarGrid, Radar, RadarChart,
+  ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from "recharts"
 import { buildDeliverable, CATEGORY_COLORS, DEFAULT_FACTORS, type DeliverableOverrides, type DeliverableAddition, type DeliverableFactors, type DeliverableCategory } from "@/lib/survey/deliverable"
 import { ProgramMapView } from "@/components/survey/program-map"
 import { exportFitPlanningPackage } from "@/lib/survey/fitPlanning"
 import { lineGaps, type ComparisonLine, type CompCategory } from "@/lib/survey/comparison"
 import { COLLAB_CATALOG, SUPPORT_CATALOG, type CatalogSpace } from "@/lib/survey/catalog"
 import { SpaceDetailModal } from "@/components/survey/space-detail-modal"
-import { WORKSTATION_SIZES, OFFICE_SIZES, SURVEY_STEPS, GOAL_MOTIVATORS, SPACE_POSTURES } from "@/lib/survey/sections"
+import { WORKSTATION_SIZES, OFFICE_SIZES, SURVEY_STEPS, GOAL_MOTIVATORS, SPACE_POSTURES, PROFILE_AXES, type ProfileScores } from "@/lib/survey/sections"
 import { resolveSeating, applyDeptMoves, type SeatPlacement, type SeatingPatch, type ResolvedSeating } from "@/lib/survey/seating"
 import { MAP_DEPT_COLORS } from "@/lib/survey/programMap"
 import { isNelsonMode, nelsonCode } from "@/lib/nelsonMode"
@@ -30,6 +34,8 @@ type Drawer = "gaps" | "decisions" | "survey" | null
 type LayerPreset = "working" | "client" | "numbers"
 type LayerKey = "engine" | "survey" | "today" | "departments" | "allocations" | "dimensions" | "notes"
 type RailTab = "dashboard" | "kpis" | "allocation" | "profile" | "session"
+type CardMode = "program" | "allocation" | "roster" | "alignment"
+type SeatAssignments = Record<string, string | "flex">
 
 /**
  * The Studio v2 — the NELSON engagement workbench, rebuilt to the founder's
@@ -61,6 +67,10 @@ export default function StudioPage() {
   const [deptAlloc, setDeptAlloc] = useState<Record<string, Record<string, number>>>({})
   /** Per-card notes from the room — comparison line key → text. */
   const [lineNotes, setLineNotes] = useState<Record<string, string>>({})
+  /** Named person → exact workstation/office card key. Supports multiple standards. */
+  const [seatAssignments, setSeatAssignments] = useState<SeatAssignments>({})
+  /** Cards the facilitator has deliberately put on the team alignment path. */
+  const [alignmentQueue, setAlignmentQueue] = useState<string[]>([])
   /** The client's mark — a small data URL. */
   const [logo, setLogo] = useState<string | undefined>(undefined)
 
@@ -94,10 +104,11 @@ export default function StudioPage() {
   const [railTab, setRailTab] = useState<RailTab>("dashboard")
   /** Left rail collapse — a slim icon strip when the room needs the width back. */
   const [railCollapsed, setRailCollapsed] = useState(false)
-  /** Which cards have their dept-allocation panel open (Workstations/Offices only). */
-  const [allocOpen, setAllocOpen] = useState<Record<string, boolean>>({})
   /** Which cards have their notes field open. */
   const [notesOpen, setNotesOpen] = useState<Record<string, boolean>>({})
+  const [cardMode, setCardMode] = useState<CardMode>("program")
+  const [activeAlignment, setActiveAlignment] = useState(0)
+  const [railWidth, setRailWidth] = useState(300)
 
   // ── Undo / redo — the session's working state, time-travelable ────────────
   type Snap = {
@@ -105,13 +116,14 @@ export default function StudioPage() {
     notes: Record<string, string>; resolvedGaps: Record<string, boolean>; factors: DeliverableFactors
     peoplePatch: SeatingPatch; deptMoves: Record<string, string>; labelOverrides: Record<string, string>
     deptAlloc: Record<string, Record<string, number>>; lineNotes: Record<string, string>
+    seatAssignments: SeatAssignments; alignmentQueue: string[]
   }
   const history = useRef<{ past: Snap[]; future: Snap[]; skip: boolean }>({ past: [], future: [], skip: false })
   const [histVer, setHistVer] = useState(0) // re-render hook for disabled states
   useEffect(() => {
     const h = history.current
     if (h.skip) { h.skip = false; return }
-    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes }
+    const snap: Snap = { overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue }
     const last = h.past[h.past.length - 1]
     if (last && JSON.stringify(last) === JSON.stringify(snap)) return
     h.past.push(snap)
@@ -126,6 +138,7 @@ export default function StudioPage() {
     setPeoplePatch(s.peoplePatch ?? {})
     setDeptMoves(s.deptMoves ?? {}); setLabelOverrides(s.labelOverrides ?? {})
     setDeptAlloc(s.deptAlloc ?? {}); setLineNotes(s.lineNotes ?? {})
+    setSeatAssignments(s.seatAssignments ?? {}); setAlignmentQueue(s.alignmentQueue ?? [])
     setHistVer((v) => v + 1)
   }
   const undo = () => {
@@ -146,11 +159,33 @@ export default function StudioPage() {
   useEffect(() => { setNelson(isNelsonMode()) }, [])
   // Rail collapse is a personal viewing preference, not engagement data — kept locally.
   useEffect(() => { setRailCollapsed(localStorage.getItem("nelson:studioRailCollapsed") === "1") }, [])
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("nelson:studioRailWidth"))
+    if (Number.isFinite(saved) && saved >= 260) setRailWidth(Math.min(420, saved))
+  }, [])
   const toggleRailCollapsed = () => {
     setRailCollapsed((v) => {
       localStorage.setItem("nelson:studioRailCollapsed", v ? "0" : "1")
       return !v
     })
+  }
+  const resizeRail = (next: number) => {
+    const viewportMax = Math.max(280, Math.min(420, window.innerWidth * 0.34))
+    const width = Math.round(Math.max(260, Math.min(viewportMax, next)))
+    setRailWidth(width)
+    localStorage.setItem("nelson:studioRailWidth", String(width))
+  }
+  const startRailResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = railWidth
+    const move = (e: PointerEvent) => resizeRail(startWidth + e.clientX - startX)
+    const up = () => {
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
   }
 
   const applyLayerPreset = (preset: LayerPreset) => {
@@ -195,7 +230,7 @@ export default function StudioPage() {
     sessionToken.current = null
     history.current = { past: [], future: [], skip: false }
     setOverrides({}); setCounts({}); setAdditions([]); setNotes({}); setResolvedGaps({}); setFactors({}); setPeoplePatch({})
-    setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setLogo(undefined)
+    setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setAlignmentQueue([]); setLogo(undefined)
     if (!source || source === "seed") {
       const seed = loadSurveySeed()
       if (seed) { setResult(seed); setSource("seed"); return }
@@ -223,6 +258,8 @@ export default function StudioPage() {
           setLabelOverrides(s?.labels ?? {})
           setDeptAlloc(s?.deptAlloc ?? {})
           setLineNotes(s?.lineNotes ?? {})
+          setSeatAssignments(s?.seatAssignments ?? {})
+          setAlignmentQueue(s?.alignmentQueue ?? [])
           setLogo(s?.logo)
           sessionToken.current = source
         }
@@ -245,7 +282,7 @@ export default function StudioPage() {
         body: JSON.stringify({
           session: {
             overrides, counts, additions, notes, resolvedGaps, factors, people: peoplePatch, deptMoves,
-            labels: labelOverrides, deptAlloc, lineNotes, logo,
+            labels: labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, logo,
           },
         }),
       })
@@ -253,7 +290,7 @@ export default function StudioPage() {
         .catch(() => setSaveState("idle"))
     }, 700)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, logo])
+  }, [overrides, counts, additions, notes, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, deptAlloc, lineNotes, seatAssignments, alignmentQueue, logo])
 
   // The Department Manager's dept-to-dept moves apply on top of the intake,
   // never mutating it — everything downstream (program math, seating, map,
@@ -360,25 +397,75 @@ export default function StudioPage() {
     return { byId: resolved.byId, offices, desks }
   }, [viewResult, resolved])
 
-  // Move a person office ↔ desk ↔ flex. Snapshots everyone's CURRENT resolved
-  // placement as the new explicit baseline before applying the one move — so
-  // the first move ever made never silently un-seats everyone else who was
-  // still riding the leaders-first convention.
-  const moveSeat = (id: string, next: SeatPlacement) => {
+  const seatCardOptions = useMemo(() => {
+    if (!d) return [] as { key: string; label: string; category: "Workstations" | "Offices" }[]
+    return d.categories.flatMap((category) =>
+      category.name === "Workstations" || category.name === "Offices"
+        ? category.lines.filter((line) => line.proposedCount > 0 || line.existingCount > 0).map((line) => ({ key: line.key, label: line.label, category: category.name as "Workstations" | "Offices" }))
+        : [],
+    )
+  }, [d])
+
+  const rosterPeople = useMemo(() => {
+    if (!viewResult) return [] as { id: string; name: string; department: string; assignment: string | "flex" }[]
+    const firstOffice = seatCardOptions.find((line) => line.category === "Offices")?.key
+    const firstWorkstation = seatCardOptions.find((line) => line.category === "Workstations")?.key
+    return viewResult.people.departments.flatMap((department) =>
+      (department.employees ?? []).map((person) => {
+        const placement = resolved.byId[person.id] ?? "flex"
+        const fallback = placement === "office" ? firstOffice : placement === "desk" ? firstWorkstation : undefined
+        return {
+          id: person.id,
+          name: person.name,
+          department: department.name,
+          assignment: seatAssignments[person.id] ?? fallback ?? "flex",
+        }
+      }),
+    )
+  }, [viewResult, resolved, seatAssignments, seatCardOptions])
+
+  const engineDeliverable = useMemo(() => (viewResult ? buildDeliverable(viewResult) : null), [viewResult])
+  const sessionImpact = useMemo(() => {
+    if (!d || !engineDeliverable) return []
+    return d.categories.map((category) => {
+      const engine = engineDeliverable.categories.find((row) => row.name === category.name)?.proposedTotalSF ?? 0
+      return { category: category.name, delta: category.proposedTotalSF - engine }
+    })
+  }, [d, engineDeliverable])
+  const activeAlignmentKey = alignmentQueue[activeAlignment]
+  const navigateAlignment = (direction: -1 | 1) => {
+    if (!alignmentQueue.length) return
+    const next = (activeAlignment + direction + alignmentQueue.length) % alignmentQueue.length
+    setActiveAlignment(next)
+    window.requestAnimationFrame(() => document.getElementById(`space-${alignmentQueue[next]}`)?.scrollIntoView({ behavior: "smooth", block: "center" }))
+  }
+  const toggleAlignment = (key: string) => {
+    setAlignmentQueue((current) => {
+      if (current.includes(key)) return current.filter((item) => item !== key)
+      return [...current, key]
+    })
+  }
+  const assignPerson = (personId: string, target: string | "flex") => {
+    setSeatAssignments((current) => ({ ...current, [personId]: target }))
     if (!viewResult) return
     const officeIds = new Set<string>()
     const deskIds = new Set<string>()
-    for (const dep of viewResult.people.departments) {
-      for (const row of resolved.byDept[dep.id] ?? []) {
-        if (row.id === id) continue
-        if (row.placement === "office") officeIds.add(row.id)
-        else if (row.placement === "desk") deskIds.add(row.id)
+    for (const department of viewResult.people.departments) {
+      for (const person of resolved.byDept[department.id] ?? []) {
+        if (person.id === personId) continue
+        if (person.placement === "office") officeIds.add(person.id)
+        if (person.placement === "desk") deskIds.add(person.id)
       }
     }
-    if (next === "office") officeIds.add(id)
-    else if (next === "desk") deskIds.add(id)
+    const targetCategory = seatCardOptions.find((option) => option.key === target)?.category
+    if (targetCategory === "Offices") officeIds.add(personId)
+    if (targetCategory === "Workstations") deskIds.add(personId)
     setPeoplePatch({ officeEmployeeIds: [...officeIds], deskEmployeeIds: [...deskIds] })
   }
+  useEffect(() => {
+    if (!alignmentQueue.length) setActiveAlignment(0)
+    else if (activeAlignment >= alignmentQueue.length) setActiveAlignment(alignmentQueue.length - 1)
+  }, [alignmentQueue, activeAlignment])
 
   // Move a person to a different department — headcounts on both sides shift
   // with them (they drive the engine), logged as a decision, undoable.
@@ -424,7 +511,7 @@ export default function StudioPage() {
       for (const dep of viewResult.people.departments) {
         for (const row of resolved.byDept[dep.id] ?? []) {
           const was = before.byId[row.id] ?? "flex"
-          if (was !== row.placement)
+          if (was !== row.placement && !seatAssignments[row.id])
             out.push({ id: `seat:${row.id}`, text: `${row.name} (${dep.name}) — ${was} → ${row.placement}` })
         }
       }
@@ -445,9 +532,17 @@ export default function StudioPage() {
       if (orig && orig.label !== label)
         out.push({ id: `label:${key}`, text: `"${orig.label}" renamed to "${label}"` })
     }
+    for (const [personId, lineKey] of Object.entries(seatAssignments)) {
+      const person = rosterPeople.find((row) => row.id === personId)
+      const line = seatCardOptions.find((row) => row.key === lineKey)
+      if (person) out.push({
+        id: `assignment:${personId}`,
+        text: `${person.name} (${person.department}) assigned to ${line?.label ?? "flex seating"}`,
+      })
+    }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d, overrides, counts, additions, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, resolved, viewResult, result, baseline])
+  }, [d, overrides, counts, additions, resolvedGaps, factors, peoplePatch, deptMoves, labelOverrides, resolved, viewResult, result, baseline, seatAssignments, rosterPeople, seatCardOptions])
 
   // ── Derived: gaps (intake holes + deferred questions) ──────────────────────
   const gaps = useMemo(() => {
@@ -638,7 +733,7 @@ export default function StudioPage() {
                       {editedCount > 0 && (
                         <div className="mt-2 border-t border-slate-100 pt-1">
                           <button
-                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setMenuOpen(false) }}
+                            onClick={() => { setOverrides({}); setCounts({}); setAdditions([]); setFactors({}); setPeoplePatch({}); setDeptMoves({}); setLabelOverrides({}); setDeptAlloc({}); setLineNotes({}); setSeatAssignments({}); setAlignmentQueue([]); setMenuOpen(false) }}
                             className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                           >
                             <Undo2 className="h-3 w-3" /> Reset program edits
@@ -655,13 +750,12 @@ export default function StudioPage() {
         {!d || !result || !viewResult ? (
           <p className="p-16 text-center text-slate-400"><RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />Loading program…</p>
         ) : (
-          <main className={`grid min-h-[calc(100vh-57px)] w-full gap-0 ${
-            railCollapsed
-              ? drawer ? "grid-cols-[56px_minmax(0,1fr)_360px]" : "grid-cols-[56px_minmax(0,1fr)]"
-              : briefing ? "grid-cols-[340px_minmax(0,1fr)]" : drawer ? "grid-cols-[300px_minmax(0,1fr)_360px]" : "grid-cols-[300px_minmax(0,1fr)]"
-          }`}>
+          <main
+            className="grid min-h-[calc(100vh-57px)] w-full gap-0"
+            style={{ gridTemplateColumns: `${railCollapsed ? 56 : railWidth}px minmax(0,1fr)${drawer && !briefing ? " 360px" : ""}` }}
+          >
             {/* ── Left rail: docked, collapsible, one clear number hierarchy ── */}
-            <aside className="sticky top-[57px] z-10 h-[calc(100vh-57px)] self-start overflow-y-auto border-r border-slate-200 bg-white">
+            <aside className="sticky top-[57px] z-10 h-[calc(100vh-57px)] self-start overflow-y-auto overflow-x-hidden border-r border-slate-200 bg-white">
               {railCollapsed ? (
                 /* Collapsed — a slim icon strip; the room gets its width back. */
                 <div className="flex flex-col items-center gap-3 px-2 py-4">
@@ -805,16 +899,20 @@ export default function StudioPage() {
                   if (railTab === "profile") {
                     return (
                       <>
-                        <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Profile movement</h3>
-                        <div className="mt-4 grid grid-cols-2 gap-3">
-                          <div className="rounded-xl bg-[#00badc]/10 p-3">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-[#0089a3]">Density</p>
-                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{d.totals.sfPerPerson}</p>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">People + place profile</h3>
+                          <span className="text-[9px] font-semibold text-[#0089a3]">Survey signal</span>
+                        </div>
+                        <StudioProfileRadar scores={d.profile} />
+                        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-slate-200">
+                          <div className="bg-slate-50 p-3">
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Place</p>
+                            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{d.totals.sfPerPerson}</p>
                             <p className="text-[10px] text-slate-500">SF / person</p>
                           </div>
-                          <div className="rounded-xl bg-slate-50 p-3">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">People</p>
-                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{d.future}</p>
+                          <div className="bg-slate-50 p-3">
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">People</p>
+                            <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{d.future}</p>
                             <p className="text-[10px] text-slate-500">at plan</p>
                           </div>
                         </div>
@@ -860,6 +958,7 @@ export default function StudioPage() {
                             <p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">People moved</p>
                           </button>
                         </div>
+                        <SessionImpactChart data={sessionImpact} />
                         <div className="mt-4 space-y-2">
                           {(decisions.length ? decisions : [{ id: "empty", text: "No session decisions yet. Adjust counts, area, allocation, or gaps and they will appear here." }]).slice(0, 5).map((x) => (
                             <p key={x.id} className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] leading-snug text-slate-600">{x.text}</p>
@@ -970,6 +1069,20 @@ export default function StudioPage() {
               )}
               </>
               )}
+              {!railCollapsed && (
+                <button
+                  type="button"
+                  onPointerDown={startRailResize}
+                  onDoubleClick={() => resizeRail(300)}
+                  aria-label="Resize Studio summary rail"
+                  title="Drag left or right to resize. Double-click to reset."
+                  className="group absolute right-0 top-0 z-20 flex h-full w-3 cursor-col-resize items-center justify-center border-0 bg-transparent"
+                >
+                  <span className="sticky top-1/2 flex h-14 w-3 -translate-y-1/2 items-center justify-center rounded-l-md border border-r-0 border-slate-200 bg-white text-slate-300 shadow-sm transition-colors group-hover:border-[#00badc]/50 group-hover:text-[#0089a3]">
+                    <GripVertical className="h-4 w-4" />
+                  </span>
+                </button>
+              )}
             </aside>
 
             {/* ── Center: the spaces (Workbench cards / Focus table / Briefing) ─ */}
@@ -1001,14 +1114,15 @@ export default function StudioPage() {
                   <div className="mb-4 flex items-center justify-between gap-4">
                     <h2 className="text-xl font-bold tracking-tight">People</h2>
                     <p className="text-xs text-slate-400">
-                      Click a placement to move someone — offices and desks recompute live, and the move joins the decision log.
+                      Assign each named person to the exact workstation or office type they will occupy.
                     </p>
                   </div>
                   {viewResult && (
                     <DepartmentManager
                       result={viewResult} seating={resolved}
-                      officesByDept={viewResult.spaces.privateOfficesByDept} desksByDept={viewResult.work.dedicatedByDept ?? {}}
-                      onMove={moveSeat} onMoveDept={moveDept}
+                      rosterPeople={rosterPeople} seatOptions={seatCardOptions}
+                      onAssign={assignPerson}
+                      onMoveDept={moveDept}
                     />
                   )}
                 </>
@@ -1035,6 +1149,8 @@ export default function StudioPage() {
                     else setShowNotesLayer((v) => !v)
                   }}
                   onPreset={applyLayerPreset}
+                  cardMode={cardMode}
+                  onCardMode={setCardMode}
                 />
               )}
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -1057,6 +1173,18 @@ export default function StudioPage() {
                   </div>
                 )}
               </div>
+
+              {!briefing && cardMode === "alignment" && (
+                <div className="mb-4 flex items-center gap-3 bg-[#0e1a2e] px-3 py-2 text-white shadow-sm">
+                  <ClipboardCheck className="h-4 w-4 text-[#00badc]" />
+                  <span className="text-xs font-bold">Alignment queue</span>
+                  <span className="text-[11px] text-white/55">{alignmentQueue.length ? `${activeAlignment + 1} of ${alignmentQueue.length}` : "No cards queued"}</span>
+                  <span className="ml-auto flex items-center gap-1">
+                    <button onClick={() => navigateAlignment(-1)} disabled={!alignmentQueue.length} className="flex h-6 w-6 items-center justify-center text-white/60 hover:text-white disabled:opacity-25" title="Previous alignment point"><ChevronLeft className="h-4 w-4" /></button>
+                    <button onClick={() => navigateAlignment(1)} disabled={!alignmentQueue.length} className="flex h-6 w-6 items-center justify-center text-white/60 hover:text-white disabled:opacity-25" title="Next alignment point"><ChevronRight className="h-4 w-4" /></button>
+                  </span>
+                </div>
+              )}
 
               {view === "focus" ? (
                 <FocusTable d={d} baseOf={baseOf} onSf={(k, n) => setSf(k, n)} onQty={(k, n) => setQty(k, n)} filter={filter} showRatios={showRatios} />
@@ -1118,7 +1246,7 @@ export default function StudioPage() {
                           </table>
                         </div>
                       ) : (
-                      <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr))]">
+                      <div className="grid justify-start gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),640px))]">
                         {visible.map((l) => (
                           <SpaceCard
                             key={l.key} line={l} base={baseOf(l.key)} result={viewResult} briefing={briefing}
@@ -1127,12 +1255,22 @@ export default function StudioPage() {
                             showAllocations={showAllocations && !compactCards} showDimensions={showDimensions && !compactCards}
                             showNotes={showNotesLayer && !compactCards}
                             compact={compactCards}
-                            people={l.key === "offices" ? seats.offices : l.key === "workstations" ? seats.desks : undefined}
+                            mode={cardMode}
+                            rosterPeople={rosterPeople}
+                            seatOptions={seatCardOptions}
+                            onAssign={assignPerson}
+                            inAlignmentQueue={alignmentQueue.includes(l.key)}
+                            alignmentActive={activeAlignmentKey === l.key}
+                            onToggleAlignment={() => toggleAlignment(l.key)}
                             onQty={(n) => setQty(l.key, n)}
                             onSf={(n) => setSf(l.key, n)}
                             onInfo={() => setDetail(detailFor(l))}
                             onDuplicate={() => duplicate(l)}
-                            onDelete={l.key.startsWith("studio:") ? () => setAdditions((p) => p.filter((a) => a.key !== l.key)) : undefined}
+                            onDelete={l.key.startsWith("studio:") ? () => {
+                              setAdditions((current) => current.filter((addition) => addition.key !== l.key))
+                              setSeatAssignments((current) => Object.fromEntries(Object.entries(current).map(([personId, target]) => [personId, target === l.key ? "flex" : target])))
+                              setAlignmentQueue((current) => current.filter((key) => key !== l.key))
+                            } : undefined}
                             onRename={
                               l.key.startsWith("studio:")
                                 ? (name) => setAdditions((p) => p.map((a) => (a.key === l.key ? { ...a, label: name } : a)))
@@ -1140,7 +1278,12 @@ export default function StudioPage() {
                             }
                             onCategory={
                               l.key.startsWith("studio:")
-                                ? (category) => setAdditions((p) => p.map((a) => (a.key === l.key ? { ...a, category } : a)))
+                                ? (category) => {
+                                  setAdditions((current) => current.map((addition) => (addition.key === l.key ? { ...addition, category } : addition)))
+                                  if (category !== "Workstations" && category !== "Offices") {
+                                    setSeatAssignments((current) => Object.fromEntries(Object.entries(current).map(([personId, target]) => [personId, target === l.key ? "flex" : target])))
+                                  }
+                                }
                                 : undefined
                             }
                             departments={viewResult.people.departments.map((dep, i) => ({ id: dep.id, name: dep.name, color: MAP_DEPT_COLORS[i % MAP_DEPT_COLORS.length] }))}
@@ -1149,8 +1292,6 @@ export default function StudioPage() {
                             surveyAskByDept={surveyAskByDept(l)}
                             categoryAllocated={categoryAllocTotals[cat.name]?.allocated ?? 0}
                             categoryQty={categoryAllocTotals[cat.name]?.qty ?? 0}
-                            allocOpen={!!allocOpen[l.key]}
-                            onToggleAlloc={() => setAllocOpen((p) => ({ ...p, [l.key]: !p[l.key] }))}
                             note={lineNotes[l.key] ?? ""}
                             onNote={(text) => setLineNotes((p) => ({ ...p, [l.key]: text }))}
                             notesOpen={!!notesOpen[l.key]}
@@ -1382,11 +1523,13 @@ function SummaryStat({
 }
 
 function LayerVisibilityBar({
-  layers, onToggle, onPreset,
+  layers, onToggle, onPreset, cardMode, onCardMode,
 }: {
   layers: Record<LayerKey, boolean>
   onToggle: (layer: LayerKey) => void
   onPreset: (preset: LayerPreset) => void
+  cardMode: CardMode
+  onCardMode: (mode: CardMode) => void
 }) {
   const labels: Record<LayerKey, string> = {
     engine: "Engine",
@@ -1399,7 +1542,17 @@ function LayerVisibilityBar({
   }
 
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-2 border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+    <div className="mb-5 border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
+        <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700"><LayoutGrid className="h-3.5 w-3.5" /> Card view</span>
+        <span className="flex overflow-hidden rounded-md border border-slate-200 text-[10px] font-bold">
+          {(["program", "allocation", "roster", "alignment"] as CardMode[]).map((mode) => (
+            <button key={mode} onClick={() => onCardMode(mode)} className={`px-2.5 py-1.5 capitalize ${cardMode === mode ? "bg-slate-900 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}>{mode}</button>
+          ))}
+        </span>
+        <span className="ml-auto text-[10px] text-slate-400">One configuration, four working views</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
       <span className="mr-1 inline-flex items-center gap-1.5 text-xs font-bold text-slate-700"><Settings2 className="h-3.5 w-3.5" /> Visible data</span>
       {(Object.keys(labels) as LayerKey[]).map((layer) => (
         <button
@@ -1421,6 +1574,7 @@ function LayerVisibilityBar({
         <button onClick={() => onPreset("client")} className="border-l border-slate-200 px-2.5 py-1.5 hover:bg-white hover:text-slate-900">Client review</button>
         <button onClick={() => onPreset("numbers")} className="border-l border-slate-200 px-2.5 py-1.5 hover:bg-white hover:text-slate-900">Numbers only</button>
       </div>
+      </div>
     </div>
   )
 }
@@ -1428,27 +1582,25 @@ function LayerVisibilityBar({
 /* ── Department Manager: every person, where they sit, one click to move ── */
 
 function DepartmentManager({
-  result, seating, officesByDept, desksByDept, onMove, onMoveDept,
+  result, seating, rosterPeople, seatOptions, onAssign, onMoveDept,
 }: {
   result: SurveyResult
   seating: ResolvedSeating
-  officesByDept: Record<string, number>
-  desksByDept: Record<string, number>
-  onMove: (id: string, next: SeatPlacement) => void
+  rosterPeople: { id: string; name: string; department: string; assignment: string | "flex" }[]
+  seatOptions: { key: string; label: string; category: "Workstations" | "Offices" }[]
+  onAssign: (id: string, target: string | "flex") => void
   onMoveDept: (id: string, toDeptId: string) => void
 }) {
   return (
     <div className="space-y-5">
       {result.people.departments.map((dep) => {
         const rows = seating.byDept[dep.id] ?? []
-        const nOff = officesByDept[dep.id] ?? 0
-        const nDesk = desksByDept[dep.id] ?? 0
-        const offCount = rows.filter((r) => r.placement === "office").length
-        const deskCount = rows.filter((r) => r.placement === "desk").length
-        const flexCount = rows.filter((r) => r.placement === "flex").length
+        const depPeople = rosterPeople.filter((person) => person.department === dep.name)
+        const categoryOf = (assignment: string) => seatOptions.find((option) => option.key === assignment)?.category
+        const offCount = depPeople.filter((person) => categoryOf(person.assignment) === "Offices").length
+        const deskCount = depPeople.filter((person) => categoryOf(person.assignment) === "Workstations").length
+        const flexCount = depPeople.filter((person) => person.assignment === "flex").length
         const growth = dep.futureHeadcount !== undefined && dep.futureHeadcount !== dep.headcount
-        const overOffice = offCount > nOff
-        const overDesk = deskCount > nDesk
         return (
           <div key={dep.id} className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1464,11 +1616,11 @@ function DepartmentManager({
                 </p>
               </div>
               <div className="flex items-center gap-2 text-[11px] font-medium">
-                <span className={`rounded-full px-2.5 py-1 ${overOffice ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-600"}`} title="Offices assigned vs planned">
-                  {offCount} / {nOff} offices
+                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700" title="Named people assigned to an office type">
+                  {offCount} offices
                 </span>
-                <span className={`rounded-full px-2.5 py-1 ${overDesk ? "bg-rose-50 text-rose-700" : "bg-slate-50 text-slate-600"}`} title="Dedicated desks assigned vs planned">
-                  {deskCount} / {nDesk} desks
+                <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-cyan-700" title="Named people assigned to a workstation type">
+                  {deskCount} workstations
                 </span>
                 {flexCount > 0 && (
                   <span className="rounded-full bg-slate-50 px-2.5 py-1 text-slate-500">{flexCount} shared</span>
@@ -1477,7 +1629,7 @@ function DepartmentManager({
             </div>
             {rows.length === 0 ? (
               <p className="mt-3 text-xs text-slate-400">
-                No roster captured for this department — allocation is headcount-only ({nOff} offices, {nDesk} dedicated desks planned).
+                No roster captured for this department. Its program remains managed through department allocation counts.
               </p>
             ) : (
               <div className="mt-4 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -1487,27 +1639,21 @@ function DepartmentManager({
                       {r.isLeader && <Crown className="h-3 w-3 shrink-0 text-amber-500" />}
                       <span className="truncate">{r.name}</span>
                     </span>
-                    <span className="flex shrink-0 items-center gap-1">
-                      <span className="flex overflow-hidden rounded-lg border border-slate-200 bg-white text-[10px] font-semibold">
-                        {(["office", "desk", "flex"] as const).map((p) => (
-                          <button
-                            key={p}
-                            onClick={() => onMove(r.id, p)}
-                            title={`Move to ${p === "flex" ? "shared — no dedicated seat" : p}`}
-                            className={`px-2 py-1 capitalize transition-colors ${
-                              r.placement === p
-                                ? p === "office"
-                                  ? "bg-[#2563eb]/12 text-[#1d4ed8]"
-                                  : p === "desk"
-                                    ? "bg-[#00badc]/15 text-[#0089a3]"
-                                    : "bg-slate-200 text-slate-600"
-                                : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        ))}
-                      </span>
+                      <span className="flex shrink-0 items-center gap-1">
+                      <select
+                        value={rosterPeople.find((person) => person.id === r.id)?.assignment ?? "flex"}
+                        onChange={(e) => onAssign(r.id, e.target.value)}
+                        aria-label={`Assign ${r.name} to a space type`}
+                        className="max-w-44 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 focus:border-[#00badc] focus:outline-none"
+                      >
+                        <option value="flex">Flexible / unassigned</option>
+                        <optgroup label="Workstations">
+                          {seatOptions.filter((option) => option.category === "Workstations").map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                        </optgroup>
+                        <optgroup label="Offices">
+                          {seatOptions.filter((option) => option.category === "Offices").map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                        </optgroup>
+                      </select>
                       <span className="relative shrink-0">
                         <select
                           value=""
@@ -1550,9 +1696,10 @@ function dims(sf: number): string | null {
 const ADDITION_CATEGORIES: CompCategory[] = ["Workstations", "Offices", "Collaboration", "Support"]
 
 function SpaceCard({
-  line, base, result, briefing, colors, showChips, showRatios, showSurvey, showToday, showAllocations, showDimensions, showNotes, compact, people, onQty, onSf, onInfo, onDuplicate, onDelete, onRename, onCategory,
-  departments, deptAlloc, onAllocChange, surveyAskByDept, categoryAllocated, categoryQty, allocOpen, onToggleAlloc,
-  note, onNote, notesOpen, onToggleNotes,
+  line, base, result, briefing, colors, showChips, showRatios, showSurvey, showToday, showAllocations, showDimensions, showNotes, compact, onQty, onSf, onInfo, onDuplicate, onDelete, onRename, onCategory,
+  departments, deptAlloc, onAllocChange, surveyAskByDept, categoryAllocated, categoryQty,
+  note, onNote, notesOpen, onToggleNotes, mode, rosterPeople, seatOptions, onAssign,
+  inAlignmentQueue, alignmentActive, onToggleAlignment,
 }: {
   line: ComparisonLine
   base?: ComparisonLine
@@ -1568,8 +1715,13 @@ function SpaceCard({
   showNotes: boolean
   /** Compact layer: just the name and the numbers — the fast read. */
   compact?: boolean
-  /** Named seat assignments (offices/workstations only) — who actually sits here. */
-  people?: SeatGroup[]
+  mode: CardMode
+  rosterPeople: { id: string; name: string; department: string; assignment: string | "flex" }[]
+  seatOptions: { key: string; label: string; category: "Workstations" | "Offices" }[]
+  onAssign: (personId: string, target: string | "flex") => void
+  inAlignmentQueue: boolean
+  alignmentActive: boolean
+  onToggleAlignment: () => void
   onQty: (n: number) => void
   onSf: (n: number | null) => void
   onInfo: () => void
@@ -1585,19 +1737,16 @@ function SpaceCard({
   surveyAskByDept: Record<string, number> | null
   categoryAllocated: number
   categoryQty: number
-  allocOpen: boolean
-  onToggleAlloc: () => void
   note: string
   onNote: (text: string) => void
   notesOpen: boolean
   onToggleNotes: () => void
 }) {
-  const [who, setWho] = useState(false)
+  const [rotated, setRotated] = useState(false)
   const deptName = (id: string) => result.people.departments.find((x) => x.id === id)?.name ?? id
   const sfChanged = !!base && line.unitSF !== base.unitSF
   const qtyChanged = !!base && line.proposedCount !== base.proposedCount
   const isAddition = line.key.startsWith("studio:")
-  const hasPeople = (people?.length ?? 0) > 0
 
   // The validation triangle: what the engine recommends, what the client
   // literally asked for, and what they have today — three independent
@@ -1638,10 +1787,17 @@ function SpaceCard({
   const allocatedTotal = Object.values(deptAlloc).reduce((a, b) => a + b, 0)
   const unassigned = Math.max(0, line.proposedCount - allocatedTotal)
   const over = Math.max(0, allocatedTotal - line.proposedCount)
+  const assignedPeople = rosterPeople.filter((person) => person.assignment === line.key)
+  const sizeOptions = line.category === "Workstations" ? WORKSTATION_SIZES : line.category === "Offices" ? OFFICE_SIZES : []
+  const dimensionLabel = dims(line.unitSF)
+  const shownDimension = rotated && dimensionLabel?.includes("×")
+    ? dimensionLabel.split("×").map((part) => part.trim()).reverse().join(" × ")
+    : dimensionLabel
 
   return (
     <div
-      className={`overflow-hidden rounded-lg border bg-white transition-shadow hover:shadow-md ${isAddition ? "border-[#00badc]/40" : "border-slate-200"}`}
+      id={`space-${line.key}`}
+      className={`overflow-hidden rounded-lg border bg-white transition-all hover:shadow-md ${alignmentActive ? "ring-2 ring-[#00badc] ring-offset-2" : ""} ${qtyChanged || sfChanged ? "shadow-[0_0_0_1px_rgba(0,186,220,0.18)]" : ""} ${isAddition ? "border-[#00badc]/40" : "border-slate-200"}`}
       style={{ borderTop: `3px solid ${colors.accent}` }}
     >
       <div className="flex items-start gap-3 px-5 pb-3 pt-4">
@@ -1667,11 +1823,7 @@ function SpaceCard({
         </div>
         {!briefing && (
           <span className="flex shrink-0 items-center">
-            {hasPeople && (
-              <IconBtn title="Who gets these seats" onClick={() => setWho((v) => !v)}>
-                <Users className={`h-3.5 w-3.5 ${who ? "text-[#0089a3]" : ""}`} />
-              </IconBtn>
-            )}
+            {seatAccounted && <span className="mr-1 text-[10px] font-semibold tabular-nums text-slate-400" title="Named occupants assigned to this exact space type">{assignedPeople.length} named</span>}
             <IconBtn title="About this space" onClick={onInfo}><Eye className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn title="Duplicate — e.g. a second size standard" onClick={onDuplicate}><Copy className="h-3.5 w-3.5" /></IconBtn>
             {onDelete && <IconBtn title="Remove this added line" onClick={onDelete}><Trash2 className="h-3.5 w-3.5 text-red-400" /></IconBtn>}
@@ -1704,8 +1856,8 @@ function SpaceCard({
         /* Number grid — QTY / SF EA / TOTAL SF as labeled cells, the same
            anatomy everywhere in the Studio; qty gets width to spare so a
            3-digit count never clips. */
-        <div className="grid grid-cols-3 gap-px border-y border-slate-200 bg-slate-200">
-          <div className="bg-white px-5 py-3.5">
+        <div className="grid grid-cols-[1.15fr_1fr_1fr] gap-px border-y border-slate-200 bg-slate-200">
+          <div className="relative px-5 py-3.5" style={{ backgroundColor: colors.tint }}>
             <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Configured quantity</p>
             <div className="mt-1 flex items-center gap-0.5">
               <button
@@ -1728,6 +1880,17 @@ function SpaceCard({
                 <Plus className="h-3 w-3" />
               </button>
             </div>
+            {seatAccounted && line.proposedCount > 0 && (
+              <div className="mt-2">
+                <div className="flex h-1.5 overflow-hidden rounded-full bg-white/80">
+                  {departments.map((department) => {
+                    const value = deptAlloc[department.id] ?? 0
+                    return value > 0 ? <span key={department.id} style={{ width: `${Math.min(100, (value / line.proposedCount) * 100)}%`, backgroundColor: department.color }} /> : null
+                  })}
+                </div>
+                <p className="mt-1 text-[9px] font-medium text-slate-500">{allocatedTotal} allocated · {unassigned} flexible</p>
+              </div>
+            )}
           </div>
           <div className="bg-white px-5 py-3.5">
             <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Unit area</p>
@@ -1736,16 +1899,32 @@ function SpaceCard({
               onChange={(e) => onSf(e.target.value === "" ? null : Number(e.target.value))}
               className="mt-1 w-full min-w-0 rounded-md border-none bg-transparent text-center text-xl font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#00badc]/40"
             />
-            {showDimensions && dims(line.unitSF) && <p className="text-center text-[10px] font-semibold text-[#0089a3]">{dims(line.unitSF)}</p>}
+            {showDimensions && shownDimension && <p className="text-center text-[10px] font-semibold text-[#0089a3]">{shownDimension}</p>}
           </div>
-          <div className="bg-[#e9f7fb] px-5 py-3.5">
-            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#0089a3]">Planned area</p>
+          <div className="bg-slate-50 px-5 py-3.5">
+            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Planned area</p>
             <p className="mt-2 text-center text-xl font-bold tabular-nums text-slate-900">{(line.proposedCount * line.unitSF).toLocaleString()} <span className="text-xs font-semibold text-slate-400">SF</span></p>
           </div>
         </div>
       )}
 
-      {!briefing && (showRatios || showSurvey || showToday) && (
+      {!briefing && mode === "program" && sizeOptions.length > 0 && !compact && (
+        <div className="border-b border-slate-100 px-4 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">Common standards</p>
+            <button onClick={() => setRotated((value) => !value)} className="text-[9px] font-bold text-[#0089a3]">Swap orientation</button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {sizeOptions.map((option) => (
+              <button key={option.id} onClick={() => onSf(option.sf)} className={`rounded-full border px-2 py-1 text-[9px] font-semibold ${line.unitSF === option.sf ? "border-[#00badc] bg-[#00badc]/10 text-[#007c94]" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+                {rotated ? option.label.split("×").map((part) => part.trim()).reverse().join(" × ") : option.label} <span className="text-slate-400">{option.sf}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!briefing && mode === "program" && (showRatios || showSurvey || showToday) && (
         <div
           className="grid divide-x divide-slate-100 border-b border-slate-200 bg-slate-50"
           style={{ gridTemplateColumns: `repeat(${[showToday, showSurvey, showRatios, true].filter(Boolean).length}, minmax(0, 1fr))` }}
@@ -1782,7 +1961,7 @@ function SpaceCard({
         </div>
       )}
 
-      {showChips && alloc.length > 0 && (
+      {mode === "program" && showChips && alloc.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-5 py-3">
           {alloc.map(([name, n]) => (
             <span key={name} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: colors.tint, color: colors.text }}>
@@ -1794,31 +1973,14 @@ function SpaceCard({
         </div>
       )}
 
-      {/* Who gets these seats — names by the survey's seating hierarchy */}
-      {showAllocations && who && !briefing && !compact && hasPeople && (
-        <div className="space-y-1 border-t border-slate-100 px-4 py-2.5">
-          {people!.map((p) => (
-            <p key={p.dept} className="text-[11px] leading-relaxed text-slate-600">
-              <span className="font-semibold text-slate-800">{p.dept}</span>
-              {" — "}
-              {p.names.join(", ")}
-              {p.extra > 0 && `${p.names.length ? " + " : ""}${p.extra} unnamed`}
-            </p>
-          ))}
-        </div>
-      )}
-
       {/* Dept allocation — collapsible, seat-accounted lines only. Answers
           "we added two, where did they go" and "we cut one, who loses a
           seat" with real per-department numbers instead of a silent total. */}
-      {!briefing && showAllocations && seatAccounted && (
+      {!briefing && mode === "allocation" && showAllocations && seatAccounted && (
         <div className="border-t border-slate-100">
-          <button
-            onClick={onToggleAlloc}
-            className="flex w-full items-center justify-between px-4 py-2 text-left transition-colors hover:bg-slate-50"
-          >
+          <div className="flex w-full items-center justify-between px-4 py-2 text-left">
             <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-              {allocOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <ChevronDown className="h-3 w-3" />
               Dept allocation
             </span>
             {unassigned > 0 ? (
@@ -1830,8 +1992,8 @@ function SpaceCard({
             ) : (
               <span className="text-[11px] text-slate-300">not allocated</span>
             )}
-          </button>
-          {allocOpen && (
+          </div>
+          {(
             <div className="px-4 pb-3">
               {categoryQty > 0 && (
                 <p className="mb-2 text-[10px] leading-relaxed text-slate-400">
@@ -1883,6 +2045,63 @@ function SpaceCard({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {!briefing && mode === "allocation" && !seatAccounted && (
+        <div className="px-4 py-4">
+          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Shared-space allocation</p>
+          <div className="mt-3 flex h-7 overflow-hidden border border-slate-200">
+            {alloc.length ? alloc.map(([name, value], index) => (
+              <span key={name} className="flex items-center justify-center text-[9px] font-bold" style={{ width: `${Math.max(12, (value / Math.max(1, alloc.reduce((sum, [, count]) => sum + count, 0))) * 100)}%`, backgroundColor: index % 2 ? "#dbeafe" : colors.tint, color: index % 2 ? "#1d4ed8" : colors.text }}>{name} {value}</span>
+            )) : <span className="flex flex-1 items-center justify-center bg-slate-50 text-[10px] text-slate-400">Shared program space · no named-seat allocation needed</span>}
+          </div>
+        </div>
+      )}
+
+      {!briefing && mode === "roster" && (
+        <div className="border-t border-slate-100">
+          {seatAccounted ? (
+            <>
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+                <div><p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Named roster assignment</p><p className="mt-0.5 text-[10px] text-slate-500">People selected here occupy this exact space type.</p></div>
+                <span className="text-[10px] font-bold text-[#0089a3]">{assignedPeople.length} assigned</span>
+              </div>
+              <div className="max-h-56 overflow-y-auto p-4">
+                <div className="flex flex-wrap gap-1.5">
+                  {rosterPeople.map((person) => {
+                    const selected = person.assignment === line.key
+                    const elsewhere = person.assignment !== "flex" && !selected
+                    const target = seatOptions.find((option) => option.key === person.assignment)?.label
+                    return (
+                      <button key={person.id} onClick={() => onAssign(person.id, selected ? "flex" : line.key)} title={`${person.department}${elsewhere ? ` · currently ${target}` : ""}`} className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-medium ${selected ? "border-[#00badc] bg-[#e8f8fb] text-[#007c94]" : elsewhere ? "border-slate-200 bg-slate-50 text-slate-400" : "border-slate-200 bg-white text-slate-600"}`}>
+                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full ${selected ? "bg-[#00badc] text-white" : "bg-slate-100 text-slate-400"}`}>{selected ? <Check className="h-2.5 w-2.5" /> : <UserRound className="h-2.5 w-2.5" />}</span>
+                        {person.name}
+                      </button>
+                    )
+                  })}
+                </div>
+                {!rosterPeople.length && <p className="text-xs text-slate-400">No named roster was captured. Department allocation remains available by headcount.</p>}
+              </div>
+            </>
+          ) : (
+            <div className="px-4 py-4 text-xs text-slate-500">This is shared program space, so named-seat assignment is intentionally not used here. Use allocation, notes, or alignment instead.</div>
+          )}
+        </div>
+      )}
+
+      {!briefing && mode === "alignment" && (
+        <div className="grid grid-cols-[minmax(0,1fr)_170px] border-t border-slate-100">
+          <div className="p-4">
+            <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[#0089a3]"><Sparkles className="h-3.5 w-3.5" /> {inAlignmentQueue ? "Team alignment point" : "Suggested review"}</p>
+            <h4 className="mt-1.5 text-sm font-bold text-slate-900">{seatAccounted && unassigned > 0 ? `Review how ${unassigned} flexible ${line.category === "Offices" ? "offices" : "seats"} should be distributed.` : configuredDelta !== 0 ? `Confirm the configured quantity relative to the engine reference.` : `Confirm this space supports the team conversation.`}</h4>
+            <p className="mt-1 text-[11px] leading-5 text-slate-500">A review point is context for the room, not a warning. The configured plan remains the working truth.</p>
+          </div>
+          <div className="border-l border-slate-100 bg-slate-50 p-3">
+            <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">Facilitation</p>
+            <button onClick={onToggleAlignment} className={`mt-2 w-full px-2 py-2 text-[9px] font-bold ${inAlignmentQueue ? "border border-[#00badc] bg-[#e8f8fb] text-[#007c94]" : "bg-slate-900 text-white"}`}>{inAlignmentQueue ? "Remove from queue" : "Add to alignment queue"}</button>
+            <button onClick={onInfo} className="mt-2 w-full border border-slate-200 bg-white px-2 py-2 text-[9px] font-bold text-slate-500">Review space reference</button>
+          </div>
         </div>
       )}
 
@@ -2239,6 +2458,48 @@ function Block({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** The category mix, drawn — the client's own mark at the center when uploaded. */
+function StudioProfileRadar({ scores }: { scores: ProfileScores }) {
+  const data = PROFILE_AXES.map((axis) => ({ axis, value: scores[axis] }))
+  return (
+    <div className="my-2 h-[190px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={data} outerRadius="62%">
+          <PolarGrid stroke="#dbe3ea" />
+          <PolarAngleAxis dataKey="axis" tick={{ fill: "#64748b", fontSize: 9 }} />
+          <Radar dataKey="value" stroke="#00badc" fill="#00badc" fillOpacity={0.22} isAnimationActive animationDuration={300} />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function SessionImpactChart({ data }: { data: { category: string; delta: number }[] }) {
+  const total = data.reduce((sum, row) => sum + row.delta, 0)
+  const max = Math.max(1, ...data.map((row) => Math.abs(row.delta)))
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">Area movement</p>
+        <p className="text-[11px] font-bold tabular-nums text-slate-700">{total > 0 ? "+" : ""}{Math.round(total).toLocaleString()} SF <span className="font-medium text-slate-400">from engine</span></p>
+      </div>
+      <div className="mt-2 h-[145px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" margin={{ top: 2, right: 8, bottom: 2, left: 2 }}>
+            <CartesianGrid horizontal={false} stroke="#eef2f6" />
+            <XAxis type="number" domain={[-max, max]} hide />
+            <YAxis type="category" dataKey="category" width={74} tick={{ fill: "#64748b", fontSize: 9 }} axisLine={false} tickLine={false} />
+            <ReferenceLine x={0} stroke="#94a3b8" />
+            <Tooltip formatter={(value) => [`${Number(value).toLocaleString()} SF`, "From engine"]} cursor={{ fill: "#f8fafc" }} />
+            <Bar dataKey="delta" radius={2}>
+              {data.map((row) => <Cell key={row.category} fill={CATEGORY_COLORS[row.category as keyof typeof CATEGORY_COLORS].accent} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
 function DonutChart({ categories, total, logo }: { categories: DeliverableCategory[]; total: number; logo?: string }) {
   const R = 38
   const C = 2 * Math.PI * R
